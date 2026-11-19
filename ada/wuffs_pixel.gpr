@@ -1,0 +1,16 @@
+--  The SPARK-proved pixel part of the base library (ada/src/pixel): colours,
+--  pixel formats and configs, pixel buffers, the pixel swizzler.  It builds
+--  on, and re-proves together with, the frozen core in src/base.
+--  Owner: base-library work.
+with "wuffs_common.gpr";
+project Wuffs_Pixel is
+   for Source_Dirs use ("src/root", "src/base", "src/pixel");
+   for Object_Dir use "obj/pixel/" & Wuffs_Common.Profile;
+   for Create_Missing_Dirs use "True";
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+   package Prove is
+      for Proof_Switches ("Ada") use ("--level=2", "--mode=all", "--checks-as-errors=on", "-j0");
+   end Prove;
+end Wuffs_Pixel;

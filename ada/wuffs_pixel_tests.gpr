@@ -1,0 +1,16 @@
+--  Test drivers for the pixel part of the base library (ada/tests_pixel).
+--  Owner: base-library work.
+--
+--    alr exec -- gprbuild -P wuffs_pixel_tests.gpr [-XWUFFS_PROFILE=release]
+--    bin/pixel_tests       (exit status 0 only if every check passed)
+with "wuffs_common.gpr";
+project Wuffs_Pixel_Tests is
+   for Source_Dirs use ("src/root", "src/base", "src/pixel", "tests_pixel");
+   for Object_Dir use "obj/pixel_tests/" & Wuffs_Common.Profile;
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("pixel_tests.adb");
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+end Wuffs_Pixel_Tests;

@@ -9,3 +9,5 @@
 /bin/
 gnatprove/
 *.su
+__pycache__/
+*.pyc

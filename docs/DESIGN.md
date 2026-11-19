@@ -81,6 +81,15 @@ call on a single array has a proved same-array `_Within` variant. The runtime
 shell, which knows the underlying object of each slice handle, picks the
 variant. We do not rely on GNAT happening to emit `memmove`.
 
+Pixel operations (swizzle, `Prepare`, pixel-buffer setters) have no `_Within`
+variants (decided by the project lead). Their rule is: the array that is
+*written* must be disjoint from every array *read* in the same call; read-only
+arrays may overlap each other (upstream's BMP decoder shares one scratch array
+between source and destination palette). The runtime shell checks this by
+address range before calling the proved code and returns a bad-argument status
+if a caller's buffers violate it, in every profile. No decoder in upstream's
+`std` creates such an overlap itself.
+
 **Index conventions.** `Wuffs.Index` is capped at 2**62 - 1 so the sum of two
 indices fits `Wuffs.Offset`. Generated calls into base/runtime subprograms
 with several same-typed parameters use named association.
