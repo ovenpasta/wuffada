@@ -11,10 +11,22 @@
 // commit a87f0bb, which is Copyright 2017 The Wuffs Authors and licensed
 // "Apache-2.0 OR MIT". No file here is a verbatim copy.
 //
-// Structure: analyze.go gathers the package-level declarations; lower.go
-// turns each function's AST into the IR of ir.go; passes.go runs IR passes;
-// emit.go prints IR; decls.go prints the package spec and body around the
-// functions.
+// Structure, in pipeline order:
+//
+//   - use.go resolves "use" declarations from the used packages' sources.
+//   - analyze.go gathers the package-level declarations and every
+//     function's Ada signature.
+//   - lower.go, lower_expr.go and lower_call.go turn each function's AST
+//     into the IR of ir.go: structured statements, in which a coroutine's
+//     suspension points are markers. Calls of built-in methods become calls
+//     into the proved base library (Wuffs.Base.*) or its shell
+//     (Wuffs.Runtime).
+//   - coroutine.go ports upstream's liveness analysis (which locals survive
+//     a suspension), flattens every statement that contains a suspension
+//     point into labels and gotos, and adds the dispatch and the epilogue.
+//   - passes.go counts uses, for the printer.
+//   - emit.go prints IR; decls.go prints the package spec and body around
+//     the functions.
 //
 // The generator rejects, with an error, any construct that it does not
 // handle. It never emits a placeholder.
@@ -28,9 +40,18 @@ import (
 	t "github.com/google/wuffs/lang/token"
 )
 
-// DefaultBasePackage is the Ada package that provides the base library's
-// status constants and computational helpers to generated code.
-const DefaultBasePackage = "Wuffs.Runtime.Temp_Base"
+// The Ada packages of the proved base library that generated code calls.
+const (
+	basePkg   = "Wuffs.Base"        // Statuses, Ensure_Not_A_Suspension.
+	intsPkg   = "Wuffs.Base.Ints"   // Min, max, saturating, bit fields.
+	slicesPkg = "Wuffs.Base.Slices" // Slice helpers.
+	endianPkg = "Wuffs.Base.Endian" // Peek and poke.
+	ioPkg     = "Wuffs.Base.IO"     // io_reader and io_writer primitives.
+	rangesPkg = "Wuffs.Base.Ranges" // range_ii_u64 and friends.
+
+	// targetPkg answers questions about the machine: see its spec.
+	targetPkg = "Wuffs.Runtime.Target"
+)
 
 // Options configures Generate.
 type Options struct {
@@ -42,8 +63,9 @@ type Options struct {
 	// statuses.
 	PackageID uint32
 
-	// BasePackage overrides DefaultBasePackage.
-	BasePackage string
+	// ResolveUse returns the interface text of a used package: see
+	// UseResolver. It is the same function that was given to check.Check.
+	ResolveUse func(usePath string) ([]byte, error)
 
 	// SourceNames are the names of the source files, for the "generated
 	// from" header. They default to the names recorded in the ASTs.
@@ -81,13 +103,14 @@ type gen struct {
 	files []*a.File
 	opts  Options
 
-	basePkg          string
 	adaPkgSimpleName string // E.g. "Adler32".
 	adaPkgName       string // E.g. "Wuffs.Std.Adler32".
 
 	names      map[string]string // Lower-cased package-level Ada names.
 	namedTypes map[string]*namedType
 
+	uses       map[t.ID]*usedPkg
+	useList    []*usedPkg
 	structs    map[t.ID]*structInfo
 	structList []*structInfo
 	consts     map[t.ID]*constInfo
@@ -112,18 +135,15 @@ func Generate(tm *t.Map, files []*a.File, opts Options) (*Output, error) {
 		tm:               tm,
 		files:            files,
 		opts:             opts,
-		basePkg:          opts.BasePackage,
 		adaPkgSimpleName: mangleGlobal(opts.PackageName),
 		names:            map[string]string{},
 		namedTypes:       map[string]*namedType{},
+		uses:             map[t.ID]*usedPkg{},
 		structs:          map[t.ID]*structInfo{},
 		consts:           map[t.ID]*constInfo{},
 		statuses:         map[t.ID]*statusInfo{},
 		funcs:            map[t.QQID]*funcInfo{},
 		useType:          map[int]bool{},
-	}
-	if g.basePkg == "" {
-		g.basePkg = DefaultBasePackage
 	}
 	g.adaPkgName = "Wuffs.Std." + g.adaPkgSimpleName
 
@@ -137,6 +157,14 @@ func Generate(tm *t.Map, files []*a.File, opts Options) (*Output, error) {
 				fi.ast.QQID().Str(g.tm), filename, line, err)
 		}
 		countUses(fi.ir)
+		if err := checkSubprogramNames(fi.ir); err != nil {
+			return nil, fmt.Errorf("adagen: func %s: %v", fi.ast.QQID().Str(g.tm), err)
+		}
+	}
+	for _, s := range g.structList {
+		if err := checkRecordNames(s); err != nil {
+			return nil, fmt.Errorf("adagen: struct %s: %v", s.ast.QID().Str(g.tm), err)
+		}
 	}
 
 	unit := strings.ToLower(strings.ReplaceAll(g.adaPkgName, ".", "-"))

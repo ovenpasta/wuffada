@@ -1,12 +1,44 @@
 --  Generated Ada (from Wuffs std) plus its non-SPARK runtime glue and tests.
---  Owner: generator work. Must not add sources under src/base.
+--  Owner: generator work. Must not add sources under src/base. It compiles
+--  the proved base library's sources (src/base, read-only here) into its own
+--  object directory; it does not include src/pixel.
 with "wuffs_common.gpr";
 project Wuffs_Gen is
-   for Source_Dirs use ("src/root", "src/runtime", "gen", "tests");
-   for Object_Dir use "obj/gen/" & Wuffs_Common.Profile;
-   for Exec_Dir use "bin";
+
+   --  Test builds only.  "force32" substitutes a Wuffs.Runtime.Target that
+   --  claims a 32-bit machine (see ada/tests/target32); its objects and
+   --  executables go to their own directories.
+   type Target_Type is ("native", "force32");
+   Target : Target_Type := external ("WUFFS_TEST_TARGET", "native");
+
+   --  Test builds only.  A directory of further generated sources to compile
+   --  (test.sh compiles the generator's golden outputs this way).
+   Extra_Src := external ("WUFFS_EXTRA_SRC", "");
+
+   Dirs := ("src/root", "src/base", "src/runtime", "gen", "tests");
+   Obj_Suffix := "";
+   Exec := "bin";
+   case Target is
+      when "native" =>
+         Dirs := Dirs & ("src/runtime/target");
+      when "force32" =>
+         Dirs := Dirs & ("tests/target32");
+         Obj_Suffix := "-force32";
+         Exec := "bin/force32";
+   end case;
+   case Extra_Src is
+      when "" =>
+         null;
+      when others =>
+         Dirs := Dirs & (Extra_Src);
+   end case;
+
+   for Source_Dirs use Dirs;
+   for Object_Dir use "obj/gen/" & Wuffs_Common.Profile & Obj_Suffix;
+   for Exec_Dir use Exec;
    for Create_Missing_Dirs use "True";
-   for Main use ("test_hashers.adb", "test_m1.adb", "test_runtime.adb");
+   for Main use
+     ("test_hashers.adb", "test_m1.adb", "test_runtime.adb", "test_decode.adb", "test_adv.adb");
    package Compiler is
       for Default_Switches ("Ada") use Wuffs_Common.Switches;
    end Compiler;

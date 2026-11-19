@@ -44,18 +44,23 @@ func (g *gen) header() string {
 // not repeat its spec's clauses.
 func (g *gen) withClauses(text string, specText string) string {
 	needs := func(s string, unit string) bool { return strings.Contains(s, unit+".") }
-	units := []string(nil)
-	for _, unit := range []string{"Interfaces", "Wuffs.Runtime", g.basePkg} {
-		if !needs(text, unit) || (specText != "" && needs(specText, unit)) {
-			continue
-		}
-		units = append(units, unit)
+	candidates := []string{"Interfaces", "Wuffs.Runtime", targetPkg, basePkg, intsPkg, slicesPkg, endianPkg, ioPkg, rangesPkg}
+	for _, o := range g.usedPackages() {
+		candidates = append(candidates, o)
 	}
-	// "with P.Q;" also makes P visible.
+	units, specUnits := []string(nil), []string(nil)
+	for _, unit := range candidates {
+		if specText != "" && needs(specText, unit) {
+			specUnits = append(specUnits, unit)
+		} else if needs(text, unit) {
+			units = append(units, unit)
+		}
+	}
+	// "with P.Q;" also makes P visible, and a body sees its spec's clauses.
 	filtered := []string(nil)
 	for _, u := range units {
 		redundant := false
-		for _, v := range units {
+		for _, v := range append(append([]string(nil), units...), specUnits...) {
 			redundant = redundant || strings.HasPrefix(v, u+".")
 		}
 		if !redundant {
@@ -142,10 +147,19 @@ func (g *gen) genSpec() string {
 		p.indent += indentStep
 		p.comment("Whether Initialize has been called (C: private_impl.magic).")
 		p.line("Magic : Wuffs.U32 := 0;")
-		for _, f := range s.fields {
-			if z := f.typ.zeroValue(); z != nil {
-				p.line(f.name + " : " + f.typ.name + " := " + flat(z) + ";")
-			} else {
+		if s.hasActiveCoroutine {
+			p.comment("Which public coroutine is suspended, if any (C: active_coroutine).")
+			p.line(activeCoroutineField + " : Wuffs.U32 := 0;")
+		}
+		for _, f := range append(append([]fieldInfo(nil), s.fields...), s.extra...) {
+			switch {
+			case f.typ.kind == kUtility:
+				// An empty struct.
+			case f.typ.kind == kStruct:
+				p.line(f.name + " : " + f.typ.name + ";")
+			case f.typ.zeroValue() != nil:
+				p.line(f.name + " : " + f.typ.name + " := " + flat(f.typ.zeroValue()) + ";")
+			default:
 				// No default: an array aggregate could be materialized on
 				// the stack. Initialize fills the array in place.
 				p.line(f.name + " : " + f.typ.name + ";")
@@ -190,7 +204,9 @@ func (g *gen) genBody() string {
 	}
 
 	for _, c := range g.constList {
-		if !c.ast.Public() {
+		// A private constant that only constant expressions mention has
+		// been folded away, and GNAT warns about unreferenced entities.
+		if !c.ast.Public() && c.used {
 			p.line("")
 			g.printConst(p, c)
 		}
@@ -213,16 +229,37 @@ func (g *gen) genBody() string {
 
 func (g *gen) printStatus(p *printer, z *statusInfo) {
 	p.comment("Wuffs: status " + z.ast.QID()[1].Str(g.tm))
-	p.line(fmt.Sprintf("%s : constant Wuffs.Status := (%s, %s);",
-		z.name, z.category, numLiteral(big.NewInt(int64(z.code)), 8)))
+	decl := fmt.Sprintf("%s : constant Wuffs.Status :=", z.name)
+	value := fmt.Sprintf("(%s, %s);", z.category, numLiteral(big.NewInt(int64(z.code)), 8))
+	if p.indent+len(decl)+1+len(value) <= maxCol {
+		p.line(decl + " " + value)
+	} else {
+		p.line(decl)
+		p.line("  " + value)
+	}
 }
 
 func (g *gen) printInitialize(p *printer, s *structInfo) {
 	p.line("procedure Initialize (Self : in out " + s.name + ") is")
 	p.line("begin")
 	p.indent += indentStep
-	for _, f := range s.fields {
-		g.printZeroFill(p, "Self."+f.name, f.typ, 0)
+	if s.hasActiveCoroutine {
+		p.line("Self." + activeCoroutineField + " := 0;")
+	}
+	for _, f := range append(append([]fieldInfo(nil), s.fields...), s.extra...) {
+		switch f.typ.kind {
+		case kUtility:
+			// An empty struct.
+		case kStruct:
+			// C: the sub-struct's initialize function.
+			pkg := ""
+			if f.typ.st.pkg != nil {
+				pkg = f.typ.st.pkg.adaName + "."
+			}
+			p.line(pkg + "Initialize (Self." + f.name + ");")
+		default:
+			g.printZeroFill(p, "Self."+f.name, f.typ, 0)
+		}
 	}
 	p.line("Self.Magic := Wuffs.Runtime.Magic_Initialized;")
 	p.indent -= indentStep

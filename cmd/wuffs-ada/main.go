@@ -75,10 +75,8 @@ func doGen(args []string) error {
 	packageName := flags.String("package_name", "", "the package name of the Wuffs input code")
 	packageID := flags.Uint("package_id", 0,
 		"overrides the package's status-code namespace, 1 ..= 65535 (default: from internal/adagen/package_ids.txt)")
-	basePackage := flags.String("base_package", adagen.DefaultBasePackage,
-		"the Ada package that provides the Wuffs base library's statuses and helpers")
 	wuffsRoot := flags.String("wuffsroot", "wuffs",
-		"the root directory of the Wuffs repository, under which gen/wuffs holds what \"use\" declarations refer to")
+		"the root directory of the Wuffs repository: `use \"std/foo\"` refers to the sources in its std/foo directory")
 	outDir := flags.String("o", "", "the directory to write the Ada source files to (default: print to stdout)")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -122,12 +120,10 @@ func doGen(args []string) error {
 		files = append(files, f)
 	}
 
-	// This is what lang/generate's resolveUse does, with an explicit root.
-	// The generator itself does not support "use" yet: the files that it
-	// names are produced by upstream's "wuffs gen".
-	resolveUse := func(usePath string) ([]byte, error) {
-		return os.ReadFile(filepath.Join(*wuffsRoot, "gen", "wuffs", filepath.FromSlash(usePath)))
-	}
+	// A "use" declaration is resolved from the used package's sources
+	// under the Wuffs root, not from the gen/wuffs interface files that
+	// upstream's "wuffs gen" writes: see adagen.UseResolver.
+	resolveUse := adagen.UseResolver(*wuffsRoot)
 	if _, err := check.Check(tm, files, resolveUse); err != nil {
 		return err
 	}
@@ -135,7 +131,7 @@ func doGen(args []string) error {
 	out, err := adagen.Generate(tm, files, adagen.Options{
 		PackageName: *packageName,
 		PackageID:   uint32(*packageID),
-		BasePackage: *basePackage,
+		ResolveUse:  resolveUse,
 	})
 	if err != nil {
 		return err

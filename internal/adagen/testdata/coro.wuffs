@@ -1,0 +1,48 @@
+// A test input for the coroutine lowering (golden output in coro.ad?.golden):
+// suspension points inside nested loops and inside an if-else chain, and a
+// labelled break and continue that leave flattened loops.
+
+pub status "#bad"
+
+pub struct foo? (
+        total : base.u32,
+)
+
+pub func foo.run?(src: base.io_reader) {
+    var i       : base.u32
+    var j       : base.u32
+    var c       : base.u8
+    var keep    : base.u32
+    var scratch : base.u32
+
+    while.outer i < 4 {
+        j = 0
+        while j < 3,
+                inv i < 4,
+        {
+            c = args.src.read_u8?()
+            if c == 0 {
+                break.outer
+            } else if c == 1 {
+                i ~mod+= 1
+                continue.outer
+            } else if c == 2 {
+                yield? base."$short read"
+            } else {
+                keep ~mod+= c as base.u32
+            }
+            j ~mod+= 1
+        }
+        scratch = i ~mod* 2
+        this.total ~mod+= scratch
+        i ~mod+= 1
+    }.outer
+    this.total ~mod+= keep
+    if this.total > 1000 {
+        return "#bad"
+    }
+}
+
+pub func foo.get_total() base.u32 {
+    return this.total
+}

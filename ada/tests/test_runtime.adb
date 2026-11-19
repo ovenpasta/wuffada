@@ -1,6 +1,5 @@
---  Tests the hand-written glue that generated code relies on: the slice
---  handles of Wuffs.Runtime and the stand-in helpers of
---  Wuffs.Runtime.Temp_Base.
+--  Tests the hand-written glue that generated code relies on: the handles
+--  of Wuffs.Runtime.
 --
 --  In the "checked" profile it also checks that misuse of a slice handle is
 --  caught: indexing is checked against the slice's own range, not just
@@ -11,18 +10,18 @@
 
 with Ada.Text_IO;
 with Test_Support;
-with Wuffs.Runtime.Temp_Base;
+with Wuffs.Base.IO;
+with Wuffs.Runtime;
 
 procedure Test_Runtime is
 
    use type Wuffs.U8;
-   use type Wuffs.U16;
    use type Wuffs.U32;
    use type Wuffs.U64;
+   use type Wuffs.Bytes;
    use type Wuffs.Offset;
 
    package RT renames Wuffs.Runtime;
-   package Base renames Wuffs.Runtime.Temp_Base;
 
    Storage : Wuffs.Bytes (10 .. 29);
 
@@ -30,9 +29,7 @@ procedure Test_Runtime is
 
    procedure Check_Misuse (Data : Wuffs.Bytes);
 
-   procedure Check_Sat;
-
-   procedure Check_Iterate;
+   procedure Check_Aliasing;
 
    function Index (X : Integer) return Wuffs.Index
    is (Wuffs.Index (Test_Support.Opaque (X)));
@@ -124,72 +121,184 @@ procedure Test_Runtime is
       Test_Support.Check (X = 0 and then U.Length = 0, "misuse left no result");
    end Check_Misuse;
 
-   procedure Check_Sat is
-      Max_32 : constant := 2 ** 32 - 1;
-      Max_64 : constant := 2 ** 64 - 1;
-      Sum, Diff : Integer;
-   begin
-      --  Exhaustively for 8 bits, against unbounded arithmetic.
-      for X in Wuffs.U8 loop
-         for Y in Wuffs.U8 loop
-            Sum := Integer'Min (Integer (X) + Integer (Y), 255);
-            Diff := Integer'Max (Integer (X) - Integer (Y), 0);
-            if Base.Sat_Add_U8 (X, Y) /= Wuffs.U8 (Sum)
-              or else Base.Sat_Sub_U8 (X, Y) /= Wuffs.U8 (Diff)
-            then
-               Test_Support.Check (False, "Sat_Add_U8 or Sat_Sub_U8", Integer (X));
-            end if;
+   --  The two-array operations, for every way that the two operands can
+   --  lie: apart, adjacent, identical, one inside the other, and partially
+   --  overlapping in either direction.  The expected result is computed
+   --  here with an explicit copy of the source (memmove semantics), not
+   --  with the code under test.
+   procedure Check_Aliasing is
+      package IO renames Wuffs.Base.IO;
+
+      Size : constant := 64;
+      Buf  : Wuffs.Bytes (100 .. 100 + Size - 1);
+      Want : Wuffs.Bytes (100 .. 100 + Size - 1);
+      Temp : Wuffs.Bytes (0 .. Size - 1);
+
+      type Layout is record
+         Dst_First, Dst_Length, Src_First, Src_Length : Wuffs.Index;
+      end record;
+
+      Layouts : constant array (Positive range <>) of Layout :=
+        [(0, 16, 32, 16),    --  apart
+         (32, 16, 0, 16),
+         (0, 16, 16, 16),    --  adjacent
+         (16, 16, 0, 16),
+         (8, 16, 8, 16),     --  identical
+         (0, 32, 8, 8),      --  source inside destination
+         (8, 8, 0, 32),      --  destination inside source
+         (8, 16, 16, 16),    --  overlapping, destination first
+         (16, 16, 8, 16),    --  overlapping, source first
+         (10, 20, 11, 20),   --  shifted by one, both ways
+         (11, 20, 10, 20),
+         (0, 64, 0, 64),     --  everything
+         (5, 0, 5, 10),      --  an empty destination
+         (5, 10, 7, 0),      --  an empty source
+         (0, 10, 60, 4),     --  a short source
+         (60, 4, 0, 10)];    --  a short destination
+
+      N64         : Wuffs.U64;
+      N32         : Wuffs.U32;
+      Count       : Wuffs.Index;
+      W           : IO.Writer;
+      R           : IO.Reader;
+
+      procedure Reset;
+
+      --  Sets Want to what moving Count bytes from offset Src_At to offset
+      --  Dst_At of the initial contents gives.
+      procedure Expect (Dst_At, Src_At, Count : Wuffs.Index);
+
+      --  A view of Buf that the compiler cannot see to be one: generated
+      --  code gets its sources through slice handles too.
+      function Handle (First, Length : Wuffs.Index) return RT.RO_Slice_U8
+      is (RT.Subslice_IJ
+            (S => (Base => Buf'Unrestricted_Access, First => Buf'First, Length => Buf'Length),
+             I => First,
+             J => First + Length));
+
+      procedure Reset is
+      begin
+         for I in Buf'Range loop
+            Buf (I) := Wuffs.U8 (I - Buf'First + 1);
          end loop;
-      end loop;
-      Test_Support.Check (True, "Sat_Add_U8 and Sat_Sub_U8 ran");
+      end Reset;
 
-      Test_Support.Check (Base.Sat_Add_U16 (16#FFF0#, 16#000F#) = 16#FFFF#, "Sat_Add_U16", 1);
-      Test_Support.Check (Base.Sat_Add_U16 (16#FFF0#, 16#0010#) = 16#FFFF#, "Sat_Add_U16", 2);
-      Test_Support.Check (Base.Sat_Add_U16 (16#1234#, 16#0101#) = 16#1335#, "Sat_Add_U16", 3);
-      Test_Support.Check (Base.Sat_Sub_U16 (16#0010#, 16#0011#) = 0, "Sat_Sub_U16", 1);
-      Test_Support.Check (Base.Sat_Sub_U16 (16#0010#, 16#0010#) = 0, "Sat_Sub_U16", 2);
-      Test_Support.Check (Base.Sat_Sub_U16 (16#FFFF#, 16#0001#) = 16#FFFE#, "Sat_Sub_U16", 3);
-
-      Test_Support.Check_U32 (Base.Sat_Add_U32 (Max_32 - 15, 15), Max_32, "Sat_Add_U32", 1);
-      Test_Support.Check_U32 (Base.Sat_Add_U32 (Max_32 - 15, 16), Max_32, "Sat_Add_U32", 2);
-      Test_Support.Check_U32 (Base.Sat_Add_U32 (2 ** 31, 2 ** 31), Max_32, "Sat_Add_U32", 3);
-      Test_Support.Check_U32 (Base.Sat_Add_U32 (1, 2), 3, "Sat_Add_U32", 4);
-      Test_Support.Check_U32 (Base.Sat_Sub_U32 (1, 2), 0, "Sat_Sub_U32", 1);
-      Test_Support.Check_U32 (Base.Sat_Sub_U32 (0, Max_32), 0, "Sat_Sub_U32", 2);
-      Test_Support.Check_U32 (Base.Sat_Sub_U32 (Max_32, 1), Max_32 - 1, "Sat_Sub_U32", 3);
-
-      Test_Support.Check_U64 (Base.Sat_Add_U64 (Max_64 - 15, 15), Max_64, "Sat_Add_U64", 1);
-      Test_Support.Check_U64 (Base.Sat_Add_U64 (Max_64 - 15, 16), Max_64, "Sat_Add_U64", 2);
-      Test_Support.Check_U64 (Base.Sat_Add_U64 (2 ** 32, 5), 2 ** 32 + 5, "Sat_Add_U64", 3);
-      Test_Support.Check_U64 (Base.Sat_Sub_U64 (5, 2 ** 32), 0, "Sat_Sub_U64", 1);
-      Test_Support.Check_U64 (Base.Sat_Sub_U64 (2 ** 32, 5), 2 ** 32 - 5, "Sat_Sub_U64", 2);
-   end Check_Sat;
-
-   procedure Check_Iterate is
-      Want : Wuffs.Index;
-      Pos  : Wuffs.Index;
+      procedure Expect (Dst_At, Src_At, Count : Wuffs.Index) is
+      begin
+         for I in Want'Range loop
+            Want (I) := Wuffs.U8 (I - Want'First + 1);
+         end loop;
+         for I in 0 .. Count - 1 loop
+            Temp (I) := Want (Want'First + Src_At + I);
+         end loop;
+         for I in 0 .. Count - 1 loop
+            Want (Want'First + Dst_At + I) := Temp (I);
+         end loop;
+      end Expect;
    begin
-      --  The example in the C source: 15, 5, 3 gives 12.
-      Test_Support.Check
-        (Base.Iterate_Total_Advance (15, 5, 3) = 12, "Iterate_Total_Advance example");
+      for K in Layouts'Range loop
+         declare
+            L   : Layout renames Layouts (K);
+            Src : constant RT.RO_Slice_U8 := Handle (L.Src_First, L.Src_Length);
+            Dst_Lo : constant Wuffs.Index := Buf'First + L.Dst_First;
+            Dst_Hi : constant Wuffs.Offset := Dst_Lo + L.Dst_Length - 1;
+            Shares : constant Boolean :=
+              L.Dst_Length > 0 and then L.Src_Length > 0
+              and then L.Dst_First < L.Src_First + L.Src_Length
+              and then L.Src_First < L.Dst_First + L.Dst_Length;
+         begin
+            Test_Support.Check
+              (RT.Share_An_Element (Buf (Dst_Lo .. Dst_Hi), Src.Base (Src.First .. RT.Last (Src)))
+               = Shares,
+               "Share_An_Element, layout",
+               K);
 
-      --  Against counting the iterations that fit.
-      for Total in Wuffs.Index range 0 .. 40 loop
-         for Len in Wuffs.Index range 1 .. 9 loop
-            for Advance in Wuffs.Index range 1 .. Len loop
-               Pos := 0;
-               while Pos + Len <= Total loop
-                  Pos := Pos + Advance;
-               end loop;
-               Want := Pos;
-               if Base.Iterate_Total_Advance (Total, Len, Advance) /= Want then
-                  Test_Support.Check (False, "Iterate_Total_Advance, total", Integer (Total));
+            --  Slice to slice.
+            Reset;
+            Count := Wuffs.Index'Min (L.Dst_Length, L.Src_Length);
+            Expect (L.Dst_First, L.Src_First, Count);
+            RT.Copy_From_Slice
+              (Dst => Buf (Dst_Lo .. Dst_Hi),
+               Src => Src.Base (Src.First .. RT.Last (Src)),
+               N   => N64);
+            Test_Support.Check
+              (Buf = Want and then N64 = Wuffs.U64 (Count), "Copy_From_Slice, layout", K);
+
+            --  Slice to writer, with the writer's cursor at each offset of
+            --  three that fit.
+            for At_W in Wuffs.Index range 0 .. 2 loop
+               if At_W <= L.Dst_Length then
+                  Reset;
+                  Count := Wuffs.Index'Min (L.Dst_Length - At_W, L.Src_Length);
+                  Expect (L.Dst_First + At_W, L.Src_First, Count);
+                  W := IO.To_Writer (M => (Wi => At_W, Ri => 0, Pos => 0, Closed => False),
+                                     Data_Length => L.Dst_Length);
+                  RT.Writer_Copy_From_Slice
+                    (Data => Buf (Dst_Lo .. Dst_Hi),
+                     W    => W,
+                     Src  => Src.Base (Src.First .. RT.Last (Src)),
+                     N    => N64);
+                  Test_Support.Check
+                    (Buf = Want and then N64 = Wuffs.U64 (Count) and then W.Iop = At_W + Count,
+                     "Writer_Copy_From_Slice, layout",
+                     K);
+
+                  for Up_To in Wuffs.U32 range 0 .. 3 loop
+                     Reset;
+                     Count :=
+                       Wuffs.Index'Min
+                         (Wuffs.Index'Min (L.Dst_Length - At_W, L.Src_Length),
+                          Wuffs.Index (Up_To) * 7);
+                     Expect (L.Dst_First + At_W, L.Src_First, Count);
+                     W := IO.To_Writer (M => (Wi => At_W, Ri => 0, Pos => 0, Closed => False),
+                                        Data_Length => L.Dst_Length);
+                     RT.Writer_Limited_Copy_U32_From_Slice
+                       (Data  => Buf (Dst_Lo .. Dst_Hi),
+                        W     => W,
+                        Up_To => Up_To * 7,
+                        Src   => Src.Base (Src.First .. RT.Last (Src)),
+                        N     => N32);
+                     Test_Support.Check
+                       (Buf = Want and then Wuffs.Index (N32) = Count and then W.Iop = At_W + Count,
+                        "Writer_Limited_Copy_U32_From_Slice, layout",
+                        K);
+
+                     --  Reader to writer: the reader's unread bytes start
+                     --  one byte into its array (if it has one).
+                     declare
+                        At_R : constant Wuffs.Index := Wuffs.Index'Min (1, L.Src_Length);
+                     begin
+                        Reset;
+                        Count :=
+                          Wuffs.Index'Min
+                            (Wuffs.Index'Min (L.Dst_Length - At_W, L.Src_Length - At_R),
+                             Wuffs.Index (Up_To) * 7);
+                        Expect (L.Dst_First + At_W, L.Src_First + At_R, Count);
+                        W := IO.To_Writer (M => (Wi => At_W, Ri => 0, Pos => 0, Closed => False),
+                                           Data_Length => L.Dst_Length);
+                        R := IO.To_Reader
+                               ((Wi => L.Src_Length, Ri => At_R, Pos => 0, Closed => False));
+                        RT.Writer_Limited_Copy_U32_From_Reader
+                          (Data     => Buf (Dst_Lo .. Dst_Hi),
+                           W        => W,
+                           Up_To    => Up_To * 7,
+                           Src_Data => Src.Base (Src.First .. RT.Last (Src)),
+                           R        => R,
+                           N        => N32);
+                        Test_Support.Check
+                          (Buf = Want
+                           and then Wuffs.Index (N32) = Count
+                           and then W.Iop = At_W + Count
+                           and then R.Iop = At_R + Count,
+                           "Writer_Limited_Copy_U32_From_Reader, layout",
+                           K);
+                     end;
+                  end loop;
                end if;
             end loop;
-         end loop;
+         end;
       end loop;
-      Test_Support.Check (True, "Iterate_Total_Advance ran");
-   end Check_Iterate;
+   end Check_Aliasing;
 
 begin
    for I in Storage'Range loop
@@ -199,8 +308,7 @@ begin
    Check_Slices (Storage);
    --  A parameter that is itself a slice with other bounds.
    Check_Slices (Storage (Storage'First .. Storage'Last));
-   Check_Sat;
-   Check_Iterate;
+   Check_Aliasing;
 
    if Test_Support.Checks_Enabled then
       Check_Misuse (Storage);

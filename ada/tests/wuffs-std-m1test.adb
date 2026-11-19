@@ -4,7 +4,10 @@
 --    internal/adagen/testdata/m1test.wuffs
 
 with Interfaces;
-with Wuffs.Runtime.Temp_Base;
+with Wuffs.Base.Endian;
+with Wuffs.Base.Ints;
+with Wuffs.Base.Slices;
+with Wuffs.Runtime.Target;
 
 package body Wuffs.Std.M1test is
 
@@ -56,6 +59,15 @@ package body Wuffs.Std.M1test is
          for G_I1 in Self.F_Grid (G_I0)'Range loop
             Self.F_Grid (G_I0) (G_I1) := 0;
          end loop;
+      end loop;
+      for G_I0 in Self.F_Buf'Range loop
+         Self.F_Buf (G_I0) := 0;
+      end loop;
+      for G_I0 in Self.F_Aux'Range loop
+         Self.F_Aux (G_I0) := 0;
+      end loop;
+      for G_I0 in Self.F_Marks'Range loop
+         Self.F_Marks (G_I0) := False;
       end loop;
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
@@ -138,7 +150,7 @@ package body Wuffs.Std.M1test is
          end loop;
          pragma Warnings ("C");
          pragma Assert (V_I <= 1000);
-         pragma Assert (V_J >= 16);
+         pragma Assert (V_J = 16);
          pragma Warnings ("c");
          <<G_Continue_1_Outer>>
          null;
@@ -160,8 +172,8 @@ package body Wuffs.Std.M1test is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return 0;
       end if;
-      V_X := Wuffs.Runtime.Temp_Base.Sat_Add_U32 (X => A_A, Y => A_B);
-      V_X := Wuffs.Runtime.Temp_Base.Sat_Sub_U32 (X => V_X, Y => 5);
+      V_X := Wuffs.Base.Ints.Sat_Add_U32 (X => A_A, Y => A_B);
+      V_X := Wuffs.Base.Ints.Sat_Sub_U32 (X => V_X, Y => 5);
       V_X := V_X * 3;
       V_X := V_X - A_B;
       V_Z := A_S and 7;
@@ -170,7 +182,7 @@ package body Wuffs.Std.M1test is
       V_Y := V_Y xor 16#FF#;
       V_W := Wuffs.U16 (Interfaces.Shift_Right (V_Y, 3) and 16#FFFF#);
       V_W := V_W + 1;
-      V_W := Wuffs.Runtime.Temp_Base.Sat_Add_U16 (X => V_W, Y => 16#FF00#);
+      V_W := Wuffs.Base.Ints.Sat_Add_U16 (X => V_W, Y => 16#FF00#);
       V_Y := V_Y + Wuffs.U64 (V_W);
       if (V_X > 100 and then (V_Y and 1) = 0) or else not Self.F_Flag then
          V_Y := V_Y + 16#1_0000_0000#;
@@ -194,7 +206,7 @@ package body Wuffs.Std.M1test is
       Self.F_Total := Self.F_Total + A_D;
       Self.F_Hist (Wuffs.Index (A_D)) := 1;
       Self.F_Hist (Wuffs.Index (A_D and 3)) :=
-        Wuffs.Runtime.Temp_Base.Sat_Add_U8 (X => Self.F_Hist (Wuffs.Index (A_D and 3)), Y => 200);
+        Wuffs.Base.Ints.Sat_Add_U8 (X => Self.F_Hist (Wuffs.Index (A_D and 3)), Y => 200);
       return Self.F_Total;
    end Add_Small;
 
@@ -206,8 +218,8 @@ package body Wuffs.Std.M1test is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
            (if Self.Magic = Wuffs.Runtime.Magic_Disabled
-            then Wuffs.Runtime.Temp_Base.Error_Disabled_By_Previous_Error
-            else Wuffs.Runtime.Temp_Base.Error_Initialize_Not_Called);
+            then Wuffs.Base.Error_Disabled_By_Previous_Error
+            else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
       V_D := Low3 (Self, A_V);
       G_Discard_1 := Add_Small (Self, V_D);
@@ -216,7 +228,7 @@ package body Wuffs.Std.M1test is
       elsif V_D = 6 then
          return Note_Widget_Note;
       elsif V_D = 5 then
-         return Wuffs.Runtime.Temp_Base.Error_Bad_Argument;
+         return Wuffs.Base.Error_Bad_Argument;
       end if;
       return Wuffs.Ok_Status;
    end Use_Small;
@@ -234,9 +246,9 @@ package body Wuffs.Std.M1test is
       --  Wuffs: iterate (length: 4, advance: 2, unroll: 2)
       G_I1_End :=
         G_I1_Pos
-          + Wuffs.Runtime.Temp_Base.Iterate_Total_Advance
-              (Total_Len => G_I1_Src.Length - G_I1_Pos,
-               Iter_Len => 6,
+          + Wuffs.Base.Slices.Iterate_Total_Advance
+              (Total_Length => G_I1_Src.Length - G_I1_Pos,
+               Iter_Length => 6,
                Iter_Advance => 4);
       while G_I1_Pos < G_I1_End loop
          V_P := Wuffs.Runtime.Subslice_IJ (S => G_I1_Src, I => G_I1_Pos, J => G_I1_Pos + 4);
@@ -255,9 +267,9 @@ package body Wuffs.Std.M1test is
       --  Wuffs: iterate (length: 4, advance: 2, unroll: 1)
       G_I1_End :=
         G_I1_Pos
-          + Wuffs.Runtime.Temp_Base.Iterate_Total_Advance
-              (Total_Len => G_I1_Src.Length - G_I1_Pos,
-               Iter_Len => 4,
+          + Wuffs.Base.Slices.Iterate_Total_Advance
+              (Total_Length => G_I1_Src.Length - G_I1_Pos,
+               Iter_Length => 4,
                Iter_Advance => 2);
       while G_I1_Pos < G_I1_End loop
          V_P := Wuffs.Runtime.Subslice_IJ (S => G_I1_Src, I => G_I1_Pos, J => G_I1_Pos + 4);
@@ -384,10 +396,10 @@ package body Wuffs.Std.M1test is
       V_T := V_T + W_G_I1_SRC;
       V_S := V_S + Wuffs.U64 (V_T);
       G_T1 :=
-        Wuffs.Runtime.Subslice_J ((Base => A_X'Unrestricted_Access,
-                                   First => A_X'First,
-                                   Length => A_X'Length),
-                                  0);
+        Wuffs.Runtime.Suffix (S => (Base => A_X'Unrestricted_Access,
+                                    First => A_X'First,
+                                    Length => A_X'Length),
+                              Up_To => 0);
       V_S :=
         V_S
           + Wuffs.U64 (T1 (Wuffs.Index (V_S and 3)))
@@ -456,5 +468,168 @@ package body Wuffs.Std.M1test is
          return 3;
       end if;
    end Pick;
+
+   function Sum_Buf (Self : Widget) return Wuffs.U64 is
+      V_I : Wuffs.U32 := 0;
+      V_T : Wuffs.U64 := 0;
+   begin
+      while V_I < 32 loop
+         V_T := V_T * 31 + Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_I)));
+         V_I := V_I + 1;
+      end loop;
+      V_I := 0;
+      while V_I < 16 loop
+         V_T := V_T * 31 + Wuffs.U64 (Self.F_Aux (Wuffs.Index (V_I)));
+         V_I := V_I + 1;
+      end loop;
+      return V_T;
+   end Sum_Buf;
+
+   function Slices
+     (Self : in out Widget; A_X : in out Wuffs.Bytes; A_K : Wuffs.U32) return Wuffs.U64
+   is
+      V_S : Wuffs.Runtime.Slice_U8;
+      V_R : Wuffs.Runtime.RO_Slice_U8;
+      V_N : Wuffs.U64 := 0;
+      V_T : Wuffs.U64 := 0;
+      V_I : Wuffs.U32 := 0;
+      V_Loc : Wuffs.U16_Array (0 .. 7) := [others => 0];
+      V_C : Wuffs.U32 := 0;
+      G_T1 : Wuffs.Runtime.RO_Slice_U8;
+      G_T2 : Wuffs.U64;
+      G_T3 : Wuffs.U64;
+      G_T4 : Wuffs.U64;
+      G_T5 : Wuffs.U64;
+      G_T6 : Wuffs.U64;
+      G_T7 : Wuffs.U64;
+      G_T8 : Wuffs.U64;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return 0;
+      end if;
+      V_I := 0;
+      while V_I < 32 loop
+         Self.F_Buf (Wuffs.Index (V_I)) := Wuffs.U8 (V_I * 7 and 16#FF#);
+         V_I := V_I + 1;
+      end loop;
+      G_T1 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  8);
+      Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_Aux (0 .. 15),
+                                     Src => G_T1.Base (G_T1.First .. Wuffs.Runtime.Last (G_T1)),
+                                     N => G_T2);
+      V_N := G_T2;
+      V_T := V_T + V_N;
+      Wuffs.Base.Slices.Copy_Within (Data => Self.F_Buf,
+                                     Dst_First => 4,
+                                     Dst_Length => 20 - 4,
+                                     Src_First => 0,
+                                     Src_Length => 32,
+                                     N => G_T3);
+      V_N := G_T3;
+      V_T := V_T * 3 + V_N;
+      V_S :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  2);
+      Wuffs.Runtime.Copy_From_Slice (Dst => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
+                                     Src => Self.F_Buf (10 .. 13),
+                                     N => G_T4);
+      V_N := G_T4;
+      V_T := V_T * 3 + V_N;
+      V_R :=
+        (Base => Self.F_Buf'Unrestricted_Access,
+         First => Self.F_Buf'First,
+         Length => Self.F_Buf'Length);
+      V_S :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  20);
+      Wuffs.Runtime.Copy_From_Slice (Dst => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
+                                     Src => V_R.Base (V_R.First .. Wuffs.Runtime.Last (V_R)),
+                                     N => G_T5);
+      V_N := G_T5;
+      V_T := V_T * 3 + V_N;
+      V_S :=
+        Wuffs.Runtime.Subslice_J ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  12);
+      Wuffs.Runtime.Copy_From_Slice (Dst => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
+                                     Src => Self.F_Aux,
+                                     N => G_T6);
+      V_N := G_T6;
+      V_T := V_T * 3 + V_N;
+      V_S :=
+        (Base => Self.F_Aux'Unrestricted_Access,
+         First => Self.F_Aux'First,
+         Length => Self.F_Aux'Length);
+      V_S := Wuffs.Runtime.Suffix (S => V_S, Up_To => 6);
+      if Wuffs.U64 (V_S.Length) > 1 then
+         Wuffs.Runtime.Set (S => V_S, I => 0, V => 16#AB#);
+         Wuffs.Runtime.Set (S => V_S, I => 1, V => Wuffs.Runtime.Get (V_S, 1) + 3);
+      end if;
+      V_R :=
+        Wuffs.Runtime.To_RO (Wuffs.Runtime.Suffix
+                               (S => (Base => Self.F_Aux'Unrestricted_Access,
+                                      First => Self.F_Aux'First,
+                                      Length => Self.F_Aux'Length),
+                                Up_To => Wuffs.U64 (A_K and 3)));
+      V_T := V_T * 3 + Wuffs.U64 (V_R.Length);
+      V_S := (Base => A_X'Unrestricted_Access, First => A_X'First, Length => A_X'Length);
+      if Wuffs.U64 (V_S.Length) >= 4 then
+         Wuffs.Base.Endian.Poke_U32LE
+           (Data => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
+            Pos => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S))'First,
+            V => 16#1234_5678#);
+      end if;
+      if Wuffs.U64 (V_S.Length) >= 4 then
+         V_T :=
+           V_T * 3
+             + Wuffs.U64 (Wuffs.Base.Endian.Peek_U32BE
+                            (Data => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
+                             Pos => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S))'First));
+      end if;
+      if Wuffs.U64 (A_X'Length) >= 2 then
+         V_T := V_T * 3 + Wuffs.U64 (Wuffs.Base.Endian.Peek_U16LE (Data => A_X, Pos => A_X'First));
+      end if;
+      Wuffs.Runtime.Copy_From_Slice (Dst => A_X, Src => Self.F_Buf (0 .. 2), N => G_T7);
+      V_N := G_T7;
+      V_T := V_T * 3 + V_N;
+      Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_Buf (28 .. Self.F_Buf'Last),
+                                     Src => A_X,
+                                     N => G_T8);
+      V_N := G_T8;
+      V_T := V_T * 3 + V_N;
+      V_Loc (Wuffs.Index (A_K and 7)) := 513;
+      V_Loc (Wuffs.Index (Interfaces.Shift_Right (A_K, 3) and 7)) :=
+        V_Loc (Wuffs.Index (Interfaces.Shift_Right (A_K, 3) and 7)) + 7;
+      V_I := 0;
+      while V_I < 8 loop
+         V_T := V_T * 3 + Wuffs.U64 (V_Loc (Wuffs.Index (V_I)));
+         V_I := V_I + 1;
+      end loop;
+      Self.F_Marks (Wuffs.Index (A_K and 3)) := True;
+      if Self.F_Marks (1) or else Self.F_Marks (2) then
+         V_T := V_T + 1000;
+      end if;
+      Self.F_Grid (0) := Self.F_Grid (1);
+      V_T := V_T + Wuffs.U64 (Self.F_Grid (0) (2));
+      V_C :=
+        Wuffs.Base.Ints.Min_U32 (X => A_K, Y => 9) + Wuffs.Base.Ints.Max_U32 (X => A_K, Y => 1000);
+      V_C :=
+        V_C
+          + Wuffs.Base.Ints.Low_Bits_U32 (X => A_K, N => A_K and 15)
+          + Wuffs.Base.Ints.High_Bits_U32 (X => A_K, N => (A_K and 7) or 1);
+      V_T := V_T * 3 + Wuffs.U64 (V_C);
+      if Wuffs.Runtime.Target.CPU_Arch_Is_32_Bit then
+         V_T := V_T + 1;
+      end if;
+      return V_T * 31 + Sum_Buf (Self);
+   end Slices;
 
 end Wuffs.Std.M1test;

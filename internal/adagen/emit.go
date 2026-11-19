@@ -33,6 +33,9 @@ func isAssociative(op string) bool {
 // binary adding ones, then the multiplying ones. Everything else is a
 // primary (or a unary "not", which binds as tightly as one).
 func precedence(e expr) int {
+	if _, ok := e.(eRel); ok {
+		return 2
+	}
 	b, ok := e.(eBin)
 	if !ok {
 		return 9
@@ -54,8 +57,11 @@ func precedence(e expr) int {
 // flattened when the eBin was made.
 func needsParens(e expr, parent expr) bool {
 	if _, ok := parent.(eUn); ok {
-		_, isBin := e.(eBin)
-		return isBin
+		switch e.(type) {
+		case eBin, eRel:
+			return true
+		}
+		return false
 	}
 	return precedence(e) <= precedence(parent)
 }
@@ -112,6 +118,10 @@ func flat(e expr) string {
 		}
 		b.WriteString(")")
 		return b.String()
+	case eRel:
+		return flatOperand(e.l, e) + " " + e.adaOp() + " " + flatOperand(e.r, e)
+	case eOut:
+		return flat(e.x)
 	case eNamed:
 		return e.name + " => " + flat(e.x)
 	case eIf:
@@ -136,6 +146,16 @@ func wrap(e expr, col int, tail int) []string {
 		return []string{s}
 	}
 	switch e := e.(type) {
+	case eRel:
+		lines := wrapOperand(e.l, e, col, 0)
+		prefix := spaces(col+2) + e.adaOp() + " "
+		sub := wrapOperand(e.r, e, len(prefix), tail)
+		lines = append(lines, prefix+sub[0])
+		return append(lines, sub[1:]...)
+
+	case eOut:
+		return wrap(e.x, col, tail)
+
 	case eBin:
 		lines := wrapOperand(e.args[0], e, col, 0)
 		for i, o := range e.args[1:] {
@@ -156,36 +176,60 @@ func wrap(e expr, col int, tail int) []string {
 		return sub
 
 	case eCall:
+		// Prefer the arguments aligned after "Fn (". If that makes a line
+		// too long, put the argument list on its own lines.
 		fn := flat(e.fn)
-		lines := []string(nil)
-		argCol := col + len(fn) + 2
-		if argCol > 48 {
-			// Put the argument list on its own lines.
-			lines = append(lines, fn)
-			argCol = col + 3
-			lines = append(lines, spaces(col+2)+"(")
-		} else {
-			lines = append(lines, fn+" (")
-		}
-		for i, o := range e.args {
-			t := 1 // For the comma or close-paren.
-			if i == len(e.args)-1 {
-				t += tail
-			}
-			sub := wrap(o, argCol, t)
-			if i == 0 {
-				lines[len(lines)-1] += sub[0]
+		layout := func(ownLines bool) []string {
+			lines := []string(nil)
+			argCol := col + len(fn) + 2
+			if ownLines {
+				lines = append(lines, fn)
+				argCol = col + 3
+				lines = append(lines, spaces(col+2)+"(")
 			} else {
-				lines = append(lines, spaces(argCol)+sub[0])
+				lines = append(lines, fn+" (")
 			}
-			lines = append(lines, sub[1:]...)
-			if i == len(e.args)-1 {
-				lines[len(lines)-1] += ")"
-			} else {
-				lines[len(lines)-1] += ","
+			for i, o := range e.args {
+				t := 1 // For the comma or close-paren.
+				if i == len(e.args)-1 {
+					t += tail
+				}
+				sub := wrap(o, argCol, t)
+				if i == 0 {
+					lines[len(lines)-1] += sub[0]
+				} else {
+					lines = append(lines, spaces(argCol)+sub[0])
+				}
+				lines = append(lines, sub[1:]...)
+				if i == len(e.args)-1 {
+					lines[len(lines)-1] += ")"
+				} else {
+					lines[len(lines)-1] += ","
+				}
+			}
+			return lines
+		}
+		fits := func(lines []string) bool {
+			for i, s := range lines {
+				n := len(s)
+				if i == 0 {
+					n += col
+				}
+				if i == len(lines)-1 {
+					n += tail
+				}
+				if n > maxCol {
+					return false
+				}
+			}
+			return true
+		}
+		if col+len(fn)+2 <= 48 {
+			if lines := layout(false); fits(lines) {
+				return lines
 			}
 		}
-		return lines
+		return layout(true)
 
 	case eQual:
 		sub := wrap(e.x, col+len(e.typ)+2, tail+1)
@@ -224,6 +268,20 @@ func wrap(e expr, col int, tail int) []string {
 		lines[len(lines)-1] += ")"
 		return lines
 
+	case eSlice:
+		// X
+		//   (Lo
+		//    .. Hi)
+		lines := wrap(e.x, col, 0)
+		lo := wrap(e.lo, col+3, 0)
+		lines = append(lines, spaces(col+2)+"("+lo[0])
+		lines = append(lines, lo[1:]...)
+		hi := wrap(e.hi, col+6, tail+1)
+		lines = append(lines, spaces(col+3)+".. "+hi[0])
+		lines = append(lines, hi[1:]...)
+		lines[len(lines)-1] += ")"
+		return lines
+
 	case eNamed:
 		prefix := e.name + " => "
 		sub := wrap(e.x, col+len(prefix), tail)
@@ -254,6 +312,10 @@ func wrapOperand(e expr, parent expr, col int, tail int) []string {
 type printer struct {
 	b      strings.Builder
 	indent int
+
+	// labelNeedsNull is whether the label being printed is not followed by
+	// a statement.
+	labelNeedsNull bool
 }
 
 func (p *printer) line(s string) {
@@ -329,7 +391,20 @@ func (p *printer) exprStmt(prefix string, e expr, suffix string, breakAfterPrefi
 func (p *printer) stmts(ss []stmt) {
 	executable := false
 	quiet := false
-	for _, s := range ss {
+	for i, s := range ss {
+		// A label needs a statement to label: the next one, or else null.
+		needNull := true
+		if i+1 < len(ss) {
+			switch ss[i+1].(type) {
+			case sComment, sLabel, sResume:
+				// Keep it simple: one label per statement.
+			case sPragma:
+				// A pragma is not a statement.
+			default:
+				needNull = false
+			}
+		}
+		p.labelNeedsNull = needNull
 		// Bracket each run of proved pragmas with a warning Off/On pair.
 		pr, ok := s.(sPragma)
 		if proved := ok && pr.proved; proved != quiet {
@@ -357,7 +432,19 @@ func (p *printer) stmts(ss []stmt) {
 func (p *printer) stmt(s stmt) {
 	switch s := s.(type) {
 	case sAssign:
-		p.exprStmt(flat(s.lhs)+" := ", s.rhs, ";", true)
+		if lhs := flat(s.lhs); p.indent+len(lhs)+len(" :=") <= maxCol {
+			p.exprStmt(lhs+" := ", s.rhs, ";", true)
+		} else {
+			// A left-hand side that needs several lines itself.
+			lines := wrap(s.lhs, p.indent, len(" :="))
+			lines[0] = spaces(p.indent) + lines[0]
+			lines[len(lines)-1] += " :="
+			p.rawLines(lines)
+			rhs := wrap(s.rhs, p.indent+2, 1)
+			rhs[0] = spaces(p.indent+2) + rhs[0]
+			rhs[len(rhs)-1] += ";"
+			p.rawLines(rhs)
+		}
 
 	case sCall:
 		p.exprStmt("", s.call, ";", false)
@@ -414,9 +501,14 @@ func (p *printer) stmt(s stmt) {
 			p.line("exit;")
 		}
 
+	case sExitWhen:
+		p.exprStmt("exit when ", s.cond, ";", false)
+
 	case sLabel:
 		p.line("<<" + s.name + ">>")
-		p.line("null;")
+		if p.labelNeedsNull {
+			p.line("null;")
+		}
 
 	case sGoto:
 		p.line("goto " + s.label + ";")
@@ -433,6 +525,31 @@ func (p *printer) stmt(s stmt) {
 
 	case sComment:
 		p.comment(s.text)
+
+	case sResume:
+		if !s.labelOnly {
+			p.line(fmt.Sprintf("%s := %d;", s.susp.name, s.n))
+		}
+		p.line("<<" + resumeLabel(s.n) + ">>")
+		if p.labelNeedsNull {
+			p.line("null;")
+		}
+
+	case sCase:
+		p.exprStmt("case ", s.sel, " is", false)
+		p.indent += indentStep
+		for _, arm := range s.arms {
+			p.line("when " + arm.value + " =>")
+			p.indent += indentStep
+			p.stmts(arm.body)
+			p.indent -= indentStep
+		}
+		p.line("when others =>")
+		p.indent += indentStep
+		p.stmts(s.others)
+		p.indent -= indentStep
+		p.indent -= indentStep
+		p.line("end case;")
 
 	default:
 		panic(fmt.Sprintf("adagen: internal error: unknown stmt %T", s))
@@ -459,7 +576,11 @@ func (f *fn) signature(indent int) (lines []string, oneLine bool) {
 	}
 	params = append(params, f.self.name+" : "+mode+f.recvType)
 	for _, o := range f.params {
-		params = append(params, o.name+" : "+o.decl)
+		mode := ""
+		if o.mode != "" {
+			mode = o.mode + " "
+		}
+		params = append(params, o.name+" : "+mode+o.decl)
 	}
 	ret := ""
 	if f.ret != nil {
@@ -519,6 +640,11 @@ func (p *printer) fnBody(f *fn) {
 	unref(f.self)
 	for _, o := range f.params {
 		unref(o)
+		// A writable slice or an I/O buffer is "in out" because of its
+		// Wuffs type, whether or not this body writes to it.
+		if o.mode != "" && o.writes == 0 && o.reads != 0 {
+			p.line("pragma Unmodified (" + o.name + ");")
+		}
 	}
 	for _, o := range f.locals {
 		if o.reads == 0 && o.writes == 0 {
@@ -534,7 +660,7 @@ func (p *printer) fnBody(f *fn) {
 		} else {
 			p.exprStmt(prefix+" := ", o.init, ";", true)
 		}
-		if o.reads == 0 {
+		if o.reads == 0 || o.quiet {
 			p.line("pragma Warnings (Off, " + o.name + ");")
 		}
 	}

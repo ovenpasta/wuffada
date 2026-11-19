@@ -14,7 +14,8 @@
 with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
 with Test_Support;
-with Wuffs.Runtime.Temp_Base;
+with Wuffs.Base;
+with Wuffs.Runtime;
 with Wuffs.Std.Adler32;
 with Wuffs.Std.Crc32;
 
@@ -142,19 +143,19 @@ procedure Test_Hashers is
       Test_Support.Check_U32 (A.Update_U32 (D), 0, "adler32 Update_U32 before Initialize");
       Test_Support.Check_U32 (C.Update_U32 (D), 0, "crc32 Update_U32 before Initialize");
       Test_Support.Check
-        (A.Set_Quirk (1, 2) = Wuffs.Runtime.Temp_Base.Error_Initialize_Not_Called,
+        (A.Set_Quirk (1, 2) = Wuffs.Base.Error_Initialize_Not_Called,
          "adler32 Set_Quirk before Initialize");
       Test_Support.Check
-        (C.Set_Quirk (1, 2) = Wuffs.Runtime.Temp_Base.Error_Initialize_Not_Called,
+        (C.Set_Quirk (1, 2) = Wuffs.Base.Error_Initialize_Not_Called,
          "crc32 Set_Quirk before Initialize");
 
       Wuffs.Std.Adler32.Initialize (A);
       Wuffs.Std.Crc32.Initialize (C);
       Test_Support.Check
-        (A.Set_Quirk (1, 2) = Wuffs.Runtime.Temp_Base.Error_Unsupported_Option,
+        (A.Set_Quirk (1, 2) = Wuffs.Base.Error_Unsupported_Option,
          "adler32 Set_Quirk");
       Test_Support.Check
-        (C.Set_Quirk (1, 2) = Wuffs.Runtime.Temp_Base.Error_Unsupported_Option, "crc32 Set_Quirk");
+        (C.Set_Quirk (1, 2) = Wuffs.Base.Error_Unsupported_Option, "crc32 Set_Quirk");
       Test_Support.Check_U64 (A.Get_Quirk (1), 0, "adler32 Get_Quirk");
       Test_Support.Check_U64 (C.Get_Quirk (1), 0, "crc32 Get_Quirk");
 

@@ -23,7 +23,8 @@ Upstream is pinned at `google/wuffs@a87f0bb` (2026-11-18). A checkout lives in
 | Path | What | SPARK |
 |---|---|---|
 | `ada/src/root/wuffs.ads` | scalar + array types shared by everything | yes |
-| `ada/src/base/` | `Wuffs.Base.*`, hand-written | **yes, proved** |
+| `ada/src/base/` | `Wuffs.Base.*` core, hand-written | **yes, proved** |
+| `ada/src/pixel/` | `Wuffs.Base.Pixel*`: pixel formats, buffers, swizzler, hand-written (`ada/wuffs_pixel.gpr`) | **yes, proved** |
 | `ada/src/runtime/` | `Wuffs.Runtime.*`, glue the generated code needs that SPARK cannot express (slice handles, interfaces) | no |
 | `ada/gen/` | generator output, `Wuffs.Std.<pkg>` (checked in) | no |
 | `ada/tests/` | test drivers | no |
@@ -114,9 +115,13 @@ The library allocates nothing and uses a small, bounded stack.
 ## Checks
 
 Profile `checked` (default): all Ada runtime checks, assertions and
-`-fstack-check` on. Profile `release`: `-gnatp`. Both are tested.
-A check failure in generated code means a generator or base-library bug, since
-Wuffs has proved the source; it must never be reachable from input data.
+`-fstack-check` on. Profile `release`: `-gnatp`, nothing checked, including
+the preconditions and predicates of the proved base library (decided by the
+project lead: the base is proved and the generated code is Wuffs-proved, so
+release trusts both). Both profiles are tested. A check failure in generated
+code means a generator or base-library bug, since Wuffs has proved the source;
+it must never be reachable from input data. The `checked` profile and the
+differential tests against upstream C are what catch generator bugs.
 
 ## SIMD
 
@@ -124,12 +129,12 @@ Not in scope yet. `choose` statements resolve to the scalar default.
 
 ## Milestones
 
-1. **Base core, proved**: status, integer helpers, peek/poke, I/O reader/writer
-   primitives, ranges/rects. **Generator M1**: adler32 + crc32 (scalar),
-   tested against known checksums.
-2. Coroutine lowering; lzw, deflate, zlib, gzip.
-3. **Pixel formats, pixel buffer, pixel swizzler, proved.** First image
-   decoders (netpbm, bmp, gif, png).
+1. Done: base core proved; generator M1 (adler32, crc32).
+2. In progress, in parallel:
+   * Generator: use the proved base, coroutine lowering, I/O, `use`;
+     lzw, deflate, zlib, gzip.
+   * Base: pixel formats, pixel buffer, pixel swizzler, proved.
+3. First image decoders (netpbm, bmp, gif, png).
 4. Remaining decoders (jpeg + YCCK swizzle, webp, ...), remaining formats.
 
 ## Open decisions (owner: project lead)

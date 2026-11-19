@@ -27,6 +27,17 @@ type loopInfo struct {
 	isIterate     bool
 }
 
+// ioArg is an io_reader or io_writer argument of the function being lowered.
+type ioArg struct {
+	arg    *argInfo
+	writer bool
+
+	// cursor is the function's Wuffs.Base.IO.Reader or Writer for the
+	// buffer (C: the iop, io0, io1 and io2 "derived variables"), or nil if
+	// the function only passes the buffer on.
+	cursor *variable
+}
+
 // lowerer lowers one function.
 type lowerer struct {
 	g  *gen
@@ -34,15 +45,29 @@ type lowerer struct {
 	f  *fn
 
 	locals map[t.ID]*variable
-	args   map[t.ID]*variable // What "args.foo" denotes: a parameter or its mutable copy.
+	args   map[t.ID]*variable // What a non-I/O "args.foo" denotes: a parameter or its mutable copy.
+	ios    map[t.ID]*ioArg
+	ioList []*ioArg
 	loops  map[a.Loop]*loopInfo
 
 	// pre holds statements that must run before the statement that is
 	// currently being lowered: they assign temporaries that its expressions
-	// use.
-	pre []stmt
+	// use. post holds statements that must run right after it.
+	pre  []stmt
+	post []stmt
 
 	nLoops, nIterates, nTemps int
+
+	// temps are the generator temporaries (made by newTemp).
+	temps map[*variable]bool
+
+	// For a coroutine: see coroutine.go.
+	status     *variable // G_Status.
+	susp       *variable // G_Susp, the current suspension point.
+	nSusp      int
+	resumables map[t.ID]bool
+	scratch    expr // Self.G_Scratch_Func, once something needs it.
+	pfield     expr // Self.G_P_Func, once something needs it.
 }
 
 func (g *gen) lowerFunc(fi *funcInfo) error {
@@ -52,10 +77,18 @@ func (g *gen) lowerFunc(fi *funcInfo) error {
 		f:      fi.ir,
 		locals: map[t.ID]*variable{},
 		args:   map[t.ID]*variable{},
+		ios:    map[t.ID]*ioArg{},
 		loops:  map[a.Loop]*loopInfo{},
 	}
 	n := fi.ast
 
+	if fi.coroutine {
+		l.status = l.newLocal(prefixGen+"Status", typStatus, raw("Wuffs.Ok_Status"))
+		var err error
+		if l.resumables, err = findResumables(g.tm, n); err != nil {
+			return err
+		}
+	}
 	if err := l.declareArgs(); err != nil {
 		return err
 	}
@@ -63,24 +96,68 @@ func (g *gen) lowerFunc(fi *funcInfo) error {
 		return err
 	}
 
+	head := []stmt(nil)
 	if l.f.public {
-		if err := l.prologue(); err != nil {
+		ss, err := l.prologue()
+		if err != nil {
 			return err
 		}
+		head = append(head, ss...)
 	}
+	for _, io := range l.ioList {
+		if io.cursor == nil {
+			continue
+		}
+		data, meta := eVar{io.arg.v}, eVar{io.arg.meta}
+		if io.writer {
+			head = append(head, sAssign{eVar{io.cursor},
+				callNamed(ioPkg+".To_Writer", "M", meta, "Data_Length", eAttr{data, "Length"})})
+		} else {
+			head = append(head, sAssign{eVar{io.cursor}, call(ioPkg+".To_Reader", meta)})
+		}
+	}
+
 	body, err := l.block(n.Body())
 	if err != nil {
 		return err
 	}
-	l.f.body = append(l.f.body, body...)
 
-	if l.f.ret != nil && !a.Terminates(n.Body()) {
-		// Upstream accepts a body that ends with a return, or with an
-		// if-else chain or a "while true" loop (without a break) that cannot
-		// fall through: ast.Terminates.
+	if fi.coroutine {
+		l.f.body = l.assembleCoroutine(head, body)
+		return nil
+	}
+	l.f.body = append(head, body...)
+	if a.Terminates(n.Body()) {
+		// The body ends with a return, or with an if-else chain or a "while
+		// true" loop (without a break) that cannot fall through.
+		return nil
+	}
+	l.f.body = append(l.f.body, l.saveCursors()...)
+	switch {
+	case l.f.ret == nil:
+		// No-op.
+	case l.f.ret.kind == kStatus:
+		// Falling off the end of a function that returns a status returns
+		// ok: in C, the function's status variable is still NULL. (Upstream
+		// does not check that a body ends with a return.)
+		l.f.body = append(l.f.body, sReturn{raw("Wuffs.Ok_Status")})
+	default:
 		return fmt.Errorf("body of a function with a return type can fall off its end")
 	}
 	return nil
+}
+
+// saveCursors returns the statements that store every I/O cursor back in
+// its buffer's meta: what the C back-end's writeFinalSaveDerivedVar emits.
+func (l *lowerer) saveCursors() []stmt {
+	ret := []stmt(nil)
+	for _, io := range l.ioList {
+		if io.cursor != nil {
+			io.arg.meta.writes++
+			ret = append(ret, sCall{call(ioPkg+".Save", eVar{io.arg.meta}, eVar{io.cursor})})
+		}
+	}
+	return ret
 }
 
 func (l *lowerer) newLocal(name string, typ *adaType, init expr) *variable {
@@ -89,18 +166,33 @@ func (l *lowerer) newLocal(name string, typ *adaType, init expr) *variable {
 	return v
 }
 
-// declareArgs fills in l.args. A parameter that the body assigns to gets a
-// local, mutable copy, since Ada "in" parameters are constants. For a slice,
-// that copy is a slice handle, and the parameter stays a plain array.
+// newTemp makes a generator temporary.
+func (l *lowerer) newTemp(typ *adaType) *variable {
+	l.nTemps++
+	v := l.newLocal(fmt.Sprintf("%sT%d", prefixGen, l.nTemps), typ, nil)
+	if l.temps == nil {
+		l.temps = map[*variable]bool{}
+	}
+	l.temps[v] = true
+	// Whatever asked for a temporary assigns it, possibly as an "out"
+	// parameter, which the IR does not show.
+	v.writes++
+	return v
+}
+
+// declareArgs fills in l.args and l.ios. A parameter that the body assigns
+// to gets a local, mutable copy, since Ada "in" parameters are constants.
+// For a slice, that copy is a slice handle, and the parameter stays a plain
+// array.
 func (l *lowerer) declareArgs() error {
 	assigned := map[t.ID]bool{}
 	if err := l.walkBody(func(o *a.Node) error {
 		if o.Kind() == a.KAssign {
+			// Only "args.foo = etc" re-assigns the argument. "args.foo[i] =
+			// etc" writes through a slice argument, to the caller's memory.
 			if lhs := o.AsAssign().LHS(); lhs != nil {
-				for ; lhs != nil; lhs = lhsBase(lhs) {
-					if foo := lhs.IsArgsDotFoo(); foo != 0 {
-						assigned[foo] = true
-					}
+				if foo := lhs.IsArgsDotFoo(); foo != 0 {
+					assigned[foo] = true
 				}
 			}
 		}
@@ -109,24 +201,86 @@ func (l *lowerer) declareArgs() error {
 		return err
 	}
 
-	for i, o := range l.fi.ast.In().Fields() {
-		id := o.AsField().Name()
-		param := l.f.params[i]
+	for _, arg := range l.fi.args {
+		id := arg.id
+		switch arg.typ.kind {
+		case kIOReader, kIOWriter:
+			if assigned[id] {
+				return errNotYet("assigning to args.%s", id.Str(l.g.tm))
+			}
+			io := &ioArg{arg: arg, writer: arg.typ.kind == kIOWriter}
+			need, err := l.needCursor(id)
+			if err != nil {
+				return err
+			}
+			if need {
+				typ, prefix := typReader, "R_"
+				if io.writer {
+					typ, prefix = typWriter, "W_"
+				}
+				io.cursor = l.newLocal(prefixGen+prefix+mangle(id.Str(l.g.tm)), typ, nil)
+			}
+			l.ios[id] = io
+			l.ioList = append(l.ioList, io)
+			continue
+		}
 		if !assigned[id] {
-			l.args[id] = param
+			l.args[id] = arg.v
 			continue
 		}
 		name := prefixArgCopy + mangle(id.Str(l.g.tm))
-		switch param.typ.kind {
+		switch arg.typ.kind {
 		case kBytes:
-			l.args[id] = l.newLocal(name, typROSliceU8, bytesToHandle(eVar{param}))
+			l.args[id] = l.newLocal(name, typROSliceU8, bytesToHandle(eVar{arg.v}))
+		case kBytesVar:
+			l.args[id] = l.newLocal(name, typSliceU8, bytesToHandle(eVar{arg.v}))
 		case kNum, kBool, kStatus:
-			l.args[id] = l.newLocal(name, param.typ, eVar{param})
+			l.args[id] = l.newLocal(name, arg.typ, eVar{arg.v})
 		default:
 			return errNotYet("assigning to args.%s", id.Str(l.g.tm))
 		}
+		if l.fi.coroutine {
+			// The C back-end does not save arguments across a suspension
+			// either, but there the caller passes them again. A modified
+			// copy would be lost.
+			return errNotYet("assigning to args.%s in a coroutine", id.Str(l.g.tm))
+		}
 	}
 	return nil
+}
+
+// needCursor reports whether the function needs its own cursor for the I/O
+// argument called name, as opposed to only passing the buffer on. It is the
+// C back-end's needDerivedVar: true if the body calls a method on args.name
+// (other than is_closed) or hands args.name to a built-in method.
+func (l *lowerer) needCursor(name t.ID) (bool, error) {
+	need := false
+	err := l.walkBody(func(o *a.Node) error {
+		switch o.Kind() {
+		case a.KExpr:
+			recv, meth, args, ok := o.AsExpr().IsMethodCall()
+			if !ok {
+				return nil
+			}
+			if recv.IsArgsDotFoo() == name {
+				if meth != t.IDIsClosed {
+					need = true
+				}
+				return nil
+			}
+			if recv.MType().IsIOType() {
+				for _, x := range args {
+					if x.AsArg().Value().IsArgsDotFoo() == name {
+						need = true
+					}
+				}
+			}
+		case a.KIOManip:
+			return errNotYet("%s blocks", o.AsIOManip().Keyword().Str(l.g.tm))
+		}
+		return nil
+	})
+	return need, err
 }
 
 // lhsBase returns the x in "x[i]" or "x.f", or nil.
@@ -180,15 +334,32 @@ func (l *lowerer) declareLocals() error {
 		switch typ.kind {
 		case kNum:
 			v := l.newLocal(name, typ, typ.zeroValue())
-			if err := l.narrow(v, id); err != nil {
-				return err
+			// In a coroutine a local's value can come back from a previous
+			// call, which the bounds of the assignments in this call do not
+			// cover in any obvious way: keep the declared type.
+			if !l.fi.coroutine {
+				if err := l.narrow(v, id); err != nil {
+					return err
+				}
 			}
 			l.locals[id] = v
 		case kBool, kStatus:
 			l.locals[id] = l.newLocal(name, typ, typ.zeroValue())
-		case kROSliceU8:
+		case kROSliceU8, kSliceU8:
 			// The default initial value is the empty slice.
 			l.locals[id] = l.newLocal(name, typ, nil)
+		case kArray:
+			// DESIGN.md: no local array above 1 KiB.
+			if typ.elem.kind != kNum {
+				return errNotYet("var %s of type %q", id.Str(l.g.tm), o.XType().Str(l.g.tm))
+			}
+			size := big.NewInt(int64(typ.elem.bits / 8))
+			size.Mul(size, typ.length)
+			if size.Cmp(big.NewInt(1024)) > 0 {
+				return errNotYet("var %s: a local array of more than 1024 bytes (it has to move into the receiver)",
+					id.Str(l.g.tm))
+			}
+			l.locals[id] = l.newLocal(name, typ, raw("[others => 0]"))
 		default:
 			return errNotYet("var %s of type %q", id.Str(l.g.tm), o.XType().Str(l.g.tm))
 		}
@@ -242,6 +413,9 @@ func (l *lowerer) narrow(v *variable, id t.ID) error {
 	}
 	v.decl = fmt.Sprintf("%s range %s .. %s", v.typ.unrefined().name, lo, hi)
 	v.init = raw(lo.String())
+	// What is known about the variable's values (for comparisons: see
+	// eRel.adaOp) is now this range.
+	v.typ = &adaType{kind: kNum, name: v.typ.unrefined().name, bits: v.typ.bits, lo: lo, hi: hi}
 	return nil
 }
 
@@ -249,7 +423,8 @@ func (l *lowerer) narrow(v *variable, id t.ID) error {
 // public function: check that Initialize was called (and that no previous
 // call disabled the object) and check the arguments that Wuffs code would
 // have had to prove in range.
-func (l *lowerer) prologue() error {
+func (l *lowerer) prologue() ([]stmt, error) {
+	out := []stmt(nil)
 	l.g.useType[32] = true
 	magic := eSel{eVar{l.f.self}, "Magic"}
 	cond := bin("/=", magic, raw(rtMagicInitialized))
@@ -262,19 +437,24 @@ func (l *lowerer) prologue() error {
 		case kStatus:
 			ret.value = eIf{
 				cond: bin("=", magic, raw(rtMagicDisabled)),
-				yes:  raw(l.g.basePkg + ".Error_Disabled_By_Previous_Error"),
-				no:   raw(l.g.basePkg + ".Error_Initialize_Not_Called"),
+				yes:  raw(basePkg + ".Error_Disabled_By_Previous_Error"),
+				no:   raw(basePkg + ".Error_Initialize_Not_Called"),
 			}
 		default:
 			ret.value = l.f.ret.zeroValue()
 		}
 	}
-	l.f.body = append(l.f.body, sIf{branches: []ifBranch{{cond, []stmt{ret}}}})
+	out = append(out, sIf{branches: []ifBranch{{cond, []stmt{ret}}}})
 
-	if len(l.fi.argChecks) == 0 {
-		return nil
-	}
+	// The argument checks. C checks that an io_buffer pointer is not NULL.
+	// An Ada array cannot be null, but its Buffer_Meta comes from outside
+	// of Wuffs code and everything after this trusts it, so check here that
+	// it describes the array (which C leaves to the caller).
 	conds := []expr(nil)
+	for _, io := range l.ioList {
+		conds = append(conds, eUn{"not",
+			call("Wuffs.Runtime.Valid_Buffer", eVar{io.arg.v}, eVar{io.arg.meta})})
+	}
 	for i, v := range l.fi.argChecks {
 		b := l.fi.argBounds[i]
 		l.g.useType[b.bits] = true
@@ -285,16 +465,42 @@ func (l *lowerer) prologue() error {
 			conds = append(conds, bin(">", eVar{v}, raw(b.hi.String())))
 		}
 	}
-	cond = conds[0]
-	if len(conds) > 1 {
-		cond = bin("or else", conds...)
+	if len(conds) > 0 {
+		if !l.fi.coroutine && l.f.ret != nil {
+			return nil, errNotYet("a public function with an I/O parameter that is not a coroutine but returns a value")
+		}
+		cond = conds[0]
+		if len(conds) > 1 {
+			cond = bin("or else", conds...)
+		}
+		l.f.self.writes++
+		ret := sReturn{}
+		if l.fi.coroutine {
+			ret.value = raw(basePkg + ".Error_Bad_Argument")
+		}
+		out = append(out, sIf{branches: []ifBranch{{cond, []stmt{
+			sAssign{magic, raw(rtMagicDisabled)},
+			ret,
+		}}}})
 	}
-	l.f.self.writes++
-	l.f.body = append(l.f.body, sIf{branches: []ifBranch{{cond, []stmt{
-		sAssign{magic, raw(rtMagicDisabled)},
-		sReturn{},
-	}}}})
-	return nil
+
+	// A public coroutine refuses to run while another one of the same
+	// object is suspended.
+	if l.fi.coroutine {
+		l.fi.recv.hasActiveCoroutine = true
+		active := eSel{eVar{l.f.self}, activeCoroutineField}
+		id := raw(fmt.Sprint(l.fi.coroID))
+		l.f.self.writes++
+		out = append(out,
+			sIf{branches: []ifBranch{{
+				bin("and then", bin("/=", active, raw("0")), bin("/=", active, id)),
+				[]stmt{
+					sAssign{magic, raw(rtMagicDisabled)},
+					sReturn{raw(basePkg + ".Error_Interleaved_Coroutine_Calls")},
+				}}}},
+			sAssign{active, raw("0")})
+	}
+	return out, nil
 }
 
 func (l *lowerer) block(nodes []*a.Node) ([]stmt, error) {
@@ -309,18 +515,20 @@ func (l *lowerer) block(nodes []*a.Node) ([]stmt, error) {
 	return ret, nil
 }
 
-// flush returns the pending prelude statements followed by ss.
+// flush returns the pending prelude statements, then ss, then the pending
+// postlude statements.
 func (l *lowerer) flush(ss ...stmt) []stmt {
 	ret := append(l.pre, ss...)
-	l.pre = nil
+	ret = append(ret, l.post...)
+	l.pre, l.post = nil, nil
 	return ret
 }
 
 // noPrelude fails if lowering an expression needed prelude statements in a
 // context that cannot have them (they would have to be re-evaluated).
 func (l *lowerer) noPrelude(what string) error {
-	if len(l.pre) != 0 {
-		return errNotYet("a slice-valued temporary in %s", what)
+	if len(l.pre) != 0 || len(l.post) != 0 {
+		return errNotYet("a temporary in %s", what)
 	}
 	return nil
 }
@@ -334,6 +542,11 @@ func (l *lowerer) statement(n *a.Node) ([]stmt, error) {
 		}
 		return nil, err
 	}
+	if l.fi.coroutine {
+		if err := l.checkTemps(ss); err != nil {
+			return nil, err
+		}
+	}
 	return ss, nil
 }
 
@@ -344,7 +557,7 @@ type locatedError struct{ s string }
 func (e *locatedError) Error() string { return e.s }
 
 func (l *lowerer) statement1(n *a.Node) ([]stmt, error) {
-	if len(l.pre) != 0 {
+	if len(l.pre) != 0 || len(l.post) != 0 {
 		return nil, fmt.Errorf("internal error: prelude statements left over")
 	}
 	switch n.Kind() {
@@ -417,11 +630,48 @@ var assignOpToBinaryOp = map[t.ID]t.ID{
 
 func (l *lowerer) assign(n *a.Assign) ([]stmt, error) {
 	op, lhs, rhs := n.Operator(), n.LHS(), n.RHS()
-	if rhs.Effect().Coroutine() {
-		return nil, errNotYet("coroutine calls")
+
+	// A call of a coroutine of this or of a used package.
+	if rhs.Operator() == a.ExprOperatorCall && rhs.Effect().Coroutine() && !isIOMethodCall(rhs) {
+		if !l.fi.coroutine {
+			return nil, fmt.Errorf("coroutine call %q outside of a coroutine", rhs.Str(l.g.tm))
+		}
+		v, err := l.expr(rhs)
+		if err != nil {
+			return nil, err
+		}
+		if op == t.IDEqQuestion {
+			// "x =? f?()" just delivers the callee's status.
+			lv, err := l.expr(lhs)
+			if err != nil {
+				return nil, err
+			}
+			if lv.typ == nil || lv.typ.kind != kStatus {
+				return nil, fmt.Errorf("left-hand side of %q is not a status", "=?")
+			}
+			return l.flush(sAssign{lv.e, v.e}), nil
+		}
+		if lhs != nil {
+			return nil, errNotYet("assigning the result of a coroutine call, other than with \"=?\"")
+		}
+		// As the C back-end's writeStatementAssign: the callee's own
+		// suspension state makes it continue where it stopped when this
+		// function is resumed at the suspension point just before the call.
+		//
+		// Everything that the call needs (the saving of I/O cursors, and
+		// above all the temporaries that hold its slice arguments) comes
+		// after the resume label, so that it is evaluated again on resume,
+		// as C evaluates the call's arguments again after its case label.
+		pre, post := l.pre, l.post
+		l.pre, l.post = nil, nil
+		ret := append([]stmt{l.suspPoint()}, pre...)
+		ret = append(ret, sAssign{eVar{l.status}, v.e})
+		ret = append(ret, post...)
+		return append(ret, sIf{branches: []ifBranch{{
+			eUn{"not", call("Wuffs.Is_Ok", eVar{l.status})}, []stmt{sGoto{labelSuspend}}}}}), nil
 	}
 	if op == t.IDEqQuestion {
-		return nil, errNotYet("the \"=?\" operator")
+		return nil, errNotYet("the \"=?\" operator on %q", rhs.Str(l.g.tm))
 	}
 
 	if lhs == nil {
@@ -434,16 +684,27 @@ func (l *lowerer) assign(n *a.Assign) ([]stmt, error) {
 			return nil, err
 		}
 		if v.typ == nil {
+			if v.e == nil {
+				// Everything was in the prelude.
+				return l.flush(), nil
+			}
 			return l.flush(sCall{v.e}), nil
+		}
+		if x, ok := v.e.(eVar); ok && x.v.kind == varLocal && strings.HasPrefix(x.v.name, prefixGen+"T") {
+			// The result is already in a temporary that nothing else reads.
+			x.v.quiet = true
+			return l.flush(), nil
 		}
 		// Ada cannot ignore a function's result.
 		l.nTemps++
 		discard := l.newLocal(fmt.Sprintf("%sDiscard_%d", prefixGen, l.nTemps), v.typ.unrefined(), nil)
+		discard.quiet = true
 		return l.flush(sAssign{eVar{discard}, v.e}), nil
 	}
 
+	// An assignment to a slice element goes through the slice handle.
 	if lhs.Operator() == t.IDOpenBracket && lhs.LHS().AsExpr().MType().IsEitherSliceType() {
-		return nil, errNotYet("assigning to a slice element")
+		return l.assignSliceElement(n)
 	}
 	lv, err := l.expr(lhs)
 	if err != nil {
@@ -481,15 +742,86 @@ func (l *lowerer) assign(n *a.Assign) ([]stmt, error) {
 		if rv.typ.kind != lv.typ.kind {
 			return nil, fmt.Errorf("cannot assign %q to %q: different types", rhs.Str(l.g.tm), lhs.Str(l.g.tm))
 		}
-	case kROSliceU8:
-		rv, err = l.toHandle(rv)
+	case kROSliceU8, kSliceU8:
+		rv, err = l.toHandle(rv, lv.typ.kind == kSliceU8)
 		if err != nil {
 			return nil, err
+		}
+	case kArray:
+		// An Ada array assignment copies in place, whatever the overlap.
+		if rv.typ.kind != kArray || rv.typ.name != lv.typ.name {
+			return nil, fmt.Errorf("cannot assign %q to %q: different types", rhs.Str(l.g.tm), lhs.Str(l.g.tm))
 		}
 	default:
 		return nil, errNotYet("assigning to %q, of type %q", lhs.Str(l.g.tm), lhs.MType().Str(l.g.tm))
 	}
 	return l.flush(sAssign{lv.e, rv.e}), nil
+}
+
+// assignSliceElement lowers "s[i] = v" and "s[i] op= v" for a slice s.
+func (l *lowerer) assignSliceElement(n *a.Assign) ([]stmt, error) {
+	lhs := n.LHS()
+	sv, err := l.expr(lhs.LHS().AsExpr())
+	if err != nil {
+		return nil, err
+	}
+	i, err := l.index(lhs.RHS().AsExpr())
+	if err != nil {
+		return nil, err
+	}
+	if sv.typ != nil && sv.typ.kind == kBytesVar && sv.lo == nil && sv.hi == nil {
+		// A whole Ada array (a writable slice parameter): its own bounds
+		// are the slice's, so this is an ordinary element assignment.
+		if !sv.zeroBased {
+			i = bin("+", eAttr{sv.arr, "First"}, i)
+		}
+		elem := val{e: eCall{sv.arr, []expr{i}}, typ: typU8}
+		rv, err := l.expr(n.RHS())
+		if err != nil {
+			return nil, err
+		}
+		if rv.typ == nil {
+			return nil, fmt.Errorf("%q has no value", n.RHS().Str(l.g.tm))
+		}
+		if n.Operator() != t.IDEq {
+			xop, ok := assignOpToBinaryOp[n.Operator()]
+			if !ok {
+				return nil, fmt.Errorf("unrecognized assignment operator %q", n.Operator().Str(l.g.tm))
+			}
+			if rv, err = l.numBinaryOp(xop, elem, rv, 8); err != nil {
+				return nil, err
+			}
+		} else if err := checkNum(rv, 8); err != nil {
+			return nil, err
+		}
+		return l.flush(sAssign{elem.e, rv.e}), nil
+	}
+	if sv.typ == nil || !sv.typ.isSlice() {
+		return nil, fmt.Errorf("%q is not a slice", lhs.LHS().AsExpr().Str(l.g.tm))
+	}
+	if sv, err = l.toHandle(sv, true); err != nil {
+		return nil, err
+	}
+	rv, err := l.expr(n.RHS())
+	if err != nil {
+		return nil, err
+	}
+	if rv.typ == nil {
+		return nil, fmt.Errorf("%q has no value", n.RHS().Str(l.g.tm))
+	}
+	if n.Operator() != t.IDEq {
+		xop, ok := assignOpToBinaryOp[n.Operator()]
+		if !ok {
+			return nil, fmt.Errorf("unrecognized assignment operator %q", n.Operator().Str(l.g.tm))
+		}
+		old := val{e: call("Wuffs.Runtime.Get", sv.e, i), typ: typU8}
+		if rv, err = l.numBinaryOp(xop, old, rv, 8); err != nil {
+			return nil, err
+		}
+	} else if err := checkNum(rv, 8); err != nil {
+		return nil, err
+	}
+	return l.flush(sCall{callNamed("Wuffs.Runtime.Set", "S", sv.e, "I", i, "V", rv.e)}), nil
 }
 
 // choose lowers a choose statement, statically. A candidate that has a
@@ -722,7 +1054,7 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	if rv, err = l.toHandle(rv); err != nil {
+	if rv, err = l.toHandle(rv, false); err != nil {
 		return nil, err
 	}
 
@@ -759,9 +1091,9 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 				ret = append(ret, sAssign{end, bin("+", pos,
 					bin("*", bin("/", remaining, lit(length*unroll)), lit(length*unroll)))})
 			} else {
-				ret = append(ret, sAssign{end, bin("+", pos, callNamed(l.g.basePkg+".Iterate_Total_Advance",
-					"Total_Len", remaining,
-					"Iter_Len", lit(length+(advance*(unroll-1))),
+				ret = append(ret, sAssign{end, bin("+", pos, callNamed(slicesPkg+".Iterate_Total_Advance",
+					"Total_Length", remaining,
+					"Iter_Length", lit(length+(advance*(unroll-1))),
 					"Iter_Advance", lit(advance*unroll)))})
 			}
 
@@ -838,16 +1170,40 @@ func (l *lowerer) readOutsideItsIterates(id t.ID) bool {
 	return found
 }
 
+// statusLiteralKind classifies a status-typed expression that is a literal:
+// 'o' for ok, '#' for an error, '$' for a suspension, '@' for a note. It is 0
+// for anything else.
+func (l *lowerer) statusLiteralKind(n *a.Expr) byte {
+	if n.Operator() == 0 && n.Ident() == t.IDOk {
+		return 'o'
+	}
+	if op := n.Operator(); (op == 0 || op == t.IDDot) && n.Ident().IsDQStrLiteral(l.g.tm) {
+		msg, _ := t.Unescape(n.Ident().Str(l.g.tm))
+		if msg == "" {
+			return 0
+		}
+		switch msg[0] {
+		case '#', '$':
+			return msg[0]
+		}
+		return '@'
+	}
+	return 0
+}
+
 func (l *lowerer) ret(n *a.Ret) ([]stmt, error) {
+	if l.fi.coroutine {
+		return l.coroutineRet(n)
+	}
 	if n.Keyword() != t.IDReturn {
-		return nil, errNotYet("%s statements", n.Keyword().Str(l.g.tm))
+		return nil, fmt.Errorf("%s statement outside of a coroutine", n.Keyword().Str(l.g.tm))
 	}
 	value := n.Value()
 	if l.f.ret == nil {
 		if value != nil && (value.Operator() != 0 || value.Ident() != t.IDNothing) {
 			return nil, fmt.Errorf("return of a value from a function without a return type")
 		}
-		return []stmt{sReturn{}}, nil
+		return append(l.saveCursors(), sReturn{}), nil
 	}
 	if value == nil {
 		return nil, fmt.Errorf("return without a value from a function with a return type")
@@ -868,20 +1224,24 @@ func (l *lowerer) ret(n *a.Ret) ([]stmt, error) {
 		if v.typ.kind != kBool {
 			return nil, fmt.Errorf("cannot return %q: wrong type", value.Str(l.g.tm))
 		}
-	case kStatus:
-		// The C back-end wraps a status that could be a suspension in
-		// wuffs_private_impl__status__ensure_not_a_suspension. Until the
-		// base library provides that, accept only what cannot be one.
-		isLiteral := value.ConstValue() != nil
-		if op := value.Operator(); (op == 0 || op == t.IDDot) && value.Ident().IsDQStrLiteral(l.g.tm) {
-			msg, _ := t.Unescape(value.Ident().Str(l.g.tm))
-			isLiteral = msg != "" && msg[0] != '$'
+	case kOpaque:
+		if v.typ != l.f.ret {
+			return nil, fmt.Errorf("cannot return %q: wrong type", value.Str(l.g.tm))
 		}
-		if v.typ.kind != kStatus || !isLiteral {
-			return nil, errNotYet("returning a status that is not an ok, error or note literal")
+	case kStatus:
+		if v.typ.kind != kStatus {
+			return nil, fmt.Errorf("cannot return %q: wrong type", value.Str(l.g.tm))
+		}
+		// As the C back-end: a function that is not a coroutine cannot
+		// return a suspension.
+		switch l.statusLiteralKind(value) {
+		case 'o', '#', '@':
+			// No-op.
+		default:
+			v.e = call(basePkg+".Ensure_Not_A_Suspension", v.e)
 		}
 	default:
 		return nil, fmt.Errorf("internal error: unexpected return type")
 	}
-	return l.flush(sReturn{v.e}), nil
+	return l.flush(append(l.saveCursors(), sReturn{v.e})...), nil
 }

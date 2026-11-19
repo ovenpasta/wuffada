@@ -10,7 +10,7 @@
 --    hasher.up_x86_sse42
 
 with Interfaces;
-with Wuffs.Runtime.Temp_Base;
+with Wuffs.Base.Ints;
 
 package body Wuffs.Std.Adler32 is
 
@@ -44,10 +44,10 @@ package body Wuffs.Std.Adler32 is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
            (if Self.Magic = Wuffs.Runtime.Magic_Disabled
-            then Wuffs.Runtime.Temp_Base.Error_Disabled_By_Previous_Error
-            else Wuffs.Runtime.Temp_Base.Error_Initialize_Not_Called);
+            then Wuffs.Base.Error_Disabled_By_Previous_Error
+            else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      return Wuffs.Runtime.Temp_Base.Error_Unsupported_Option;
+      return Wuffs.Base.Error_Unsupported_Option;
    end Set_Quirk;
 
    overriding procedure Update (Self : in out Hasher; A_X : Wuffs.Bytes) is
@@ -84,8 +84,8 @@ package body Wuffs.Std.Adler32 is
       G_I1_Pos : Wuffs.Index := 0;
       G_I1_End : Wuffs.Index := 0;
    begin
-      V_S1 := Self.F_State and 16#FFFF#;
-      V_S2 := Interfaces.Shift_Right (Self.F_State, 16);
+      V_S1 := Wuffs.Base.Ints.Low_Bits_U32 (X => Self.F_State, N => 16);
+      V_S2 := Wuffs.Base.Ints.High_Bits_U32 (X => Self.F_State, N => 16);
       while Wuffs.U64 (M_X.Length) > 0 loop
          V_Remaining := Wuffs.Runtime.Subslice_J (M_X, 0);
          if Wuffs.U64 (M_X.Length) > 5552 then

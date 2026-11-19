@@ -143,6 +143,27 @@ int main(void) {
   v("pick", 5, wuffs_m1test__widget__pick(&w, 5));
   v("pick", 0, wuffs_m1test__widget__pick(&w, 0));
 
+  {
+    static const size_t slices_length[6] = {0, 1, 2, 4, 6, 6};
+    static const uint32_t slices_k[6] = {0, 5, 77, 1000, 0xFFFFFFFFu, 3};
+    for (i = 0; i < 6; i++) {
+      uint8_t scratch[6];
+      uint64_t x = 0;
+      int j;
+      for (j = 0; j < 6; j++) {
+        scratch[j] = (uint8_t)((13 * j + 5 + i) % 256);
+      }
+      v("slices", i,
+        wuffs_m1test__widget__slices(
+            &w, wuffs_base__make_slice_u8(scratch, slices_length[i]),
+            slices_k[i]));
+      for (j = 0; j < 6; j++) {
+        x = x * 256 + scratch[j];
+      }
+      v("slices x", i, x);
+    }
+  }
+
   wuffs_m1test__widget__set_count(&w, 500);
   v("get_count", 500, wuffs_m1test__widget__get_count(&w));
   wuffs_m1test__widget__set_count(&w, 1000);

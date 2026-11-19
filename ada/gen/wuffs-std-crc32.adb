@@ -10,7 +10,7 @@
 --    ieee_hasher.up_x86_sse42
 
 with Interfaces;
-with Wuffs.Runtime.Temp_Base;
+with Wuffs.Base;
 
 package body Wuffs.Std.Crc32 is
 
@@ -734,10 +734,10 @@ package body Wuffs.Std.Crc32 is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
            (if Self.Magic = Wuffs.Runtime.Magic_Disabled
-            then Wuffs.Runtime.Temp_Base.Error_Disabled_By_Previous_Error
-            else Wuffs.Runtime.Temp_Base.Error_Initialize_Not_Called);
+            then Wuffs.Base.Error_Disabled_By_Previous_Error
+            else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      return Wuffs.Runtime.Temp_Base.Error_Unsupported_Option;
+      return Wuffs.Base.Error_Unsupported_Option;
    end Set_Quirk;
 
    overriding procedure Update (Self : in out Ieee_Hasher; A_X : Wuffs.Bytes) is

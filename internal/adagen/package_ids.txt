@@ -9,6 +9,11 @@
 
 adler32 1
 crc32 2
+lzw 3
+deflate 4
+zlib 5
+gzip 6
 
 # Test-only packages count down from 65535.
 m1test 65535
+advtest 65534

@@ -3,7 +3,7 @@
 --  Sources:
 --    testdata/tiny.wuffs
 
-with Wuffs.Runtime.Temp_Base;
+with Wuffs.Base;
 
 package body Wuffs.Std.Tiny is
 
@@ -38,13 +38,13 @@ package body Wuffs.Std.Tiny is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
            (if Self.Magic = Wuffs.Runtime.Magic_Disabled
-            then Wuffs.Runtime.Temp_Base.Error_Disabled_By_Previous_Error
-            else Wuffs.Runtime.Temp_Base.Error_Initialize_Not_Called);
+            then Wuffs.Base.Error_Disabled_By_Previous_Error
+            else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
       if A_Value > 1 then
          return Error_Too_Big;
       end if;
-      return Wuffs.Runtime.Temp_Base.Error_Unsupported_Option;
+      return Wuffs.Base.Error_Unsupported_Option;
    end Set_Quirk;
 
    overriding procedure Update (Self : in out Summer; A_X : Wuffs.Bytes) is

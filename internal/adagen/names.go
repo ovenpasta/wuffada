@@ -96,6 +96,23 @@ func mangle(s string) string {
 	return strings.Join(pieces, "_")
 }
 
+// baseStatusExceptions lists the base statuses whose Ada constant in
+// Wuffs.Base is not what mangleMessage derives from the message.
+var baseStatusExceptions = map[string]string{
+	"@I/O redirect":     "Note_IO_Redirect",
+	"#bad I/O position": "Error_Bad_IO_Position",
+	"#disabled by WUFFS_CONFIG__DST_PIXEL_FORMAT__ENABLE_ALLOWLIST": "Error_Disabled_By_Dst_Pixel_Format_Enable_Allowlist",
+}
+
+// baseStatusName returns the name of the Wuffs.Base constant for the base
+// status whose message (with its leading '@', '$' or '#') is msg.
+func baseStatusName(msg string) (string, error) {
+	if s, ok := baseStatusExceptions[msg]; ok {
+		return s, nil
+	}
+	return mangleMessage(msg)
+}
+
 // mangleMessage converts a Wuffs status message such as "#unsupported
 // option" to an Ada identifier such as "Error_Unsupported_Option".
 func mangleMessage(msg string) (string, error) {
@@ -178,4 +195,123 @@ func (g *gen) declareName(name string, what string) error {
 	}
 	g.names[lower] = what
 	return nil
+}
+
+// The functions below are a backstop. The naming scheme above is meant to
+// make clashes impossible; these check, for every declarative region that
+// the generator emits other than the package itself (which declareName
+// covers), that every name is a valid Ada identifier and that no two are the
+// same (ignoring case), so that a mistake in the scheme is a generation
+// error and never an Ada compilation error.
+
+type nameSet struct {
+	what string
+	seen map[string]string
+}
+
+func (s *nameSet) add(name string, what string) error {
+	if !isValidAdaIdent(name) {
+		return fmt.Errorf("internal error: %s %q is not a valid Ada identifier", what, name)
+	}
+	lower := strings.ToLower(name)
+	if prev, ok := s.seen[lower]; ok {
+		return fmt.Errorf("internal error: %s: the name %q is used for %s and for %s", s.what, name, prev, what)
+	}
+	if s.seen == nil {
+		s.seen = map[string]string{}
+	}
+	s.seen[lower] = what
+	return nil
+}
+
+// checkRecordNames checks the components of the record for s.
+func checkRecordNames(s *structInfo) error {
+	names := &nameSet{what: "record components"}
+	if err := names.add("Magic", "the magic component"); err != nil {
+		return err
+	}
+	if s.hasActiveCoroutine {
+		if err := names.add(activeCoroutineField, "the active coroutine component"); err != nil {
+			return err
+		}
+	}
+	for _, f := range s.fields {
+		if f.typ.kind == kUtility {
+			continue
+		}
+		if err := names.add(f.name, "a field"); err != nil {
+			return err
+		}
+	}
+	for _, f := range s.extra {
+		if err := names.add(f.name, "coroutine state"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkSubprogramNames checks the names that f's body declares: its
+// parameters, local variables, loop names and labels (which, in Ada, are
+// all declared in the subprogram's one declarative region).
+func checkSubprogramNames(f *fn) error {
+	names := &nameSet{what: "subprogram " + f.name}
+	if err := names.add(f.self.name, "the receiver"); err != nil {
+		return err
+	}
+	for _, o := range f.params {
+		if err := names.add(o.name, "a parameter"); err != nil {
+			return err
+		}
+	}
+	for _, o := range f.locals {
+		// (An unused local is not declared, but its name is still taken.)
+		if err := names.add(o.name, "a local variable"); err != nil {
+			return err
+		}
+	}
+	var visit func(ss []stmt) error
+	visit = func(ss []stmt) error {
+		for _, s := range ss {
+			switch s := s.(type) {
+			case sLabel:
+				if err := names.add(s.name, "a label"); err != nil {
+					return err
+				}
+			case sResume:
+				if err := names.add(resumeLabel(s.n), "a resume label"); err != nil {
+					return err
+				}
+			case sLoop:
+				if s.name != "" {
+					if err := names.add(s.name, "a loop name"); err != nil {
+						return err
+					}
+				}
+				if err := visit(s.body); err != nil {
+					return err
+				}
+			case sIf:
+				for _, br := range s.branches {
+					if err := visit(br.body); err != nil {
+						return err
+					}
+				}
+				if err := visit(s.els); err != nil {
+					return err
+				}
+			case sCase:
+				for _, arm := range s.arms {
+					if err := visit(arm.body); err != nil {
+						return err
+					}
+				}
+				if err := visit(s.others); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return visit(f.body)
 }

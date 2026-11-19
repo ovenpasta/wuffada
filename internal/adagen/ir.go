@@ -3,6 +3,8 @@
 
 package adagen
 
+import "math/big"
+
 // This file defines the per-function intermediate representation: a small
 // Ada-shaped tree of statements and expressions. Functions are lowered from
 // the Wuffs AST to this IR (lower_*.go), transformed by passes (passes.go)
@@ -68,6 +70,21 @@ type (
 		args []expr
 	}
 
+	// eRel is a comparison: l op r, for one of Ada's relational operators.
+	// Every comparison in the IR is an eRel (bin makes one too), and the
+	// operator that is printed is always adaOp's: see there.
+	//
+	// li and ri say what is known about the operands' values, if anything.
+	eRel struct {
+		op     string
+		l, r   expr
+		li, ri operandInfo
+	}
+
+	// eOut marks an actual parameter of a procedure call whose formal has
+	// mode "out" (or "in out"): the call assigns x. It prints as x.
+	eOut struct{ x expr }
+
 	// eAgg is a record aggregate with named components.
 	eAgg struct {
 		names []string
@@ -100,6 +117,8 @@ func (eUn) isExpr()    {}
 func (eBin) isExpr()   {}
 func (eAgg) isExpr()   {}
 func (eIf) isExpr()    {}
+func (eRel) isExpr()   {}
+func (eOut) isExpr()   {}
 func (eNamed) isExpr() {}
 
 func raw(s string) expr { return eRaw{s} }
@@ -140,6 +159,9 @@ type (
 	// sExit is "exit [name];".
 	sExit struct{ name string }
 
+	// sExitWhen is "exit when cond;", for the innermost loop.
+	sExitWhen struct{ cond expr }
+
 	// sLabel is "<<name>> null;".
 	sLabel struct{ name string }
 
@@ -162,23 +184,51 @@ type (
 	}
 
 	sComment struct{ text string }
+
+	// sResume is a coroutine's suspension point number n: "G_Susp := n;"
+	// followed by the label that the coroutine's dispatch jumps to when it
+	// is resumed at n. See coroutine.go.
+	//
+	// If labelOnly, it is just the label: the statements before it have
+	// already set G_Susp and jumped away.
+	sResume struct {
+		n         int
+		susp      *variable
+		labelOnly bool
+	}
+
+	// sCase is "case sel is when value => body ... when others => others
+	// end case;".
+	sCase struct {
+		sel    expr
+		arms   []caseArm
+		others []stmt
+	}
 )
+
+type caseArm struct {
+	value string
+	body  []stmt
+}
 
 type ifBranch struct {
 	cond expr
 	body []stmt
 }
 
-func (sAssign) isStmt()  {}
-func (sCall) isStmt()    {}
-func (sIf) isStmt()      {}
-func (sLoop) isStmt()    {}
-func (sExit) isStmt()    {}
-func (sLabel) isStmt()   {}
-func (sGoto) isStmt()    {}
-func (sReturn) isStmt()  {}
-func (sPragma) isStmt()  {}
-func (sComment) isStmt() {}
+func (sAssign) isStmt()   {}
+func (sCall) isStmt()     {}
+func (sIf) isStmt()       {}
+func (sLoop) isStmt()     {}
+func (sExit) isStmt()     {}
+func (sExitWhen) isStmt() {}
+func (sLabel) isStmt()    {}
+func (sGoto) isStmt()     {}
+func (sReturn) isStmt()   {}
+func (sPragma) isStmt()   {}
+func (sComment) isStmt()  {}
+func (sResume) isStmt()   {}
+func (sCase) isStmt()     {}
 
 type varKind uint8
 
@@ -193,6 +243,14 @@ type variable struct {
 	kind varKind
 	name string   // Ada name.
 	typ  *adaType // Ada type.
+
+	// mode is a parameter's mode: "" (in) or "in out".
+	mode string
+
+	// quiet means that the variable only exists to receive a value that
+	// nothing reads (a discarded result), so GNAT's warnings about it are
+	// turned off.
+	quiet bool
 
 	// decl is the subtype indication to declare the variable with (which may
 	// be narrower than typ.name) and init is its initial value, if any.
@@ -216,4 +274,63 @@ type fn struct {
 	ret        *adaType // nil for a procedure.
 	locals     []*variable
 	body       []stmt
+}
+
+// operandInfo is what is known about a comparison's operand: that it is the
+// literal lit, or that it has an Ada subtype whose bounds are lo and hi.
+// The zero value means that nothing is known.
+type operandInfo struct {
+	lit    *big.Int
+	lo, hi *big.Int
+}
+
+var relationalInverse = map[string]string{
+	"=": "/=", "/=": "=", "<": ">=", ">=": "<", ">": "<=", "<=": ">",
+}
+
+func isRelational(op string) bool {
+	_, ok := relationalInverse[op]
+	return ok
+}
+
+// rel makes a comparison about whose operands nothing is known.
+func rel(op string, l expr, r expr) expr { return eRel{op: op, l: l, r: r} }
+
+// negated returns the comparison that is true exactly when e is false.
+func (e eRel) negated() eRel {
+	e.op = relationalInverse[e.op]
+	return e
+}
+
+// adaOp returns the operator to print for e. It is e.op, except that a
+// comparison of a value with a literal that is a bound of the value's
+// subtype is normalised:
+//
+//	x <= lowest   becomes   x = lowest
+//	x >= highest  becomes   x = highest
+//
+// (and likewise with the literal on the left). They are equivalent, since
+// x cannot be below lowest or above highest, and GNAT warns that the former
+// "can never be less than" (an error in this project's builds). Wuffs code
+// often says "x <= 0" for an unsigned x or "x >= 9" for an x whose
+// refinement stops at 9, and negating "x < 10" for an x in 0 .. 10 (which
+// flattening a loop does) gives such a comparison too. Because this is the
+// only place that chooses the printed operator, every comparison gets the
+// same treatment however it came about.
+func (e eRel) adaOp() string {
+	atBound := func(op string, v operandInfo, lit operandInfo) bool {
+		if lit.lit == nil || v.lo == nil || v.hi == nil {
+			return false
+		}
+		return (op == "<=" && lit.lit.Cmp(v.lo) == 0) || (op == ">=" && lit.lit.Cmp(v.hi) == 0)
+	}
+	if atBound(e.op, e.li, e.ri) {
+		return "="
+	}
+	// Literal on the left: "lit >= x" is "x <= lit".
+	mirrored := map[string]string{"<=": ">=", ">=": "<="}[e.op]
+	if mirrored != "" && atBound(mirrored, e.ri, e.li) {
+		return "="
+	}
+	return e.op
 }

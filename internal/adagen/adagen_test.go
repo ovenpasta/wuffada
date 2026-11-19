@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -38,12 +39,16 @@ func generate(opts Options, names []string, srcs [][]byte) (*Output, error) {
 		}
 		files = append(files, f)
 	}
-	resolveUse := func(usePath string) ([]byte, error) {
-		return nil, fmt.Errorf("no such use path %q", usePath)
+	resolveUse := opts.ResolveUse
+	if resolveUse == nil {
+		resolveUse = func(usePath string) ([]byte, error) {
+			return nil, fmt.Errorf("no such use path %q", usePath)
+		}
 	}
 	if _, err := check.Check(tm, files, resolveUse); err != nil {
 		return nil, err
 	}
+	opts.ResolveUse = resolveUse
 	return Generate(tm, files, opts)
 }
 
@@ -130,6 +135,35 @@ func TestCheckedIn(tt *testing.T) {
 			"wuffs/std/crc32/common_up_x86_sse42.wuffs",
 		},
 	}, {
+		name:   "lzw",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/lzw/decode_lzw.wuffs",
+			"wuffs/std/lzw/decode_quirks.wuffs",
+		},
+	}, {
+		name:   "deflate",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/deflate/common_consts.wuffs",
+			"wuffs/std/deflate/decode_deflate.wuffs",
+			"wuffs/std/deflate/decode_huffman_bmi2.wuffs",
+			"wuffs/std/deflate/decode_huffman_fast32.wuffs",
+			"wuffs/std/deflate/decode_huffman_fast64.wuffs",
+			"wuffs/std/deflate/decode_huffman_slow.wuffs",
+		},
+	}, {
+		name:   "zlib",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/zlib/decode_quirks.wuffs",
+			"wuffs/std/zlib/decode_zlib.wuffs",
+		},
+	}, {
+		name:   "gzip",
+		outDir: "ada/gen",
+		files:  []string{"wuffs/std/gzip/decode_gzip.wuffs"},
+	}, {
 		name:   "m1test",
 		outDir: "ada/tests",
 		files:  []string{"internal/adagen/testdata/m1test.wuffs"},
@@ -157,7 +191,11 @@ func TestCheckedIn(tt *testing.T) {
 			tt.Errorf("%s: no package id: %v", tc.name, err)
 			continue
 		}
-		out, err := generate(Options{PackageName: tc.name, PackageID: id}, tc.files, srcs)
+		out, err := generate(Options{
+			PackageName: tc.name,
+			PackageID:   id,
+			ResolveUse:  UseResolver(filepath.Join(root, "wuffs")),
+		}, tc.files, srcs)
 		if err != nil {
 			tt.Errorf("%s: %v", tc.name, err)
 			continue
@@ -222,21 +260,42 @@ func TestRejects(tt *testing.T) {
 		opts Options
 		want string
 	}{{
-		what: "coroutine",
+		what: "io_bind",
 		src: prelude + `
 			pub func foo.bar?(src: base.io_reader) {
+				var r : base.io_reader
 				var c : base.u8
-				c = args.src.read_u8?()
+				io_bind (io: r, data: this.a[..], history_position: 0) {
+					c = r.read_u8?()
+				}
 				this.x = c as base.u32
 			}`,
-		want: "not yet supported: coroutines",
+		want: "not yet supported: io_bind blocks",
 	}, {
-		what: "yield in a coroutine",
+		what: "assigning to an argument in a coroutine",
 		src: prelude + `
-			pub func foo.bar?() {
+			pub func foo.bar?(n: base.u32) {
+				args.n = args.n ~mod+ 1
+				this.x = args.n
 				yield? base."$short read"
 			}`,
-		want: "not yet supported: coroutines",
+		want: "not yet supported: assigning to args.n in a coroutine",
+	}, {
+		what: "a local array of more than 1 KiB",
+		src: prelude + `
+			pub func foo.bar!() {
+				var big : array[1025] base.u8
+				big[0] = 1
+				this.x = big[0] as base.u32
+			}`,
+		want: "not yet supported: var big: a local array of more than 1024 bytes",
+	}, {
+		what: "a slice of something other than bytes",
+		src: prelude + `
+			pub func foo.bar!(s: roslice base.u16) {
+				this.x = (args.s.length() & 0xFF) as base.u32
+			}`,
+		want: "slice type \"roslice base.u16\" is not yet supported",
 	}, {
 		what: "non-classy struct",
 		src:  "pub struct foo(\n    x : base.u32,\n)\n",
@@ -245,30 +304,6 @@ func TestRejects(tt *testing.T) {
 		what: "private struct",
 		src:  "pri struct foo?(\n    x : base.u32,\n)\n",
 		want: "not yet supported: struct foo: private structs",
-	}, {
-		what: "writable slice parameter",
-		src: prelude + `
-			pub func foo.bar!(dst: slice base.u8) {
-				this.x = (args.dst.length() & 0xFF) as base.u32
-			}`,
-		want: "not yet supported: parameter dst of type \"slice base.u8\"",
-	}, {
-		what: "unsupported builtin method",
-		src: prelude + `
-			pub func foo.bar!(v: base.u32) {
-				this.x = args.v.min(no_more_than: 4)
-			}`,
-		want: "not yet supported: method call",
-	}, {
-		what: "slicing an array",
-		src: prelude + `
-			pri func foo.baz!(s: roslice base.u8) {
-				this.x = (args.s.length() & 0xFF) as base.u32
-			}
-			pub func foo.bar!() {
-				this.baz!(s: this.a[.. 2])
-			}`,
-		want: "not yet supported: slicing",
 	}, {
 		what: "interface without an Ada equivalent",
 		src: `pub struct foo? implements base.hasher_u64()
@@ -331,18 +366,6 @@ func TestRejects(tt *testing.T) {
 				this.x = abc ~mod+ aBC
 			}`,
 		want: "another local variable has the same Ada name \"V_ABC\"",
-	}, {
-		what: "returning a non-literal status",
-		src: prelude + `
-			pri func foo.baz!() base.status {
-				return ok
-			}
-			pub func foo.bar!() base.status {
-				var z : base.status
-				z = this.baz!()
-				return z
-			}`,
-		want: "not yet supported: returning a status that is not an ok, error or note literal",
 	}}
 
 	for _, tc := range testCases {
@@ -514,7 +537,7 @@ func TestNamesSliceTemporary(tt *testing.T) {
 		}
 		pub func foo.bar!(x: roslice base.u8) base.u32 {
 			var s : base.u32
-			s = this.baz(s: args.x[.. 0])
+			s = this.baz(s: args.x.suffix(up_to: 2))
 			s ~mod+= T1[s & 3] as base.u32
 			s ~mod+= G_T1[s & 3] as base.u32
 			return s
@@ -667,9 +690,635 @@ func TestLongSourceName(tt *testing.T) {
 }
 
 func TestPackageIDs(tt *testing.T) {
-	for name, want := range map[string]uint32{"adler32": 1, "crc32": 2, "m1test": 65535, "nosuch": 0} {
+	for name, want := range map[string]uint32{
+		"adler32": 1, "crc32": 2, "lzw": 3, "deflate": 4, "zlib": 5, "gzip": 6, "m1test": 65535, "nosuch": 0,
+	} {
 		if got, err := PackageID(name); err != nil || got != want {
 			tt.Errorf("PackageID(%q): got %d, %v, want %d", name, got, err, want)
+		}
+	}
+}
+
+// ---- Coroutines.
+
+// TestCoroutineGolden checks the whole lowering of a coroutine with
+// suspension points inside nested loops and inside an if-else chain, and
+// with a labelled break and continue that leave flattened loops.
+func TestCoroutineGolden(tt *testing.T) {
+	out, err := generateFiles(Options{PackageName: "coro", PackageID: 9}, "testdata/coro.wuffs")
+	if err != nil {
+		tt.Fatal(err)
+	}
+	compareGolden(tt, out.Spec, "testdata/coro.ads.golden")
+	compareGolden(tt, out.Body, "testdata/coro.adb.golden")
+
+	body := string(out.Body)
+	wantContains(tt, body,
+		// The dispatch.
+		"      case G_Susp is\n         when 0 =>\n            null;\n         when 1 =>\n            goto G_Resume_1;\n",
+		// A suspension point inside two loops is a top-level label.
+		"\n      G_Susp := 1;\n      <<G_Resume_1>>\n",
+		// "break.outer" and "continue.outer" out of flattened loops.
+		"      goto G_Done_2;\n",
+		"      goto G_Continue_1_Outer;\n",
+		// A yield inside an if-else chain.
+		"      G_Susp := 2;\n      goto G_Suspend;\n      <<G_Resume_2>>\n",
+		// The loop invariant of a flattened loop is an assertion.
+		"      pragma Assert (V_I < 4);\n",
+		// Only the locals that are live across a suspension are saved.
+		"      Self.G_S_1_Run_I := V_I;\n      Self.G_S_1_Run_J := V_J;\n      Self.G_S_1_Run_Keep := V_Keep;\n")
+	wantNotContains(tt, body, "Loop_Invariant", "Run_C ", "Run_Scratch", "end loop")
+}
+
+// findResumablesIn parses and checks src, and returns the names of the
+// resumable locals of its function called name, sorted.
+func findResumablesIn(tt *testing.T, src string, name string) string {
+	tt.Helper()
+	tm := &t.Map{}
+	tokens, _, err := t.Tokenize(tm, "test.wuffs", []byte(src+"\n"))
+	if err != nil {
+		tt.Fatal(err)
+	}
+	f, err := parse.Parse(tm, "test.wuffs", tokens, nil)
+	if err != nil {
+		tt.Fatal(err)
+	}
+	if _, err := check.Check(tm, []*a.File{f}, nil); err != nil {
+		tt.Fatal(err)
+	}
+	for _, n := range f.TopLevelDecls() {
+		if n.Kind() != a.KFunc || n.AsFunc().FuncName().Str(tm) != name {
+			continue
+		}
+		m, err := findResumables(tm, n.AsFunc())
+		if err != nil {
+			tt.Fatal(err)
+		}
+		names := []string(nil)
+		for id, resumable := range m {
+			if resumable {
+				names = append(names, id.Str(tm))
+			}
+		}
+		sort.Strings(names)
+		return strings.Join(names, " ")
+	}
+	tt.Fatalf("no function %q", name)
+	return ""
+}
+
+// TestLiveness checks the port of upstream's liveness analysis: which
+// locals have to survive a suspension.
+func TestLiveness(tt *testing.T) {
+	const prelude = "pub struct foo? (\n    x : base.u32,\n)\n"
+	testCases := []struct {
+		what string
+		body string
+		want string
+	}{{
+		what: "read after a suspension",
+		body: `
+			var a : base.u32
+			var b : base.u32
+			a = 1
+			b = 2
+			yield? base."$short read"
+			this.x = a`,
+		want: "a",
+	}, {
+		what: "assigned again before being read",
+		body: `
+			var a : base.u32
+			a = 1
+			yield? base."$short read"
+			a = 2
+			this.x = a`,
+		want: "",
+	}, {
+		what: "live around a loop",
+		body: `
+			var i : base.u32
+			var c : base.u8
+			var t : base.u32
+			while i < 10 {
+				c = args.src.read_u8?()
+				t = c as base.u32
+				this.x ~mod+= t
+				i ~mod+= 1
+			}`,
+		want: "i",
+	}, {
+		what: "live in one branch only",
+		body: `
+			var a : base.u32
+			var b : base.u32
+			a = this.x
+			b = this.x
+			if a > 3 {
+				yield? base."$short read"
+				this.x = b
+			} else {
+				this.x = a
+			}`,
+		want: "b",
+	}, {
+		what: "the argument of a coroutine call",
+		body: `
+			var a : base.u32
+			a = this.x
+			this.other?(n: a)`,
+		want: "a",
+	}, {
+		what: "not across a built-in I/O call that it is assigned from",
+		body: `
+			var c : base.u8
+			c = args.src.read_u8?()
+			this.x = c as base.u32
+			c = args.src.read_u8?()
+			this.x ~mod+= c as base.u32`,
+		want: "",
+	}}
+	for _, tc := range testCases {
+		src := prelude +
+			"pri func foo.other?(n: base.u32) {\n    this.x = args.n\n    yield? base.\"$short read\"\n}\n" +
+			"pub func foo.bar?(src: base.io_reader) {\n" + tc.body + "\n}\n"
+		if got := findResumablesIn(tt, src, "bar"); got != tc.want {
+			tt.Errorf("%s: got %q, want %q", tc.what, got, tc.want)
+		}
+	}
+}
+
+// TestFlatten checks the flattening pass on hand-made IR.
+func TestFlatten(tt *testing.T) {
+	susp := &variable{name: "G_Susp"}
+	cond := func(s string) expr { return raw(s) }
+	body := []stmt{
+		sCall{raw("Before")},
+		// A loop without a suspension point stays a loop, but its exit
+		// from the enclosing (flattened) loop becomes a goto.
+		sLoop{name: "G_Loop_1", cond: cond("A"), body: []stmt{
+			sPragma{name: "Loop_Invariant", args: []expr{raw("Inv")}},
+			sLoop{cond: cond("B"), body: []stmt{
+				sPragma{name: "Loop_Invariant", args: []expr{raw("Inner_Inv")}},
+				sIf{branches: []ifBranch{{cond("C"), []stmt{sExit{"G_Loop_1"}}}}},
+			}},
+			sIf{
+				branches: []ifBranch{
+					{cond("D"), []stmt{sResume{n: 1, susp: susp}, sCall{raw("After_Resume")}}},
+					{cond("E"), []stmt{sGoto{"G_Exit"}}},
+				},
+				els: []stmt{sCall{raw("Else_Part")}},
+			},
+		}},
+		sCall{raw("After")},
+	}
+	p := &printer{}
+	p.stmts(dropUnusedLabels(flatten(body)))
+	want := `Before;
+<<G_Head_1>>
+if not A then
+   goto G_Done_2;
+end if;
+pragma Assert (Inv);
+while B loop
+   pragma Loop_Invariant (Inner_Inv);
+   if C then
+      goto G_Done_2;
+   end if;
+end loop;
+if not D then
+   goto G_Else_4;
+end if;
+G_Susp := 1;
+<<G_Resume_1>>
+After_Resume;
+goto G_Fi_3;
+<<G_Else_4>>
+if not E then
+   goto G_Else_5;
+end if;
+goto G_Exit;
+<<G_Else_5>>
+Else_Part;
+<<G_Fi_3>>
+goto G_Head_1;
+<<G_Done_2>>
+After;
+`
+	if got := p.b.String(); got != want {
+		tt.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+
+	// Nothing to flatten: nothing changes.
+	plain := []stmt{sLoop{cond: cond("A"), body: []stmt{sCall{raw("X")}}}}
+	p = &printer{}
+	p.stmts(flatten(plain))
+	if got, want := p.b.String(), "while A loop\n   X;\nend loop;\n"; got != want {
+		tt.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestUseResolver(tt *testing.T) {
+	root := filepath.Join("..", "..", "wuffs")
+	if _, err := os.Stat(root); err != nil {
+		tt.Skip("no Wuffs checkout at ./wuffs")
+	}
+	src, err := UseResolver(root)("std/adler32.wuffs")
+	if err != nil {
+		tt.Fatal(err)
+	}
+	wantContains(tt, string(src),
+		"pub struct hasher? implements base.hasher_u32()\n",
+		"pub func hasher.update_u32!(x: roslice base.u8) base.u32 { }\n")
+	wantNotContains(tt, string(src), "up_arm_neon", "pri ")
+	if _, err := UseResolver(root)("std/no_such_package.wuffs"); err == nil {
+		tt.Errorf("no error for a missing package")
+	}
+}
+
+// TestSliceArgumentOfCoroutineCall is the reviewer's repro for a slice
+// argument that was evaluated before the resume label (so that the callee
+// got an empty slice when the caller was resumed): the temporary that holds
+// the slice must be assigned after the label.
+func TestSliceArgumentOfCoroutineCall(tt *testing.T) {
+	got := mustGenerate(tt, `
+		pub struct foo? (
+			sum : base.u32,
+			buf : array[16] base.u8,
+		)
+		pri func foo.eat?(s: roslice base.u8, src: base.io_reader) {
+			var c : base.u8
+			c = args.src.read_u8?()
+			this.sum ~mod+= (args.s.length() & 0xFF) as base.u32
+			c = args.src.read_u8?()
+			this.sum ~mod+= c as base.u32
+		}
+		pub func foo.bar?(src: base.io_reader) {
+			var c : base.u8
+			c = args.src.read_u8?()
+			this.buf[12] = c
+			this.eat?(s: this.buf[..].suffix(up_to: 4), src: args.src)
+		}`)
+	// In Bar (the last function): the label, then the temporary, then the
+	// saving of the cursor, then the call.
+	wantContains(tt, got, ""+
+		"      G_Susp := 2;\n"+
+		"      <<G_Resume_2>>\n"+
+		"      G_T2 :=\n"+
+		"        Wuffs.Runtime.Suffix (S => (Base => Self.F_Buf'Unrestricted_Access,\n")
+	label, tmp, callee := strings.LastIndex(got, "<<G_Resume_2>>"), strings.LastIndex(got, "G_T2 :="),
+		strings.LastIndex(got, "Eat (Self,")
+	if label < 0 || tmp < label || callee < tmp {
+		tt.Errorf("the slice temporary is not assigned between the resume label and the call:\n%s", got)
+	}
+}
+
+// TestCheckTemps checks the structural guard behind that: IR in which a
+// temporary is computed before a resume label and read after it is refused.
+func TestCheckTemps(tt *testing.T) {
+	tmp := &variable{name: "G_T1"}
+	other := &variable{name: "V_X"}
+	susp := &variable{name: "G_Susp"}
+	l := &lowerer{temps: map[*variable]bool{tmp: true}}
+	use := sAssign{eVar{other}, eVar{tmp}}
+	def := sAssign{eVar{tmp}, raw("1")}
+	resume := sResume{n: 1, susp: susp}
+
+	good := [][]stmt{
+		{def, use},
+		{resume, def, use},
+		{def, use, resume},
+		// Defined on every path after the label.
+		{resume, sIf{branches: []ifBranch{{raw("C"), []stmt{def}}}, els: []stmt{def}}, use},
+		// As an "out" parameter.
+		{resume, sCall{callNamed("P", "N", expr(eOut{eVar{tmp}}))}, use},
+		// The read_u16le? shape: both branches define it, one after a label.
+		{sIf{branches: []ifBranch{{raw("C"), []stmt{def}}}, els: []stmt{resume, def}}, use},
+	}
+	for i, ss := range good {
+		if err := l.checkTemps(ss); err != nil {
+			tt.Errorf("good #%d: %v", i, err)
+		}
+	}
+	bad := [][]stmt{
+		{def, resume, use},
+		{def, sIf{branches: []ifBranch{{raw("C"), []stmt{resume}}}}, use},
+		{resume, sIf{branches: []ifBranch{{raw("C"), []stmt{def}}}}, use},
+		{def, sLoop{cond: raw("C"), body: []stmt{use, resume}}},
+		{def, resume, sCall{call("P", bin("+", eVar{tmp}, raw("1")))}},
+		// Passed directly, but as an "in" parameter: a read.
+		{def, resume, sCall{callNamed("P", "X", expr(eVar{tmp}))}},
+		{resume, sCall{callNamed("P", "X", expr(eVar{tmp}), "N", expr(eOut{eVar{tmp}}))}},
+	}
+	for i, ss := range bad {
+		if err := l.checkTemps(ss); err == nil {
+			tt.Errorf("bad #%d: no error", i)
+		}
+	}
+}
+
+// TestAssertionsAreReads is the reviewer's repro for a local that only a
+// loop invariant mentions after a suspension: lowered assertions are
+// evaluated (in the checked profile), so the local has to be saved, unlike
+// in upstream's liveness analysis.
+func TestAssertionsAreReads(tt *testing.T) {
+	const src = `
+		pub struct foo? (
+			x : base.u32,
+		)
+		pub func foo.bar?(src: base.io_reader) {
+			var c : base.u8
+			var n : base.u32[..= 10]
+			var m : base.u32[..= 10]
+			var i : base.u32
+			n = 5
+			m = 6
+			this.x ~mod+= n
+			while i < 3,
+					inv n == 5,
+					inv m == 6,
+			{
+				c = args.src.read_u8?()
+				this.x ~mod+= c as base.u32
+				i ~mod+= 1
+			}
+		}`
+	if got, want := findResumablesIn(tt, src, "bar"), "i m n"; got != want {
+		tt.Errorf("resumables: got %q, want %q", got, want)
+	}
+	got := mustGenerate(tt, src)
+	wantContains(tt, got,
+		"      Self.G_S_1_Bar_N := V_N;\n",
+		"         V_N := Self.G_S_1_Bar_N;\n",
+		"      Self.G_S_1_Bar_M := V_M;\n",
+		"      pragma Assert (V_N = 5);\n",
+		"      pragma Assert (V_M = 6);\n")
+}
+
+// TestLivenessThroughOutput targets two rules of the liveness analysis by
+// what they do to the generated code: the state at a "continue" is merged
+// into the loop's entry state, and the arguments of a coroutine call are
+// live at once.
+func TestLivenessThroughOutput(tt *testing.T) {
+	// x is read at the top of the loop body. It is only live there, after
+	// a suspension, on the path through "continue": the other path assigns
+	// it first.
+	got := mustGenerate(tt, `
+		pub struct foo? (
+			x : base.u32,
+		)
+		pub func foo.bar?(src: base.io_reader) {
+			var x : base.u32
+			var i : base.u32
+			var c : base.u8
+			x = this.x
+			while i < 3 {
+				this.x ~mod+= x
+				c = args.src.read_u8?()
+				i ~mod+= 1
+				if c == 0 {
+					continue
+				}
+				x = 5
+			}
+		}`)
+	wantContains(tt, got,
+		"      Self.G_S_1_Bar_X := V_X;\n",
+		"         V_X := Self.G_S_1_Bar_X;\n",
+		"      Self.G_S_1_Bar_I := V_I;\n")
+	wantNotContains(tt, got, "_Bar_C ")
+
+	// a is an argument of a coroutine call and never mentioned again. The
+	// call is made again when the caller is resumed, so a must be saved. b
+	// is assigned after the call and not live across anything.
+	got = mustGenerate(tt, `
+		pub struct foo? (
+			x : base.u32,
+		)
+		pri func foo.other?(n: base.u32, src: base.io_reader) {
+			var c : base.u8
+			c = args.src.read_u8?()
+			this.x ~mod+= args.n ~mod+ (c as base.u32)
+		}
+		pub func foo.bar?(src: base.io_reader) {
+			var a : base.u32
+			var b : base.u32
+			a = this.x ~mod+ 1
+			this.other?(n: a, src: args.src)
+			b = this.x
+			this.x = b ~mod* 3
+		}`)
+	wantContains(tt, got,
+		"      Self.G_S_2_Bar_A := V_A;\n",
+		"         V_A := Self.G_S_2_Bar_A;\n",
+		"Other (Self, A_N => V_A, A_Src => A_Src, A_Src_Meta => A_Src_Meta);\n")
+	wantNotContains(tt, got, "_Bar_B ")
+}
+
+// TestSliceActuals checks the rule for slice arguments of Wuffs function
+// calls: only a whole slice parameter of the caller is passed directly;
+// anything else (here, parts of a field of the receiver, which GNAT would
+// reject next to the receiver itself) goes through a slice handle.
+func TestSliceActuals(tt *testing.T) {
+	got := mustGenerate(tt, `
+		pub struct foo? (
+			sum : base.u32,
+			buf : array[16] base.u8,
+		)
+		pri func foo.g!(s: slice base.u8) base.u32 {
+			if args.s.length() > 0 {
+				args.s[0] = 1
+			}
+			return this.sum
+		}
+		pri func foo.h!(s: slice base.u8) {
+			if args.s.length() > 0 {
+				args.s[0] ~mod+= 2
+			}
+		}
+		pub func foo.bar!(w: slice base.u8) base.u32 {
+			var x : base.u32
+			this.h!(s: this.buf[2 .. 8])
+			x = this.g!(s: this.buf[..])
+			this.h!(s: args.w)
+			return x
+		}`)
+	wantContains(tt, got,
+		// Through handles.
+		"H (Self, G_T1.Base (G_T1.First .. Wuffs.Runtime.Last (G_T1)));\n",
+		"G (Self, G_T2.Base (G_T2.First .. Wuffs.Runtime.Last (G_T2)))",
+		// The caller's own parameter, whole.
+		"H (Self, A_W);\n",
+		// Element writes through a slice parameter.
+		"A_S (A_S'First + 0) := 1;\n",
+		"A_S (A_S'First + 0) := A_S (A_S'First + 0) + 2;\n")
+	wantNotContains(tt, got, "(Self, Self.")
+}
+
+// TestComparisonsAtBounds checks that a comparison with a bound of its
+// operand's subtype is normalised wherever it comes from: written in the
+// source, or produced by negating a loop or if condition when a coroutine
+// is flattened (GNAT rejects "V_I >= 10" for a V_I in 0 .. 10: "can never
+// be greater than"). The first source is the reviewer's repro; test.sh
+// compiles the same shapes (advtest.wuffs has them).
+func TestComparisonsAtBounds(tt *testing.T) {
+	got := mustGenerate(tt, `
+		pub struct foo? (
+			sum : base.u32,
+		)
+		pub func foo.w?(src: base.io_reader) {
+			var c : base.u8
+			var i : base.u32[..= 10]
+			var j : base.u32[..= 7]
+			while i < 10 {
+				c = args.src.read_u8?()
+				this.sum ~mod+= c as base.u32
+				if c > 0 {
+					c = args.src.read_u8?()
+				}
+				if 7 > j {
+					c = args.src.read_u8?()
+				}
+				i += 1
+			}
+		}`)
+	wantContains(tt, got,
+		"      if V_I = 10 then\n         goto G_Done_2;\n",
+		"      if V_C = 0 then\n",
+		"      if 7 = V_J then\n")
+	wantNotContains(tt, got, ">= 10", "<= 0", "7 <= V_J")
+
+	// Directly, and with a narrowed local.
+	got = mustGenerate(tt, `
+		pub struct foo? (
+			sum : base.u32,
+		)
+		pub func foo.bar!(v: base.u32) {
+			var a : base.u32
+			var i : base.u32[..= 9]
+			a = args.v & 0xFF
+			i = args.v % 10
+			if a >= 255 {
+				this.sum = 1
+			}
+			if i <= 0 {
+				this.sum = 2
+			}
+			if 9 <= i {
+				this.sum = 3
+			}
+			if a >= 254 {
+				this.sum = 4
+			}
+		}`)
+	wantContains(tt, got, "if V_A = 255 then", "if V_I = 0 then", "if 9 = V_I then", "if V_A >= 254 then")
+
+	// The operator is chosen in one place, also for a negated comparison.
+	e := eRel{op: "<", l: raw("X"), r: raw("10"),
+		li: operandInfo{lo: big.NewInt(0), hi: big.NewInt(10)}, ri: operandInfo{lit: big.NewInt(10)}}
+	if got, want := flat(negate(e)), "X = 10"; got != want {
+		tt.Errorf("negated: got %q, want %q", got, want)
+	}
+	if got, want := flat(negate(negate(e))), "X < 10"; got != want {
+		tt.Errorf("negated twice: got %q, want %q", got, want)
+	}
+	if got, want := flat(negate(rel(">", raw("X"), raw("0")))), "X <= 0"; got != want {
+		tt.Errorf("without knowing the operand's type: got %q, want %q", got, want)
+	}
+}
+
+// TestStateNames checks that the record components for coroutine state are
+// unambiguous: func "p_q" with a local "r" and func "p" with a local "q_r"
+// (the reviewer's repro, which used to give two components G_S_P_Q_R).
+func TestStateNames(tt *testing.T) {
+	got := mustGenerate(tt, `
+		pub struct foo? (
+			sum : base.u32,
+		)
+		pub func foo.p_q?(src: base.io_reader) {
+			var r : base.u8
+			r = args.src.read_u8?()
+			this.sum = args.src.read_u32le?()
+			this.sum ~mod+= r as base.u32
+		}
+		pub func foo.p?(src: base.io_reader) {
+			var q_r : base.u8
+			q_r = args.src.read_u8?()
+			this.sum = args.src.read_u32le?()
+			this.sum ~mod+= q_r as base.u32
+		}`)
+	wantContains(tt, got,
+		"      G_P_1_P_Q : Wuffs.U32 := 0;\n",
+		"      G_Scratch_1_P_Q : Wuffs.U64 := 0;\n",
+		"      G_S_1_P_Q_R : Wuffs.U8 := 0;\n",
+		"      G_P_2_P : Wuffs.U32 := 0;\n",
+		"      G_Scratch_2_P : Wuffs.U64 := 0;\n",
+		"      G_S_2_P_Q_R : Wuffs.U8 := 0;\n")
+}
+
+// TestLabelsAndLoopNames checks that the labels of flattened statements
+// cannot clash with Ada loop names: a loop with a break that stays a loop,
+// followed by a loop that is flattened (the reviewer's repro, which used to
+// give both a loop and a label called G_Loop_1).
+func TestLabelsAndLoopNames(tt *testing.T) {
+	got := mustGenerate(tt, `
+		pub struct foo? (
+			sum : base.u32,
+		)
+		pub func foo.z?(src: base.io_reader) {
+			var c : base.u8
+			var i : base.u32
+			while true {
+				i ~mod+= 1
+				if i > 3 {
+					break
+				}
+			}
+			while i < 10 {
+				c = args.src.read_u8?()
+				i ~mod+= 1
+			}
+			this.sum ~mod+= (c as base.u32) ~mod+ i
+		}`)
+	wantContains(tt, got, "      G_Loop_1 :\n      loop\n", "      <<G_Head_1>>\n", "      goto G_Head_1;\n")
+	wantNotContains(tt, got, "<<G_Loop_")
+}
+
+// TestDuplicateNameChecks checks the backstop: a clash of names in a record
+// or in a subprogram is a generation error.
+func TestDuplicateNameChecks(tt *testing.T) {
+	s := &structInfo{
+		fields: []fieldInfo{{name: "F_X", typ: typU32}},
+		extra:  []fieldInfo{{name: "G_P_1_A", typ: typU32}, {name: "g_p_1_a", typ: typU32}},
+	}
+	if err := checkRecordNames(s); err == nil || !strings.Contains(err.Error(), "is used for") {
+		tt.Errorf("record: got %v", err)
+	}
+	s.extra = s.extra[:1]
+	if err := checkRecordNames(s); err != nil {
+		tt.Errorf("record: got %v", err)
+	}
+
+	f := &fn{
+		name:   "F",
+		self:   &variable{name: "Self"},
+		params: []*variable{{name: "A_X"}},
+		locals: []*variable{{name: "V_X"}, {name: "G_T1"}},
+		body: []stmt{
+			sLoop{name: "G_Loop_1", body: []stmt{sLabel{"G_Continue_1"}}},
+			sLabel{"G_Head_1"},
+			sResume{n: 1, susp: &variable{name: "G_Susp"}},
+		},
+	}
+	if err := checkSubprogramNames(f); err != nil {
+		tt.Errorf("subprogram: got %v", err)
+	}
+	for _, extra := range []stmt{sLabel{"G_Loop_1"}, sLabel{"g_head_1"}, sLabel{"V_X"}, sLabel{"G_Resume_1"},
+		sLoop{name: "A_X"}, sLabel{"not an identifier"}} {
+		g := *f
+		g.body = append(append([]stmt(nil), f.body...), extra)
+		if err := checkSubprogramNames(&g); err == nil {
+			tt.Errorf("subprogram with %v: no error", extra)
 		}
 	}
 }

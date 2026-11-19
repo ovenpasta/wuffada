@@ -35,10 +35,29 @@ gen "$tmp/gen" crc32 \
     wuffs/std/crc32/common_crc32.wuffs \
     wuffs/std/crc32/common_up_arm_crc32.wuffs \
     wuffs/std/crc32/common_up_x86_sse42.wuffs
+gen "$tmp/gen" lzw \
+    wuffs/std/lzw/decode_lzw.wuffs \
+    wuffs/std/lzw/decode_quirks.wuffs
+gen "$tmp/gen" deflate \
+    wuffs/std/deflate/common_consts.wuffs \
+    wuffs/std/deflate/decode_deflate.wuffs \
+    wuffs/std/deflate/decode_huffman_bmi2.wuffs \
+    wuffs/std/deflate/decode_huffman_fast32.wuffs \
+    wuffs/std/deflate/decode_huffman_fast64.wuffs \
+    wuffs/std/deflate/decode_huffman_slow.wuffs
+gen "$tmp/gen" zlib \
+    wuffs/std/zlib/decode_quirks.wuffs \
+    wuffs/std/zlib/decode_zlib.wuffs
+gen "$tmp/gen" gzip \
+    wuffs/std/gzip/decode_gzip.wuffs
 
 # A test-only package that exercises what the standard packages above do not
 # (see the comment in the .wuffs file). Its driver is ada/tests/test_m1.adb.
 gen "$tmp/tests" m1test internal/adagen/testdata/m1test.wuffs
+
+# A test-only package of adversarial coroutines. Its driver is
+# ada/tests/test_adv.adb.
+gen "$tmp/tests" advtest internal/adagen/testdata/advtest.wuffs
 
 # Success: replace the checked-in output.
 rm -f ada/gen/*.ads ada/gen/*.adb ada/tests/wuffs-std-*.ads ada/tests/wuffs-std-*.adb

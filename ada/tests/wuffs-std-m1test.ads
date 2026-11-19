@@ -68,11 +68,17 @@ package Wuffs.Std.M1test with Preelaborate is
    --  Wuffs: func widget.pick
    function Pick (Self : Widget; A_V : Wuffs.U32) return Wuffs.U32;
 
+   --  Wuffs: func widget.slices
+   function Slices
+     (Self : in out Widget; A_X : in out Wuffs.Bytes; A_K : Wuffs.U32) return Wuffs.U64;
+
 private
 
    subtype G_U32_Range_0_1000 is Wuffs.U32 range 0 .. 1000;
 
    type G_Array_2_Of_Array_3_Of_U16 is array (Wuffs.Index range 0 .. 1) of Wuffs.U16_Array (0 .. 2);
+
+   type G_Array_4_Of_Boolean is array (Wuffs.Index range 0 .. 3) of Boolean;
 
    subtype G_U32_Range_0_7 is Wuffs.U32 range 0 .. 7;
 
@@ -89,6 +95,9 @@ private
       F_Flag : Boolean := False;
       F_Hist : Wuffs.Bytes (0 .. 7);
       F_Grid : G_Array_2_Of_Array_3_Of_U16;
+      F_Buf : Wuffs.Bytes (0 .. 31);
+      F_Aux : Wuffs.Bytes (0 .. 15);
+      F_Marks : G_Array_4_Of_Boolean;
    end record;
 
    --  Wuffs: func widget.low3
@@ -108,5 +117,8 @@ private
 
    --  Wuffs: func widget.g_loop_1
    function W_G_Loop_1 (Self : in out Widget) return Wuffs.U32;
+
+   --  Wuffs: func widget.sum_buf
+   function Sum_Buf (Self : Widget) return Wuffs.U64;
 
 end Wuffs.Std.M1test;

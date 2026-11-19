@@ -29,6 +29,10 @@ pub struct widget? (
         flag  : base.bool,
         hist  : array[8] base.u8,
         grid  : array[2] array[3] base.u16,
+        buf   : array[32] base.u8,
+        aux   : array[16] base.u8,
+        marks : array[4] base.bool,
+        util  : base.utility,
 )
 
 pub func widget.set_count!(n: base.u32[..= 1000]) {
@@ -242,7 +246,7 @@ pub func widget.names!(x: roslice base.u8) base.u64 {
     t ~mod+= A_X
     t ~mod+= G_I1_SRC
     s ~mod+= t as base.u64
-    s ~mod+= (T1[s & 3] as base.u64) ~mod+ (this.sum4(x: args.x[.. 0]) as base.u64)
+    s ~mod+= (T1[s & 3] as base.u64) ~mod+ (this.sum4(x: args.x.suffix(up_to: 0)) as base.u64)
     s ~mod+= G_T1[s & 3] as base.u64
     return s
 }
@@ -291,4 +295,110 @@ pub func widget.pick(v: base.u32) base.u32 {
     } else {
         return 3
     }
+}
+
+// Slices of arrays, writable slice variables, copies between slices (of one
+// array and of two), peek and poke, element assignment, local arrays, and
+// the other built-in methods.
+
+pri func widget.sum_buf() base.u64 {
+    var i : base.u32
+    var t : base.u64
+
+    while i < 32 {
+        t = (t ~mod* 31) ~mod+ (this.buf[i] as base.u64)
+        i += 1
+    }
+    i = 0
+    while i < 16 {
+        t = (t ~mod* 31) ~mod+ (this.aux[i] as base.u64)
+        i += 1
+    }
+    return t
+}
+
+pub func widget.slices!(x: slice base.u8, k: base.u32) base.u64 {
+    var s   : slice base.u8
+    var r   : roslice base.u8
+    var n   : base.u64
+    var t   : base.u64
+    var i   : base.u32
+    var loc : array[8] base.u16
+    var c   : base.u32
+
+    i = 0
+    while i < 32 {
+        this.buf[i] = ((i ~mod* 7) & 0xFF) as base.u8
+        i += 1
+    }
+
+    // Two different arrays.
+    n = this.aux[.. 16].copy_from_slice!(s: this.buf[8 ..])
+    t ~mod+= n
+    // Two overlapping parts of one array, visibly.
+    n = this.buf[4 .. 20].copy_from_slice!(s: this.buf[.. 32])
+    t = (t ~mod* 3) ~mod+ n
+    // The same, but only the run-time values show it.
+    s = this.buf[2 ..]
+    n = s.copy_from_slice!(s: this.buf[10 .. 14])
+    t = (t ~mod* 3) ~mod+ n
+    r = this.buf[..]
+    s = this.buf[20 ..]
+    n = s.copy_from_slice!(s: r)
+    t = (t ~mod* 3) ~mod+ n
+    s = this.buf[.. 12]
+    n = s.copy_from_slice!(s: this.aux[..])
+    t = (t ~mod* 3) ~mod+ n
+
+    // Element assignment through a slice, prefix and suffix.
+    s = this.aux[..]
+    s = s.suffix(up_to: 6)
+    if s.length() > 1 {
+        s[0] = 0xAB
+        s[1] ~mod+= 3
+    }
+    r = this.aux[..].suffix(up_to: (args.k & 3) as base.u64)
+    t = (t ~mod* 3) ~mod+ r.length()
+
+    // The argument: a writable slice of the caller's.
+    s = args.x
+    if s.length() >= 4 {
+        s.poke_u32le!(a: 0x1234_5678)
+    }
+    if s.length() >= 4 {
+        t = (t ~mod* 3) ~mod+ (s.peek_u32be() as base.u64)
+    }
+    if args.x.length() >= 2 {
+        t = (t ~mod* 3) ~mod+ (args.x.peek_u16le() as base.u64)
+    }
+    n = args.x.copy_from_slice!(s: this.buf[.. 3])
+    t = (t ~mod* 3) ~mod+ n
+    n = this.buf[28 ..].copy_from_slice!(s: args.x)
+    t = (t ~mod* 3) ~mod+ n
+
+    // A local array, an array of bools, array assignment.
+    loc[args.k & 7] = 513
+    loc[(args.k >> 3) & 7] ~mod+= 7
+    i = 0
+    while i < 8 {
+        t = (t ~mod* 3) ~mod+ (loc[i] as base.u64)
+        i += 1
+    }
+    this.marks[args.k & 3] = true
+    if this.marks[1] or this.marks[2] {
+        t ~mod+= 1000
+    }
+    this.grid[0] = this.grid[1]
+    t ~mod+= this.grid[0][2] as base.u64
+
+    // Numeric methods.
+    c = args.k.min(no_more_than: 9) ~mod+ args.k.max(no_less_than: 1000)
+    // (Not high_bits(n: 0): upstream's C shifts by the full width for that,
+    // which is undefined behavior in C, so there is nothing to compare with.)
+    c ~mod+= args.k.low_bits(n: args.k & 15) ~mod+ args.k.high_bits(n: (args.k & 7) | 1)
+    t = (t ~mod* 3) ~mod+ (c as base.u64)
+    if this.util.cpu_arch_is_32_bit() {
+        t ~mod+= 1
+    }
+    return (t ~mod* 31) ~mod+ this.sum_buf()
 }

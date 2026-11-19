@@ -20,7 +20,19 @@ type fieldInfo struct {
 }
 
 type structInfo struct {
-	ast    *a.Struct
+	// pkg is the used package that the struct belongs to, or nil for a
+	// struct of the package being generated.
+	pkg    *usedPkg
+	classy bool
+
+	ast *a.Struct
+
+	// extra are the record components that the generator adds, for
+	// coroutine state. hasActiveCoroutine means that one of them is
+	// activeCoroutineField.
+	extra              []fieldInfo
+	hasActiveCoroutine bool
+
 	name   string // Ada name.
 	typ    *adaType
 	fields []fieldInfo
@@ -42,6 +54,8 @@ func (s *structInfo) field(id t.ID) *fieldInfo {
 }
 
 type constInfo struct {
+	// used means that generated code refers to the constant by name.
+	used bool
 	ast  *a.Const
 	name string // Ada name.
 	typ  *adaType
@@ -55,13 +69,41 @@ type statusInfo struct {
 	msg      string
 }
 
+// argInfo is how one Wuffs argument appears among a function's Ada
+// parameters.
+type argInfo struct {
+	id  t.ID
+	typ *adaType
+
+	// v is the parameter: for a slice, the Ada array; for an io_reader or
+	// io_writer, the Ada array of the buffer's data, and then meta is the
+	// second parameter, the buffer's Wuffs.Base.IO.Buffer_Meta.
+	v    *variable
+	meta *variable
+}
+
 type funcInfo struct {
 	ast  *a.Func
 	recv *structInfo
 	ir   *fn
+	args []*argInfo
 
 	// skipped means that no Ada is generated for the function.
 	skipped bool
+
+	// sigErr is why a function of a used package has no Ada signature. It is
+	// reported only if the function is called.
+	sigErr error
+
+	// number is the function's 1-based position among the functions that
+	// are generated for this package. It makes the names of the function's
+	// coroutine state unambiguous: see lowerer.stateName.
+	number int
+
+	// coroutine means that the function is a Wuffs coroutine ("?"). coroID
+	// is the 1-based number of a public coroutine among its receiver's.
+	coroutine bool
+	coroID    int
 
 	// argChecks are the public function's parameters that have a refinement
 	// type, which is checked at run time (as the caller is not Wuffs code).
@@ -71,7 +113,8 @@ type funcInfo struct {
 
 // supportedInterfaces maps a Wuffs base interface to its Ada equivalent.
 var supportedInterfaces = map[string]string{
-	"hasher_u32": "Wuffs.Runtime.Hasher_U32",
+	"hasher_u32":     "Wuffs.Runtime.Hasher_U32",
+	"io_transformer": "Wuffs.Runtime.IO_Transformer",
 }
 
 func (g *gen) analyze() error {
@@ -79,16 +122,17 @@ func (g *gen) analyze() error {
 	for _, file := range g.files {
 		for _, n := range file.TopLevelDecls() {
 			switch n.Kind() {
-			case a.KConst, a.KFunc, a.KStatus, a.KStruct:
+			case a.KConst, a.KFunc, a.KStatus, a.KStruct, a.KUse:
 				// No-op.
-			case a.KUse:
-				return errNotYet("\"use\" declarations (at %s:%d)", n.AsUse().Filename(), n.AsUse().Line())
 			default:
 				return fmt.Errorf("unrecognized top-level declaration kind %s", n.Kind())
 			}
 		}
 	}
 
+	if err := g.analyzeUses(); err != nil {
+		return err
+	}
 	if err := g.analyzeStatuses(); err != nil {
 		return err
 	}
@@ -169,6 +213,7 @@ func (g *gen) analyzeStructs() error {
 			return errNotYet("%s: private structs", what)
 		}
 		s := &structInfo{
+			classy:           true,
 			ast:              n,
 			name:             mangleGlobal(n.QID()[1].Str(g.tm)),
 			interfaceMethods: map[string]bool{},
@@ -176,7 +221,7 @@ func (g *gen) analyzeStructs() error {
 		if err := g.declareName(s.name, what); err != nil {
 			return err
 		}
-		s.typ = &adaType{kind: kStruct, name: s.name}
+		s.typ = &adaType{kind: kStruct, name: s.name, st: s}
 
 		for _, o := range n.Implements() {
 			qid := o.AsTypeExpr().QID()
@@ -208,6 +253,12 @@ func (g *gen) analyzeStructs() error {
 			switch typ.kind {
 			case kNum, kBool, kArray:
 				// No-op.
+			case kStruct:
+				if !typ.st.classy {
+					return errNotYet("%s: field %s of a non-classy struct type", what, o.Name().Str(g.tm))
+				}
+			case kUtility:
+				// An empty struct: it needs no Ada component.
 			default:
 				return errNotYet("%s: field %s of type %q", what, o.Name().Str(g.tm), o.XType().Str(g.tm))
 			}
@@ -266,6 +317,7 @@ func (g *gen) analyzeConsts() error {
 }
 
 func (g *gen) analyzeFuncs() error {
+	nPublicCoroutines := map[t.ID]int{}
 	for _, file := range g.files {
 		for _, n := range file.TopLevelDecls() {
 			if n.Kind() != a.KFunc {
@@ -274,6 +326,14 @@ func (g *gen) analyzeFuncs() error {
 			n := n.AsFunc()
 			fi := &funcInfo{ast: n}
 			g.funcs[n.QQID()] = fi
+
+			// As in the C back-end, a receiver's public coroutines are
+			// numbered in declaration order, whether or not they are
+			// generated.
+			if n.Public() && n.Effect().Coroutine() {
+				nPublicCoroutines[n.Receiver()[1]]++
+				fi.coroID = nPublicCoroutines[n.Receiver()[1]]
+			}
 
 			// The rule for what is skipped: exactly those functions that
 			// carry a "choose cpu_arch >= etc" assertion, which the parser
@@ -284,35 +344,46 @@ func (g *gen) analyzeFuncs() error {
 				g.skipped = append(g.skipped, n.QQID().Str(g.tm))
 				continue
 			}
-			if err := g.analyzeFunc(fi); err != nil {
+			recv := n.Receiver()
+			if recv[0] != 0 || g.structs[recv[1]] == nil {
+				return fmt.Errorf("func %s (at %s:%d): %v", n.QQID().Str(g.tm), n.Filename(), n.Line(),
+					errNotYet("functions whose receiver is not a struct of this package"))
+			}
+			fi.recv = g.structs[recv[1]]
+			if err := g.analyzeFunc(fi, ""); err != nil {
 				return fmt.Errorf("func %s (at %s:%d): %v", n.QQID().Str(g.tm), n.Filename(), n.Line(), err)
 			}
+
+			// Ada overloads subprograms on the receiver's type, so two
+			// structs can have a method of the same name, but a method
+			// cannot share a name with anything else.
+			what := "func " + fi.ir.name
+			if prev, ok := g.names[strings.ToLower(fi.ir.name)]; !ok || prev != what {
+				if err := g.declareName(fi.ir.name, what); err != nil {
+					return fmt.Errorf("func %s (at %s:%d): %v", n.QQID().Str(g.tm), n.Filename(), n.Line(), err)
+				}
+			}
 			g.funcList = append(g.funcList, fi)
+			fi.number = len(g.funcList)
 		}
 	}
 	return nil
 }
 
-// analyzeFunc computes fi's Ada signature.
-func (g *gen) analyzeFunc(fi *funcInfo) error {
+// analyzeFunc computes the Ada signature of fi, whose receiver is fi.recv.
+// For a function of a used package, pkgPrefix is that Ada package's name and
+// a dot.
+func (g *gen) analyzeFunc(fi *funcInfo, pkgPrefix string) error {
 	n := fi.ast
-	if n.Effect().Coroutine() {
-		return errNotYet("coroutines (functions marked with \"?\")")
-	}
 	for _, o := range n.Asserts() {
 		// The Wuffs compiler itself rejects these (lang/check: "function
 		// assertions are not supported yet"), except for the "choose
 		// cpu_arch" ones.
 		return errNotYet("function assertion %q", o.AsAssert().Condition().Str(g.tm))
 	}
-	recv := n.Receiver()
-	if recv[0] != 0 || g.structs[recv[1]] == nil {
-		return errNotYet("functions whose receiver is not a struct of this package")
-	}
-	fi.recv = g.structs[recv[1]]
 
 	f := &fn{
-		name:      mangleGlobal(n.FuncName().Str(g.tm)),
+		name:      pkgPrefix + mangleGlobal(n.FuncName().Str(g.tm)),
 		wuffsName: n.QQID().Str(g.tm),
 		public:    n.Public(),
 		recvType:  fi.recv.name,
@@ -320,34 +391,21 @@ func (g *gen) analyzeFunc(fi *funcInfo) error {
 		selfInOut: !n.Effect().Pure(),
 	}
 	fi.ir = f
-
-	// Ada overloads subprograms on the receiver's type, so two structs can
-	// have a method of the same name, but a method cannot share a name with
-	// anything else.
-	what := "func " + f.name
-	if prev, ok := g.names[strings.ToLower(f.name)]; !ok || prev != what {
-		if err := g.declareName(f.name, what); err != nil {
-			return err
-		}
-	}
+	fi.coroutine = n.Effect().Coroutine()
 	f.overriding = f.public && fi.recv.interfaceMethods[n.FuncName().Str(g.tm)]
 
 	for _, o := range n.In().Fields() {
 		o := o.AsField()
 		name := prefixArg + mangle(o.Name().Str(g.tm))
 		for _, prev := range f.params {
-			if strings.EqualFold(prev.name, name) {
+			if strings.EqualFold(prev.name, name) || strings.EqualFold(prev.name, name+"_Meta") ||
+				strings.EqualFold(prev.name+"_Meta", name) {
 				return fmt.Errorf("two parameters have the same Ada name %q", name)
 			}
 		}
-		if o.XType().IsEitherSliceType() {
-			if o.XType().Decorator() != t.IDRoslice || uintBits(o.XType().Inner().QID()) != 8 ||
-				o.XType().Inner().IsRefined() {
-				return errNotYet("parameter %s of type %q", o.Name().Str(g.tm), o.XType().Str(g.tm))
-			}
-			f.params = append(f.params, &variable{kind: varParam, name: name, typ: typBytes, decl: typBytes.name})
-			continue
-		}
+		arg := &argInfo{id: o.Name()}
+		fi.args = append(fi.args, arg)
+
 		if f.public && uintBits(o.XType().QID()) != 0 && o.XType().Decorator() == 0 {
 			// The caller is not Wuffs code, so nothing has proved that the
 			// argument is within any refinement, and Ada's range checks are
@@ -360,37 +418,70 @@ func (g *gen) analyzeFunc(fi *funcInfo) error {
 			typ := numType(uintBits(o.XType().QID()))
 			v := &variable{kind: varParam, name: name, typ: typ, decl: typ.name}
 			if lo != nil {
-				if n.Effect().Pure() || n.Out() != nil {
-					return errNotYet("refined parameter %s of a public function that is pure or returns a value",
-						o.Name().Str(g.tm))
+				if n.Effect().Pure() || n.Out() != nil || fi.coroutine {
+					return errNotYet("refined parameter %s of a public function that is pure, "+
+						"returns a value or is a coroutine", o.Name().Str(g.tm))
 				}
 				fi.argChecks = append(fi.argChecks, v)
 				fi.argBounds = append(fi.argBounds, &adaType{kind: kNum, bits: typ.bits, lo: lo, hi: hi})
 			}
+			arg.typ, arg.v = typ, v
 			f.params = append(f.params, v)
 			continue
 		}
+
 		typ, err := g.typeOf(o.XType(), f.public)
 		if err != nil {
 			return fmt.Errorf("parameter %s: %v", o.Name().Str(g.tm), err)
 		}
+		arg.typ = typ
 		switch typ.kind {
 		case kNum, kBool, kStatus:
-			// No-op.
+			arg.v = &variable{kind: varParam, name: name, typ: typ, decl: typ.name}
+		case kROSliceU8:
+			// A slice parameter is a plain Ada array: its bounds travel with
+			// it. The body makes a handle from it only if it needs one.
+			arg.typ = typBytes
+			arg.v = &variable{kind: varParam, name: name, typ: typBytes, decl: typBytes.name}
+		case kSliceU8:
+			arg.typ = typBytesVar
+			arg.v = &variable{kind: varParam, name: name, typ: typBytesVar, decl: typBytesVar.name, mode: "in out"}
+		case kIOReader:
+			arg.v = &variable{kind: varParam, name: name, typ: typBytes, decl: typBytes.name}
+			arg.meta = &variable{kind: varParam, name: name + "_Meta", typ: typMeta, decl: typMeta.name, mode: "in out"}
+		case kIOWriter:
+			arg.v = &variable{kind: varParam, name: name, typ: typBytesVar, decl: typBytesVar.name, mode: "in out"}
+			arg.meta = &variable{kind: varParam, name: name + "_Meta", typ: typMeta, decl: typMeta.name, mode: "in out"}
 		default:
 			return errNotYet("parameter %s of type %q", o.Name().Str(g.tm), o.XType().Str(g.tm))
 		}
-		v := &variable{kind: varParam, name: name, typ: typ, decl: typ.name}
-		f.params = append(f.params, v)
+		f.params = append(f.params, arg.v)
+		if arg.meta != nil {
+			f.params = append(f.params, arg.meta)
+		}
+	}
+	if !f.selfInOut {
+		for _, o := range f.params {
+			if o.mode != "" {
+				return errNotYet("a pure function with a writable slice or an I/O parameter")
+			}
+		}
 	}
 
+	if fi.coroutine {
+		if n.Out() != nil {
+			return errNotYet("a coroutine with an explicit return type")
+		}
+		f.ret = typStatus
+		return nil
+	}
 	if out := n.Out(); out != nil {
 		typ, err := g.typeOf(out, f.public)
 		if err != nil {
 			return fmt.Errorf("return type: %v", err)
 		}
 		switch typ.kind {
-		case kNum, kBool, kStatus:
+		case kNum, kBool, kStatus, kOpaque:
 			// No-op.
 		default:
 			return errNotYet("return type %q", out.Str(g.tm))

@@ -13,17 +13,18 @@
 --  Exits with a failure status if any check fails.
 
 with Test_Support;
-with Wuffs.Runtime.Temp_Base;
+with Wuffs.Base;
 with Wuffs.Std.M1test;
 
 procedure Test_M1 is
 
    use type Wuffs.Status;
    use type Wuffs.U32;
+   use type Wuffs.U64;
    use type Wuffs.Offset;
 
    package M renames Wuffs.Std.M1test;
-   package Base renames Wuffs.Runtime.Temp_Base;
+   package Base renames Wuffs.Base;
 
    W : M.Widget;
 
@@ -43,6 +44,21 @@ procedure Test_M1 is
    Want_Status : constant U64_List (0 .. 7) := [5 => 3, 6 => 2, 7 => 1, others => 0];
 
    Total : Wuffs.U32 := 0;
+
+   Scratch : Wuffs.Bytes (40 .. 45);
+   X       : Wuffs.U64;
+
+   Slices_Length : constant array (0 .. 5) of Wuffs.Index := [0, 1, 2, 4, 6, 6];
+
+   Slices_K : constant array (0 .. 5) of Wuffs.U32 := [0, 5, 77, 1000, 16#FFFF_FFFF#, 3];
+
+   Want_Slices : constant U64_List (0 .. 5) :=
+     [16#881B_C611_08B8_8F3E#, 16#DC15_5B82_58B4_EC3F#, 16#BDC2_91F5_4CEA_5CC2#,
+      16#4C51_E2D8_A671_D943#, 16#4C51_E2D8_A91F_D463#, 16#4C51_E2D8_A960_B1F9#];
+
+   Want_Slices_X : constant U64_List (0 .. 5) :=
+     [16#0000_0512_1F2C_3946#, 16#0000_3813_202D_3A47#, 16#0000_383F_212E_3B48#,
+      16#0000_383F_4612_3C49#, 16#0000_383F_4612_3D4A#, 16#0000_383F_4612_3E4B#];
 
    procedure V (What : String; N : Integer; Got, Want : Wuffs.U64);
 
@@ -175,6 +191,27 @@ begin
    V ("pick", 6, Wuffs.U64 (M.Pick (W, 6)), 2);
    V ("pick", 5, Wuffs.U64 (M.Pick (W, 5)), 3);
    V ("pick", 0, Wuffs.U64 (M.Pick (W, 0)), 3);
+
+   --  Slices of arrays, writable slices, copies, peek and poke, local
+   --  arrays, numeric methods.  X is what the function leaves in its
+   --  writable argument.
+   for I in Want_Slices'Range loop
+      for J in Scratch'Range loop
+         Scratch (J) := Wuffs.U8 ((13 * (J - Scratch'First) + 5 + Wuffs.Index (I)) mod 256);
+      end loop;
+      V ("slices",
+         I,
+         M.Slices
+           (W,
+            A_X => Scratch (Scratch'First .. Scratch'First + Slices_Length (I) - 1),
+            A_K => Slices_K (I)),
+         Want_Slices (I));
+      X := 0;
+      for J in Scratch'Range loop
+         X := X * 256 + Wuffs.U64 (Scratch (J));
+      end loop;
+      V ("slices x", I, X, Want_Slices_X (I));
+   end loop;
 
    --  A public function's refined argument is checked at run time: a bad one
    --  disables the object, as in C.

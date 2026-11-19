@@ -47,6 +47,8 @@ func countStmts(ss []stmt) {
 				countExpr(s.cond)
 			}
 			countStmts(s.body)
+		case sExitWhen:
+			countExpr(s.cond)
 		case sReturn:
 			if s.value != nil {
 				countExpr(s.value)
@@ -55,6 +57,16 @@ func countStmts(ss []stmt) {
 			for _, o := range s.args {
 				countExpr(o)
 			}
+		case sResume:
+			if !s.labelOnly {
+				s.susp.writes++
+			}
+		case sCase:
+			countExpr(s.sel)
+			for _, arm := range s.arms {
+				countStmts(arm.body)
+			}
+			countStmts(s.others)
 		}
 	}
 }
@@ -98,6 +110,11 @@ func countExpr(e expr) {
 		countExpr(e.x)
 	case eNamed:
 		countExpr(e.x)
+	case eRel:
+		countExpr(e.l)
+		countExpr(e.r)
+	case eOut:
+		countLHS(e.x)
 	case eUn:
 		countExpr(e.x)
 	case eBin:

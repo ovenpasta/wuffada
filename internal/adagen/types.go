@@ -23,9 +23,17 @@ const (
 	kBool
 	kStatus
 	kROSliceU8 // Wuffs "roslice base.u8", as a re-assignable handle.
-	kBytes     // Wuffs "roslice base.u8", as an Ada array (a parameter).
+	kSliceU8   // Wuffs "slice base.u8", as a re-assignable handle.
+	kBytes     // A read-only view of bytes, as an Ada array (object or slice).
+	kBytesVar  // A writable view of bytes, as an Ada array (object or slice).
 	kArray
 	kStruct
+	kUtility  // Wuffs "base.utility": an empty struct with built-in methods.
+	kOpaque   // A base library value type (optional_u63, range_ii_u64).
+	kIOReader // Wuffs "base.io_reader": an Ada array plus a Buffer_Meta.
+	kIOWriter // Wuffs "base.io_writer": likewise, writable.
+	kMeta     // Wuffs.Base.IO.Buffer_Meta.
+	kCursor   // Wuffs.Base.IO.Reader or Writer.
 )
 
 // adaType is the Ada type of a Wuffs type, variable or expression.
@@ -43,6 +51,12 @@ type adaType struct {
 	// For kArray.
 	elem   *adaType
 	length *big.Int
+
+	// For kStruct: the struct, of this package or of a used one.
+	st *structInfo
+
+	// For kOpaque: the Ada expression for the zero value.
+	zero string
 }
 
 var (
@@ -59,7 +73,20 @@ var (
 	typU64    = &adaType{kind: kNum, name: "Wuffs.U64", bits: 64}
 
 	typROSliceU8 = &adaType{kind: kROSliceU8, name: "Wuffs.Runtime.RO_Slice_U8"}
+	typSliceU8   = &adaType{kind: kSliceU8, name: "Wuffs.Runtime.Slice_U8"}
 	typBytes     = &adaType{kind: kBytes, name: "Wuffs.Bytes"}
+	typBytesVar  = &adaType{kind: kBytesVar, name: "Wuffs.Bytes"}
+	typUtility   = &adaType{kind: kUtility, name: "base.utility"}
+	typIOReader  = &adaType{kind: kIOReader, name: "base.io_reader"}
+	typIOWriter  = &adaType{kind: kIOWriter, name: "base.io_writer"}
+	typMeta      = &adaType{kind: kMeta, name: ioPkg + ".Buffer_Meta"}
+	typReader    = &adaType{kind: kCursor, name: ioPkg + ".Reader"}
+	typWriter    = &adaType{kind: kCursor, name: ioPkg + ".Writer"}
+
+	typOptionalU63 = &adaType{kind: kOpaque, name: intsPkg + ".Optional_U63",
+		zero: intsPkg + ".Make_Optional_U63 (Has_Value => False, Value => 0)"}
+	typRangeIIU64 = &adaType{kind: kOpaque, name: rangesPkg + ".Range_II_U64",
+		zero: rangesPkg + ".Empty_Range_II_U64"}
 )
 
 func numType(bits int) *adaType {
@@ -109,8 +136,20 @@ func (x *adaType) zeroValue() expr {
 		return raw("False")
 	case kStatus:
 		return raw("Wuffs.Ok_Status")
+	case kOpaque:
+		return raw(x.zero)
 	}
 	return nil
+}
+
+// isSlice reports whether x is one of the four representations of a slice
+// of bytes.
+func (x *adaType) isSlice() bool {
+	switch x.kind {
+	case kROSliceU8, kSliceU8, kBytes, kBytesVar:
+		return true
+	}
+	return false
 }
 
 func uintBits(qid t.QID) int {
@@ -144,6 +183,20 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 	switch x.Decorator() {
 	case 0:
 		qid := x.QID()
+		if qid[0] == t.IDBase {
+			switch qid[1] {
+			case t.IDUtility:
+				return typUtility, nil
+			case t.IDOptionalU63:
+				return typOptionalU63, nil
+			case t.IDRangeIIU64:
+				return typRangeIIU64, nil
+			case t.IDIOReader:
+				return typIOReader, nil
+			case t.IDIOWriter:
+				return typIOWriter, nil
+			}
+		}
 		if x.IsCPUArchType() || x.IsEtcUtilityType() {
 			return nil, fmt.Errorf("cpu_arch type %q is not supported: SIMD is out of scope", x.Str(g.tm))
 		}
@@ -175,6 +228,10 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 			if s := g.structs[qid[1]]; s != nil {
 				return s.typ, nil
 			}
+		} else if u := g.uses[qid[0]]; u != nil {
+			if s := u.structs[qid[1]]; s != nil {
+				return s.typ, nil
+			}
 		}
 		return nil, fmt.Errorf("type %q is not yet supported", x.Str(g.tm))
 
@@ -185,7 +242,10 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 		return nil, fmt.Errorf("slice type %q is not yet supported (only \"roslice base.u8\" is)", x.Str(g.tm))
 
 	case t.IDSlice:
-		return nil, fmt.Errorf("writable slice type %q is not yet supported", x.Str(g.tm))
+		if uintBits(x.Inner().QID()) == 8 && x.Inner().Decorator() == 0 && !x.Inner().IsRefined() {
+			return typSliceU8, nil
+		}
+		return nil, fmt.Errorf("slice type %q is not yet supported (only \"slice base.u8\" is)", x.Str(g.tm))
 
 	case t.IDArray, t.IDRoarray:
 		length := x.ArrayLength().ConstValue()
@@ -200,15 +260,16 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 		ret := &adaType{kind: kArray, elem: elem, length: length}
 		switch elem.kind {
 		case kNum:
-			if elem.lo != nil {
-				return nil, fmt.Errorf("array of refined element type %q is not yet supported", x.Str(g.tm))
-			}
 			// These are constrained subtypes of the root package's array
 			// types, so that (sub)arrays can be passed to the base library.
+			// That loses an element type's refinement: the elements are of
+			// the unrefined type.
+			elem = elem.unrefined()
+			ret.elem = elem
 			root := map[int]string{8: "Bytes", 16: "U16_Array", 32: "U32_Array", 64: "U64_Array"}[elem.bits]
 			ret.name = fmt.Sprintf("Wuffs.%s (0 .. %s)", root, last)
 			return ret, nil
-		case kArray:
+		case kArray, kBool:
 			ret.name = prefixGen + "Array_" + length.String() + "_Of_" + arrayTypeSuffix(elem)
 			if err := g.addNamedType(ret.name, public, fmt.Sprintf(
 				"type %s is array (Wuffs.Index range 0 .. %s) of %s;", ret.name, last, elem.name)); err != nil {

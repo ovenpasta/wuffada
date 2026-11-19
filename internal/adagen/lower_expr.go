@@ -6,6 +6,7 @@ package adagen
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 
 	a "github.com/google/wuffs/lang/ast"
 	t "github.com/google/wuffs/lang/token"
@@ -19,10 +20,30 @@ type val struct {
 	e   expr
 	typ *adaType // nil for a call to a procedure.
 	cv  *big.Int // The value, if typ is typIdeal.
+
+	// For a kBytes or kBytesVar value, e is derived from these: arr names
+	// the whole underlying Ada array object, and lo and hi (if not nil) are
+	// the offsets from arr'First of the view's first element and of the
+	// element after its last one. A slice handle is only ever made from arr,
+	// never from the Ada slice e: see wuffs-runtime.ads.
+	arr    expr
+	lo, hi expr
+
+	// zeroBased means that arr'First is known to be 0 (a constrained array).
+	zeroBased bool
+
+	// io is the argument, for a kIOReader or kIOWriter value.
+	io *ioArg
+
+	// variable means that e names an Ada variable (something assignable).
+	variable bool
 }
 
 // bin makes an eBin, flattening chains of one associative operator.
 func bin(op string, args ...expr) expr {
+	if isRelational(op) && len(args) == 2 {
+		return rel(op, args[0], args[1])
+	}
 	if !isAssociative(op) {
 		return eBin{op, args}
 	}
@@ -38,8 +59,8 @@ func bin(op string, args ...expr) expr {
 }
 
 // bytesToHandle makes a slice handle from an expression that names a whole
-// Wuffs.Bytes object. The fat pointer that 'Unrestricted_Access makes here
-// must not outlive that object's bounds: see wuffs-runtime.ads.
+// array object. The fat pointer that 'Unrestricted_Access makes here must
+// not outlive that object's bounds: see wuffs-runtime.ads.
 func bytesToHandle(e expr) expr {
 	return eAgg{
 		names: []string{"Base", "First", "Length"},
@@ -47,35 +68,135 @@ func bytesToHandle(e expr) expr {
 	}
 }
 
-// toHandle converts a slice-typed value to a slice handle.
-func (l *lowerer) toHandle(v val) (val, error) {
+// bytesVal makes the value for the bytes of the whole Ada array object arr,
+// or for its elements at offsets lo (inclusive, nil for 0) to hi (exclusive,
+// nil for the length).
+func bytesVal(arr expr, lo expr, hi expr, writable bool, zeroBased bool) val {
+	v := val{typ: typBytes, arr: arr, lo: lo, hi: hi, zeroBased: zeroBased}
+	if writable {
+		v.typ = typBytesVar
+	}
+	if lo == nil && hi == nil {
+		v.e = arr
+		return v
+	}
+	first, last := expr(nil), expr(nil)
+	if zeroBased {
+		first = raw("0")
+		if lo != nil {
+			first = lo
+		}
+		last = eAttr{arr, "Last"}
+		if hi != nil {
+			last = indexMinus1(hi)
+		}
+	} else {
+		first = eAttr{arr, "First"}
+		if lo != nil {
+			first = bin("+", first, lo)
+		}
+		last = eAttr{arr, "Last"}
+		if hi != nil {
+			last = bin("-", bin("+", eAttr{arr, "First"}, hi), raw("1"))
+		}
+	}
+	v.e = eSlice{arr, first, last}
+	return v
+}
+
+// indexMinus1 returns e - 1, folded if e is a decimal literal.
+func indexMinus1(e expr) expr {
+	if r, ok := e.(eRaw); ok {
+		if n, err := strconv.ParseInt(r.s, 10, 64); err == nil {
+			return raw(strconv.FormatInt(n-1, 10))
+		}
+	}
+	return bin("-", e, raw("1"))
+}
+
+// markWritten records that something may write to the variable that the
+// name e is a part of, in a way that the IR does not show (it is passed as
+// an "in out" parameter, or a writable handle is made from it).
+func markWritten(e expr) {
+	if e == nil {
+		return
+	}
+	if v := rootVariable(e); v != nil {
+		v.writes++
+	}
+}
+
+// toHandle converts a slice-typed value to a slice handle: a writable one
+// (Slice_U8) or a read-only one (RO_Slice_U8).
+func (l *lowerer) toHandle(v val, writable bool) (val, error) {
+	want := typROSliceU8
+	if writable {
+		want = typSliceU8
+	}
 	switch v.typ.kind {
 	case kROSliceU8:
+		if writable {
+			return val{}, fmt.Errorf("a read-only slice where a writable one is needed")
+		}
 		return v, nil
-	case kBytes:
-		return val{e: bytesToHandle(v.e), typ: typROSliceU8}, nil
+	case kSliceU8:
+		if !writable {
+			return val{e: call("Wuffs.Runtime.To_RO", v.e), typ: want}, nil
+		}
+		return v, nil
+	case kBytes, kBytesVar:
+		if writable && v.typ.kind == kBytes {
+			return val{}, fmt.Errorf("a read-only slice where a writable one is needed")
+		}
+		if writable {
+			markWritten(v.arr)
+		}
+		h := bytesToHandle(v.arr)
+		switch {
+		case v.lo == nil && v.hi == nil:
+			// No-op.
+		case v.hi == nil:
+			h = call("Wuffs.Runtime.Subslice_I", h, v.lo)
+		case v.lo == nil:
+			h = call("Wuffs.Runtime.Subslice_J", h, v.hi)
+		default:
+			h = callNamed("Wuffs.Runtime.Subslice_IJ", "S", h, "I", v.lo, "J", v.hi)
+		}
+		return val{e: h, typ: want}, nil
 	}
 	return val{}, fmt.Errorf("internal error: toHandle of a non-slice")
 }
 
 // toBytes converts a slice-typed value to an Ada array (a view, not a copy),
 // to pass it as a parameter.
-func (l *lowerer) toBytes(v val) (val, error) {
+func (l *lowerer) toBytes(v val, writable bool) (val, error) {
+	want := typBytes
+	if writable {
+		want = typBytesVar
+	}
 	switch v.typ.kind {
-	case kBytes:
+	case kBytes, kBytesVar:
+		if writable && v.typ.kind == kBytes {
+			return val{}, fmt.Errorf("a read-only slice where a writable one is needed")
+		}
+		if writable {
+			markWritten(v.arr)
+		}
 		return v, nil
-	case kROSliceU8:
+	case kROSliceU8, kSliceU8:
+		if writable && v.typ.kind == kROSliceU8 {
+			return val{}, fmt.Errorf("a read-only slice where a writable one is needed")
+		}
 		h := v.e
 		if _, ok := h.(eVar); !ok {
 			// The handle is used three times below. Evaluate it once.
-			l.nTemps++
-			tmp := eVar{l.newLocal(fmt.Sprintf("%sT%d", prefixGen, l.nTemps), typROSliceU8, nil)}
+			tmp := eVar{l.newTemp(v.typ)}
 			l.pre = append(l.pre, sAssign{tmp, h})
 			h = tmp
 		}
 		return val{
 			e:   eSlice{eSel{h, "Base"}, eSel{h, "First"}, call("Wuffs.Runtime.Last", h)},
-			typ: typBytes,
+			typ: want,
 		}, nil
 	}
 	return val{}, fmt.Errorf("internal error: toBytes of a non-slice")
@@ -133,11 +254,11 @@ func (l *lowerer) baseStatus(id t.ID) (val, error) {
 	if !ok {
 		return val{}, fmt.Errorf("bad status %s", id.Str(l.g.tm))
 	}
-	name, err := mangleMessage(msg)
+	name, err := baseStatusName(msg)
 	if err != nil {
 		return val{}, err
 	}
-	return val{e: raw(l.g.basePkg + "." + name), typ: typStatus}, nil
+	return val{e: raw(basePkg + "." + name), typ: typStatus}, nil
 }
 
 // expr lowers an expression.
@@ -146,6 +267,7 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 	// where the C back-end substitutes the value.
 	if n.Operator() == 0 && l.locals[n.Ident()] == nil {
 		if c := l.g.consts[n.Ident()]; c != nil {
+			c.used = true
 			return val{e: raw(c.name), typ: c.typ}, nil
 		}
 	}
@@ -166,7 +288,7 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 	case 0:
 		id := n.Ident()
 		if v := l.locals[id]; v != nil {
-			return val{e: eVar{v}, typ: v.typ}, nil
+			return val{e: eVar{v}, typ: v.typ, variable: true}, nil
 		}
 		if id.IsDQStrLiteral(l.g.tm) {
 			if z := l.g.statuses[id]; z != nil {
@@ -176,9 +298,15 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 		}
 		switch id {
 		case t.IDThis:
-			return val{}, errNotYet("\"this\" other than as \"this.field\" or \"this.method(etc)\"")
+			return val{e: eVar{l.f.self}, typ: l.fi.recv.typ, variable: l.f.selfInOut}, nil
 		case t.IDCoroutineResumed:
-			return val{}, errNotYet("coroutine_resumed")
+			// C: (self->private_impl.p_func != 0), the stored suspension
+			// point, which is only reset when the coroutine completes.
+			if !l.fi.coroutine {
+				return val{e: raw("False"), typ: typBool}, nil
+			}
+			l.g.useType[32] = true
+			return val{e: bin("/=", l.pField(), raw("0")), typ: typBool}, nil
 		}
 		return val{}, fmt.Errorf("unrecognized identifier %q", n.Str(l.g.tm))
 
@@ -200,19 +328,27 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 		}
 		switch lv.typ.kind {
 		case kArray:
-			return val{e: eCall{lv.e, []expr{i}}, typ: lv.typ.elem}, nil
-		case kROSliceU8:
+			return val{e: eCall{lv.e, []expr{i}}, typ: lv.typ.elem, variable: lv.variable}, nil
+		case kROSliceU8, kSliceU8:
 			return val{e: call("Wuffs.Runtime.Get", lv.e, i), typ: typU8}, nil
-		case kBytes:
-			return val{e: eCall{lv.e, []expr{bin("+", eAttr{lv.e, "First"}, i)}}, typ: typU8}, nil
+		case kBytes, kBytesVar:
+			if lv.lo == nil && lv.hi == nil {
+				// The whole Ada array: its own bounds are the slice's.
+				if !lv.zeroBased {
+					i = bin("+", eAttr{lv.arr, "First"}, i)
+				}
+				return val{e: eCall{lv.arr, []expr{i}}, typ: typU8}, nil
+			}
+			h, err := l.toHandle(lv, false)
+			if err != nil {
+				return val{}, err
+			}
+			return val{e: call("Wuffs.Runtime.Get", h.e, i), typ: typU8}, nil
 		}
 		return val{}, errNotYet("indexing %q, of type %q", lhs.Str(l.g.tm), lhs.MType().Str(l.g.tm))
 
 	case t.IDDotDot:
 		lhs := n.LHS().AsExpr()
-		if !lhs.MType().IsEitherSliceType() {
-			return val{}, errNotYet("slicing %q, of type %q", lhs.Str(l.g.tm), lhs.MType().Str(l.g.tm))
-		}
 		lv, err := l.expr(lhs)
 		if err != nil {
 			return val{}, err
@@ -221,12 +357,6 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 			return val{}, fmt.Errorf("%q has no value", lhs.Str(l.g.tm))
 		}
 		mhs, rhs := n.MHS().AsExpr(), n.RHS().AsExpr()
-		if mhs == nil && rhs == nil {
-			return lv, nil
-		}
-		if lv, err = l.toHandle(lv); err != nil {
-			return val{}, err
-		}
 		i, j := expr(nil), expr(nil)
 		if mhs != nil {
 			if i, err = l.index(mhs); err != nil {
@@ -238,26 +368,64 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 				return val{}, err
 			}
 		}
+		switch lv.typ.kind {
+		case kArray:
+			// A slice of an array of bytes is an Ada slice of it (or, if it
+			// has to become a handle, a part of the whole array).
+			if lv.typ.elem.kind != kNum || lv.typ.elem.bits != 8 {
+				return val{}, errNotYet("slicing %q, of type %q", lhs.Str(l.g.tm), lhs.MType().Str(l.g.tm))
+			}
+			return bytesVal(lv.e, i, j, lv.variable, true), nil
+		case kBytes, kBytesVar:
+			if lv.lo == nil && lv.hi == nil {
+				return bytesVal(lv.arr, i, j, lv.typ.kind == kBytesVar, lv.zeroBased), nil
+			}
+		case kROSliceU8, kSliceU8:
+			// Handled below.
+		default:
+			return val{}, errNotYet("slicing %q, of type %q", lhs.Str(l.g.tm), lhs.MType().Str(l.g.tm))
+		}
+		if mhs == nil && rhs == nil {
+			return lv, nil
+		}
+		writable := lv.typ.kind == kSliceU8 || lv.typ.kind == kBytesVar
+		if lv, err = l.toHandle(lv, writable); err != nil {
+			return val{}, err
+		}
 		switch {
 		case rhs == nil:
-			return val{e: call("Wuffs.Runtime.Subslice_I", lv.e, i), typ: typROSliceU8}, nil
+			return val{e: call("Wuffs.Runtime.Subslice_I", lv.e, i), typ: lv.typ}, nil
 		case mhs == nil:
-			return val{e: call("Wuffs.Runtime.Subslice_J", lv.e, j), typ: typROSliceU8}, nil
+			return val{e: call("Wuffs.Runtime.Subslice_J", lv.e, j), typ: lv.typ}, nil
 		}
-		return val{e: callNamed("Wuffs.Runtime.Subslice_IJ", "S", lv.e, "I", i, "J", j), typ: typROSliceU8}, nil
+		return val{e: callNamed("Wuffs.Runtime.Subslice_IJ", "S", lv.e, "I", i, "J", j), typ: lv.typ}, nil
 
 	case t.IDDot:
 		lhs := n.LHS().AsExpr()
 		if lhs.Operator() == 0 {
 			switch lhs.Ident() {
 			case t.IDArgs:
+				if io := l.ios[n.Ident()]; io != nil {
+					typ := typIOReader
+					if io.writer {
+						typ = typIOWriter
+					}
+					return val{typ: typ, io: io}, nil
+				}
 				if v := l.args[n.Ident()]; v != nil {
-					return val{e: eVar{v}, typ: v.typ}, nil
+					switch v.typ.kind {
+					case kBytes, kBytesVar:
+						return bytesVal(eVar{v}, nil, nil, v.typ.kind == kBytesVar, false), nil
+					}
+					return val{e: eVar{v}, typ: v.typ, variable: v.kind == varLocal}, nil
 				}
 				return val{}, fmt.Errorf("unrecognized argument %q", n.Str(l.g.tm))
 			case t.IDThis:
 				if f := l.fi.recv.field(n.Ident()); f != nil {
-					return val{e: eSel{eVar{l.f.self}, f.name}, typ: f.typ}, nil
+					if f.typ.kind == kUtility {
+						return val{typ: typUtility}, nil
+					}
+					return val{e: eSel{eVar{l.f.self}, f.name}, typ: f.typ, variable: l.f.selfInOut}, nil
 				}
 				return val{}, fmt.Errorf("unrecognized field %q", n.Str(l.g.tm))
 			}
@@ -344,6 +512,20 @@ func checkNum(v val, bits int) error {
 	return fmt.Errorf("operand %q is not a %d-bit unsigned integer", flat(v.e), bits)
 }
 
+// infoOf returns what a comparison can know about the operand v.
+func infoOf(v val) operandInfo {
+	switch v.typ.kind {
+	case kIdeal:
+		return operandInfo{lit: v.cv}
+	case kNum:
+		if v.typ.lo != nil {
+			return operandInfo{lo: v.typ.lo, hi: v.typ.hi}
+		}
+		return operandInfo{lo: zero, hi: numTypeMax(v.typ.bits)}
+	}
+	return operandInfo{}
+}
+
 func (l *lowerer) binaryOp(n *a.Expr) (val, error) {
 	op := n.Operator()
 	if op == t.IDXBinaryAs {
@@ -373,7 +555,7 @@ func (l *lowerer) binaryOp(n *a.Expr) (val, error) {
 		default:
 			return val{}, errNotYet("comparison %q", n.Str(l.g.tm))
 		}
-		return val{e: bin(adaOp, lv.e, rv.e), typ: typBool}, nil
+		return val{e: eRel{op: adaOp, l: lv.e, r: rv.e, li: infoOf(lv), ri: infoOf(rv)}, typ: typBool}, nil
 	}
 
 	switch op {
@@ -446,9 +628,9 @@ func (l *lowerer) numBinaryOp(op t.ID, lv val, rv val, bits int) (val, error) {
 
 	switch op {
 	case t.IDXBinaryTildeSatPlus:
-		return val{e: callNamed(fmt.Sprintf("%s.Sat_Add_U%d", l.g.basePkg, bits), "X", lv.e, "Y", rv.e), typ: typ}, nil
+		return val{e: callNamed(fmt.Sprintf("%s.Sat_Add_U%d", intsPkg, bits), "X", lv.e, "Y", rv.e), typ: typ}, nil
 	case t.IDXBinaryTildeSatMinus:
-		return val{e: callNamed(fmt.Sprintf("%s.Sat_Sub_U%d", l.g.basePkg, bits), "X", lv.e, "Y", rv.e), typ: typ}, nil
+		return val{e: callNamed(fmt.Sprintf("%s.Sat_Sub_U%d", intsPkg, bits), "X", lv.e, "Y", rv.e), typ: typ}, nil
 	}
 	if adaOp, ok := numOps[op]; ok {
 		l.g.useType[bits] = true
@@ -526,130 +708,4 @@ func (l *lowerer) as(n *a.Expr) (val, error) {
 		return val{e: call(typ.name, lv.e), typ: typ}, nil
 	}
 	return val{}, errNotYet("conversion %q", n.Str(l.g.tm))
-}
-
-// call lowers a method call.
-func (l *lowerer) call(n *a.Expr) (val, error) {
-	if n.Effect().Coroutine() {
-		return val{}, errNotYet("coroutine call %q", n.Str(l.g.tm))
-	}
-	method := n.LHS().AsExpr()
-	recv := method.LHS().AsExpr()
-	recvTyp := recv.MType()
-	args := n.Args()
-
-	if recv.Operator() == 0 && recv.Ident() == t.IDThis {
-		return l.userCall(n, method.Ident(), args)
-	}
-
-	switch {
-	case recvTyp.IsEitherSliceType():
-		if method.Ident() != t.IDLength || len(args) != 0 {
-			break
-		}
-		rv, err := l.expr(recv)
-		if err != nil {
-			return val{}, err
-		}
-		switch rv.typ.kind {
-		case kBytes:
-			return val{e: call("Wuffs.U64", eAttr{rv.e, "Length"}), typ: typU64}, nil
-		case kROSliceU8:
-			return val{e: call("Wuffs.U64", eSel{rv.e, "Length"}), typ: typU64}, nil
-		}
-
-	case recvTyp.Decorator() == 0 && uintBits(recvTyp.QID()) != 0:
-		bits := uintBits(recvTyp.QID())
-		if (method.Ident() != t.IDLowBits && method.Ident() != t.IDHighBits) || len(args) != 1 {
-			break
-		}
-		cv := args[0].AsArg().Value().ConstValue()
-		if cv == nil || cv.Sign() < 0 || cv.Cmp(big.NewInt(int64(bits))) > 0 {
-			return val{}, errNotYet("%q with a non-constant argument", n.Str(l.g.tm))
-		}
-		rv, err := l.expr(recv)
-		if err != nil {
-			return val{}, err
-		}
-		if rv.typ == nil || rv.typ.kind != kNum {
-			// A constant receiver would have made the whole call constant.
-			return val{}, errNotYet("%q", n.Str(l.g.tm))
-		}
-		nBits := int(cv.Int64())
-		if method.Ident() == t.IDLowBits {
-			// C: ((recv) & mask).
-			mask := big.NewInt(1)
-			mask.Lsh(mask, uint(nBits))
-			mask.Sub(mask, one)
-			l.g.useType[bits] = true
-			return val{e: bin("and", rv.e, raw(numLiteral(mask, 1))), typ: numType(bits)}, nil
-		}
-		// C: ((recv) >> (8*sizeof(recv) - (n))). In Ada, as in Wuffs but
-		// unlike C, shifting by the full width is well defined, giving zero.
-		return val{
-			e:   call("Interfaces.Shift_Right", rv.e, raw(fmt.Sprint(bits-nBits))),
-			typ: numType(bits),
-		}, nil
-	}
-	return val{}, errNotYet("method call %q on a receiver of type %q", n.Str(l.g.tm), recvTyp.Str(l.g.tm))
-}
-
-// userCall lowers a call of a method of the current function's receiver.
-func (l *lowerer) userCall(n *a.Expr, method t.ID, args []*a.Node) (val, error) {
-	recv := l.fi.ast.Receiver()
-	callee := l.g.funcs[t.QQID{recv[0], recv[1], method}]
-	if callee == nil {
-		return val{}, errNotYet("method call %q", n.Str(l.g.tm))
-	}
-	if callee.skipped {
-		return val{}, fmt.Errorf("call %q of a function that was skipped as it needs a cpu_arch capability", n.Str(l.g.tm))
-	}
-	f := callee.ir
-	if len(args) != len(f.params) {
-		return val{}, fmt.Errorf("call %q: wrong number of arguments", n.Str(l.g.tm))
-	}
-
-	es := []expr{eVar{l.f.self}}
-	if f.selfInOut {
-		if !l.f.selfInOut {
-			return val{}, fmt.Errorf("call %q of an impure function from a pure function", n.Str(l.g.tm))
-		}
-		l.f.self.writes++
-	}
-	for i, o := range args {
-		arg := o.AsArg().Value()
-		v, err := l.expr(arg)
-		if err != nil {
-			return val{}, err
-		}
-		if v.typ == nil {
-			return val{}, fmt.Errorf("argument %q has no value", arg.Str(l.g.tm))
-		}
-		want := f.params[i].typ
-		switch want.kind {
-		case kBytes:
-			if v.typ.kind != kBytes && v.typ.kind != kROSliceU8 {
-				return val{}, fmt.Errorf("argument %q is not a slice", arg.Str(l.g.tm))
-			}
-			if v, err = l.toBytes(v); err != nil {
-				return val{}, err
-			}
-		case kNum:
-			if err := checkNum(v, want.bits); err != nil {
-				return val{}, fmt.Errorf("argument %q: %v", arg.Str(l.g.tm), err)
-			}
-		case kBool, kStatus:
-			if v.typ.kind != want.kind {
-				return val{}, fmt.Errorf("argument %q has the wrong type", arg.Str(l.g.tm))
-			}
-		default:
-			return val{}, fmt.Errorf("internal error: unexpected parameter type")
-		}
-		es = append(es, v.e)
-	}
-	ret := val{e: eCall{eRaw{f.name}, es}}
-	if f.ret != nil {
-		ret.typ = f.ret
-	}
-	return ret, nil
 }
