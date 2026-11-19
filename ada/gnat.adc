@@ -1,0 +1,5 @@
+--  Library-wide configuration pragmas. See docs/DESIGN.md, "Stack and heap".
+pragma Restrictions (No_Recursion);
+pragma Restrictions (No_Secondary_Stack);
+pragma Restrictions (No_Allocators);
+pragma Restrictions (No_Implicit_Heap_Allocations);

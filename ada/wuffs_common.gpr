@@ -1,0 +1,16 @@
+abstract project Wuffs_Common is
+   type Profile_Type is ("checked", "release");
+   Profile : Profile_Type := external ("WUFFS_PROFILE", "checked");
+
+   --  Stack frames above this many bytes, and all GNAT warnings, are build
+   --  errors. See docs/DESIGN.md, "Stack and heap".
+   Stack_Limit := "8192";
+
+   Common := ("-gnat2022", "-gnatwa", "-gnatwe", "-gnatyyM100", "-gnatec=" & Wuffs_Common'Project_Dir & "gnat.adc",
+              "-fstack-usage", "-Wstack-usage=" & Stack_Limit, "-Werror=stack-usage=" & Stack_Limit, "-g");
+   Switches := ();
+   case Profile is
+      when "checked" => Switches := Common & ("-O2", "-gnata", "-gnato", "-gnatVa", "-fstack-check");
+      when "release" => Switches := Common & ("-O2", "-gnatp");
+   end case;
+end Wuffs_Common;

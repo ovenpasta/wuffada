@@ -1,0 +1,9 @@
+name = "wuffs_ada"
+description = "Pure Ada/SPARK Wuffs base library and generated decoders"
+version = "0.1.0-dev"
+licenses = "MIT OR Apache-2.0"
+project-files = ["wuffs_base.gpr", "wuffs_gen.gpr"]
+tags = ["spark", "image", "decoder"]
+
+[[depends-on]]
+gnatprove = "^16.1.0"

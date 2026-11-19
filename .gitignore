@@ -1,0 +1,11 @@
+# Upstream Wuffs checkout (pinned in docs/DESIGN.md, not vendored).
+/wuffs/
+# Build products.
+/ada/obj/
+/ada/lib/
+/ada/bin/
+/ada/alire/
+/ada/config/
+/bin/
+gnatprove/
+*.su
