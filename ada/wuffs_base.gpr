@@ -1,0 +1,13 @@
+--  The hand-written, SPARK-proved base library. Owner: base-library work.
+with "wuffs_common.gpr";
+project Wuffs_Base is
+   for Source_Dirs use ("src/root", "src/base");
+   for Object_Dir use "obj/base/" & Wuffs_Common.Profile;
+   for Create_Missing_Dirs use "True";
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+   package Prove is
+      for Proof_Switches ("Ada") use ("--level=2", "--mode=all", "--checks-as-errors=on", "-j0");
+   end Prove;
+end Wuffs_Base;
