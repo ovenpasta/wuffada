@@ -1,0 +1,13 @@
+--  Generated Ada (from Wuffs std) plus its non-SPARK runtime glue and tests.
+--  Owner: generator work. Must not add sources under src/base.
+with "wuffs_common.gpr";
+project Wuffs_Gen is
+   for Source_Dirs use ("src/root", "src/runtime", "gen", "tests");
+   for Object_Dir use "obj/gen/" & Wuffs_Common.Profile;
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("test_hashers.adb", "test_m1.adb", "test_runtime.adb");
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+end Wuffs_Gen;

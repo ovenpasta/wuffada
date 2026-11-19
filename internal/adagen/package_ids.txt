@@ -1,0 +1,14 @@
+# The status-code namespace ("package id") of each Wuffs package that
+# wuffs-ada generates Ada for: see Wuffs.Status in ada/src/root/wuffs.ads
+# (Code = Package_Id * 2**16 + N; id 0 is the base package).
+#
+# One line per package: NAME ID. An id, once assigned, never changes and is
+# never reused, as status codes are part of the generated packages' API. Add
+# new packages at the end of the first group with the next free id; the order
+# of this file is the order of assignment, not alphabetical.
+
+adler32 1
+crc32 2
+
+# Test-only packages count down from 65535.
+m1test 65535

@@ -1,0 +1,294 @@
+// Part of wuffada (wuffs-ada: Wuffs to Ada).
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
+// This is not part of Wuffs' standard library. It is a test input for
+// wuffs-ada that exercises the milestone 1 constructs that std/adler32 and
+// std/crc32 do not: labeled loops, break and continue, loop and statement
+// assertions, refinement types, saturating arithmetic, statuses, constants,
+// array fields, public functions with refined arguments and iterate loops
+// whose advance differs from their length.
+//
+// gen.sh generates ada/tests/wuffs-std-m1test.ad[sb] from it and
+// ada/tests/test_m1.adb checks what the functions compute. Upstream's wuffs-c
+// accepts this file too: ada/tests/crosscheck compares the Ada results with
+// what upstream's generated C computes.
+
+pub status "#widget error"
+
+pri status "@widget note"
+
+pub const LIMIT : base.u32 = 1000
+
+pub const WEIGHTS : roarray[4] base.u8 = [1, 2, 3, 0xF4]
+
+pri const PAIRS : roarray[2] roarray[3] base.u16 = [[1, 2, 3], [0x400, 0x500, 0x600]]
+
+pub struct widget? (
+        total : base.u32,
+        count : base.u32[..= 1000],
+        flag  : base.bool,
+        hist  : array[8] base.u8,
+        grid  : array[2] array[3] base.u16,
+)
+
+pub func widget.set_count!(n: base.u32[..= 1000]) {
+    this.count = args.n
+}
+
+pub func widget.get_count() base.u32 {
+    return this.count
+}
+
+pub func widget.get_total() base.u32 {
+    return this.total
+}
+
+pub func widget.get_hist(i: base.u32) base.u8 {
+    return this.hist[args.i & 7]
+}
+
+pub func widget.loops!(n: base.u32) base.u32 {
+    var i     : base.u32[..= 1000]
+    var j     : base.u32[..= 16]
+    var total : base.u32
+    var limit : base.u32[..= 1000]
+
+    limit = LIMIT
+    if args.n < 1000 {
+        limit = args.n
+    }
+
+    while.outer i < limit,
+            inv i <= 1000,
+    {
+        assert i < 1000 via "a < b: a < c; c <= b"(c: limit)
+        i += 1
+        if (i & 1) == 0 {
+            continue.outer
+        }
+        j = 0
+        while j < 16,
+                inv i <= 1000,
+                post j >= 16,
+        {
+            j += 1
+            total ~mod+= j
+            if total > 20000 {
+                break.outer
+            }
+        }
+    }.outer
+    return total
+}
+
+pub func widget.arith!(a: base.u32, b: base.u32, s: base.u8) base.u64 {
+    var x : base.u32
+    var y : base.u64
+    var z : base.u8
+    var w : base.u16
+
+    x = args.a ~sat+ args.b
+    x ~sat-= 5
+    x = x ~mod* 3
+    x ~mod-= args.b
+    z = args.s & 7
+    y = (x as base.u64) << z
+    y |= (args.a as base.u64) << 30
+    y ^= 0xFF
+    w = ((y >> 3) & 0xFFFF) as base.u16
+    w ~mod+= 1
+    w ~sat+= 0xFF00
+    y ~mod+= w as base.u64
+    if ((x > 100) and ((y & 1) == 0)) or (not this.flag) {
+        y ~mod+= 0x1_0000_0000
+    } else if x == 7 {
+        y = 7
+    } else {
+        y ~mod-= 1
+    }
+    y = (y / 3) ~mod+ (y % 1000)
+    return y
+}
+
+pri func widget.low3(v: base.u32) base.u32[..= 7] {
+    return args.v & 7
+}
+
+pri func widget.add_small!(d: base.u32[..= 7]) base.u32 {
+    this.total ~mod+= args.d
+    this.hist[args.d] = 1
+    this.hist[args.d & 3] ~sat+= 200
+    return this.total
+}
+
+pub func widget.use_small!(v: base.u32) base.status {
+    var d : base.u32[..= 7]
+
+    d = this.low3(v: args.v)
+    this.add_small!(d: d)
+    if d == 7 {
+        return "#widget error"
+    } else if d == 6 {
+        return "@widget note"
+    } else if d == 5 {
+        return base."#bad argument"
+    }
+    return ok
+}
+
+pri func widget.sum4(x: roslice base.u8) base.u32 {
+    var p : roslice base.u8
+    var s : base.u32
+
+    // Overlapping windows.
+    iterate (p = args.x)(length: 4, advance: 2, unroll: 2) {
+        s ~mod+= (p[0] as base.u32) ~mod+ ((p[3] as base.u32) << 8)
+    }
+    return s
+}
+
+pub func widget.windows!(x: roslice base.u8) base.u32 {
+    var s : base.u32
+    var t : roslice base.u8
+
+    s = this.sum4(x: args.x)
+    if args.x.length() >= 4 {
+        s ~mod+= this.sum4(x: args.x[2 ..])
+        t = args.x[1 .. 4]
+        s ~mod+= this.sum4(x: t)
+        s ~mod+= (t[1] as base.u32) ~mod+ (args.x[0] as base.u32)
+        s ~mod+= WEIGHTS[s & 3] as base.u32
+        s ~mod+= PAIRS[1][s & 1] as base.u32
+    }
+    return s
+}
+
+pub func widget.countdown!(n: base.u32) base.u32 {
+    var steps : base.u32
+
+    while args.n > 0 {
+        args.n -= 1
+        steps ~mod+= 1
+    }
+    return steps
+}
+
+pub func widget.narrow(v: base.u32) base.u32 {
+    var a : base.u32
+    var b : base.u32
+
+    a = args.v & 0xFF
+    b = a
+    while true {
+        if b > 100 {
+            break
+        }
+        b = 200
+        break
+    }
+    return a ~mod+ b
+}
+
+// Upstream's wuffs-c cannot generate a public function that returns a bool,
+// so this one is private, behind toggle_u32.
+pri func widget.toggle!() base.bool {
+    this.flag = not this.flag
+    this.grid[1][2] = 0x1234
+    return this.flag and (this.grid[1][2] == 0x1234)
+}
+
+pub func widget.toggle_u32!() base.u32 {
+    var b : base.bool
+
+    b = this.toggle!()
+    if b {
+        return 1
+    }
+    return 0
+}
+
+// The rest checks that no Wuffs name can collide with, or be hidden by, a
+// name that the generator invents or derives: these constants and this
+// method are spelled like the generator's temporaries, loop names, local
+// variables and arguments (or like what those used to be called).
+
+pri const I1_END : base.u32 = 7
+
+pri const I1_POS : base.u32 = 3
+
+pri const T1 : roarray[4] base.u8 = [10, 20, 30, 40]
+
+pri const G_T1 : roarray[4] base.u8 = [50, 60, 70, 80]
+
+pri const V_S : base.u32 = 100
+
+pri const A_X : base.u32 = 2000
+
+pri const G_I1_SRC : base.u32 = 30000
+
+pri const G_I1_POS : base.u32 = 5
+
+pub func widget.names!(x: roslice base.u8) base.u64 {
+    var p : roslice base.u8
+    var s : base.u64
+    var t : base.u32
+
+    iterate (p = args.x)(length: 1, advance: 1, unroll: 1) {
+        t = (p[0] as base.u32) ~mod+ I1_END
+        s ~mod+= (t as base.u64) ~mod+ (this.hist[I1_POS] as base.u64)
+        s ~mod+= this.hist[G_I1_POS] as base.u64
+    }
+    t = this.total ~mod+ V_S
+    t ~mod+= A_X
+    t ~mod+= G_I1_SRC
+    s ~mod+= t as base.u64
+    s ~mod+= (T1[s & 3] as base.u64) ~mod+ (this.sum4(x: args.x[.. 0]) as base.u64)
+    s ~mod+= G_T1[s & 3] as base.u64
+    return s
+}
+
+pri func widget.loop_1!() base.u32 {
+    this.total ~mod+= 1
+    return this.total
+}
+
+pri func widget.g_loop_1!() base.u32 {
+    this.total ~mod+= 2
+    return this.total
+}
+
+pub func widget.call_loops!(n: base.u32) base.u32 {
+    var s : base.u32
+
+    while true {
+        s ~mod+= this.loop_1!()
+        s ~mod+= this.g_loop_1!()
+        if s > args.n {
+            break
+        }
+    }
+    return s
+}
+
+// Functions that return a value without ending in a return statement.
+
+pub func widget.find(v: base.u32) base.u32 {
+    var i : base.u32
+
+    while true {
+        if (i ~mod* i) >= args.v {
+            return i
+        }
+        i ~mod+= 1
+    }
+}
+
+pub func widget.pick(v: base.u32) base.u32 {
+    if args.v > 10 {
+        return 1
+    } else if args.v > 5 {
+        return 2
+    } else {
+        return 3
+    }
+}
