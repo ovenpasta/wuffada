@@ -24,10 +24,11 @@ read it before changing anything.
 |---|---|
 | `docs/DESIGN.md` | architecture, type mapping, milestones, open decisions |
 | `ada/src/root/wuffs.ads` | shared scalar/array/status types (architect-owned) |
-| `ada/src/base/` | `Wuffs.Base.*`, hand-written, SPARK, proved |
+| `ada/src/base/`, `ada/src/pixel/`, `ada/src/ycck/` | `Wuffs.Base.*`, hand-written (pixel rows script-generated), SPARK, proved |
 | `ada/src/runtime/` | `Wuffs.Runtime.*`, non-SPARK glue for generated code |
 | `ada/gen/` | generator output `Wuffs.Std.*` (checked in, never hand-edited) |
-| `ada/tests/`, `ada/tests_base/` | generator tests; base-library tests + C oracle |
+| `ada/tests/`, `ada/tests_base/`, `ada/tests_pixel/`, `ada/tests_ycck/` | generator tests; proved-library tests + C oracles |
+| `examples/` | `decode_image`: image file to PPM/PAM with the Ada library only |
 | `cmd/wuffs-ada/`, `internal/adagen/` | the generator (Go) |
 | `wuffs/` | upstream checkout, pinned at `a87f0bb`, git-ignored, read-only |
 
@@ -43,9 +44,15 @@ alr exec -- gprbuild -P wuffs_base_tests.gpr && bin/base_tests
 alr exec -- gprbuild -P wuffs_base_tests.gpr -XWUFFS_PROFILE=release && bin/base_tests
 tests_base/oracle/regen.sh                           # regenerate expected values from upstream C
 
+# Pixel and YCCK libraries: same pattern (each proof run is 10-17 minutes)
+alr exec -- gnatprove -P wuffs_pixel.gpr
+alr exec -- gprbuild -P wuffs_pixel_tests.gpr && bin/pixel_tests
+alr exec -- gnatprove -P wuffs_ycck.gpr
+tests_ycck/run_all.sh                                # generator checks, tests and fuzz, both profiles
+
 # Generator: regenerate ada/gen, build both profiles, run everything
 ./gen.sh
-./test.sh
+./test.sh                 # WUFFS_ASAN=1 ./test.sh adds a release build under AddressSanitizer
 ```
 
 If `wuffs/` is missing: `git clone https://github.com/google/wuffs && git -C wuffs checkout a87f0bb`.

@@ -11,6 +11,10 @@ project Wuffs_Pixel is
       for Default_Switches ("Ada") use Wuffs_Common.Switches;
    end Compiler;
    package Prove is
-      for Proof_Switches ("Ada") use ("--level=2", "--mode=all", "--checks-as-errors=on", "-j0");
+      --  Level 2 (provers cvc5, z3, altergo), but with a step limit in place
+      --  of the level's 5 second prover timeout, so that a check is proved or
+      --  not regardless of how busy the machine is.  The same limit is in
+      --  wuffs_base.gpr, wuffs_pixel.gpr and wuffs_ycck.gpr.
+      for Proof_Switches ("Ada") use Wuffs_Common.Proof_Switches;
    end Prove;
 end Wuffs_Pixel;

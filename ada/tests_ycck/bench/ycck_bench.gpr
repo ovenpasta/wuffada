@@ -1,0 +1,16 @@
+--  The YCCK benchmark (not a test): see bench.sh.  Built with the release
+--  profile's optimisation switches (-O2 -gnatp).  The library's style and
+--  stack switches and gnat.adc restrictions are not applied here: the
+--  program reads its command line, which needs the secondary stack.
+project YCCK_Bench is
+   for Source_Dirs use (".", "../../src/root", "../../src/base", "../../src/pixel",
+                        "../../src/ycck");
+   for Object_Dir use "../../obj/ycck_bench";
+   for Exec_Dir use "../../bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("ycck_bench.adb");
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnat2022", "-O2", "-gnatp");
+   end Compiler;
+end YCCK_Bench;

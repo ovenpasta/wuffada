@@ -25,6 +25,7 @@ Upstream is pinned at `google/wuffs@a87f0bb` (2026-11-18). A checkout lives in
 | `ada/src/root/wuffs.ads` | scalar + array types shared by everything | yes |
 | `ada/src/base/` | `Wuffs.Base.*` core, hand-written | **yes, proved** |
 | `ada/src/pixel/` | `Wuffs.Base.Pixel*`: pixel formats, buffers, swizzler, hand-written (`ada/wuffs_pixel.gpr`) | **yes, proved** |
+| `ada/src/ycck/` | `Wuffs.Base.Pixel_Swizzler_YCCK`, `Color_YCC`, `Pixel_Buffers.Rows`: YCbCr/YCCK conversion and chroma upsampling for JPEG/VP8, hand-written (`ada/wuffs_ycck.gpr`) | **yes, proved** |
 | `ada/src/runtime/` | `Wuffs.Runtime.*`, glue the generated code needs that SPARK cannot express (slice handles, interfaces) | no |
 | `ada/gen/` | generator output, `Wuffs.Std.<pkg>` (checked in) | no |
 | `ada/tests/` | test drivers | no |
@@ -73,6 +74,11 @@ Proof target: GNATprove `--mode=all --level=2`, zero unproved checks, no
 that a reviewer accepted. Functional correctness is covered by tests against
 upstream's C output on `wuffs/test/data`, not by proof.
 
+Prover effort is bounded by a **step limit, not wall-clock time** (decided by
+the project lead), so a proof passes or fails identically on a loaded or slow
+machine. The limit lives in the `Prove` package of each proved project and is
+set with margin over the largest step count any check needs.
+
 **Aliasing.** SPARK assumes distinct array parameters do not overlap, but the
 C functions being replaced are `memmove`s and Wuffs code does copy within one
 array (deflate history, the JPEG bitstream buffer). Proved two-array
@@ -89,6 +95,20 @@ between source and destination palette). The runtime shell checks this by
 address range before calling the proved code and returns a bad-argument status
 if a caller's buffers violate it, in every profile. No decoder in upstream's
 `std` creates such an overlap itself.
+
+`Swizzle_YCCK` writes two arrays, the pixels and the 2 KiB scratch buffer;
+each must be disjoint from every other array argument and from each other.
+
+**Proved-callers-only packages.** `Wuffs.Base.Pixel_Buffers.Rows`,
+`Pixel_Buffers.Row_Start` and the `Endian` pokes take their safety from
+preconditions and return no status. Generated code and the runtime shell must
+never call `Pixel_Buffers.Rows`; it exists for `Swizzle_YCCK`, which
+establishes the preconditions from its own checked entry tests.
+
+**Type-valid records.** "No precondition" on a proved entry point means: for
+arguments whose fields hold values of their subtypes. In the release profile
+nothing enforces subtype ranges, so the shell validates every caller-supplied
+record field (`'Valid`) before the proved code sees it.
 
 **Index conventions.** `Wuffs.Index` is capped at 2**62 - 1 so the sum of two
 indices fits `Wuffs.Offset`. Generated calls into base/runtime subprograms
@@ -142,9 +162,11 @@ Not in scope yet. `choose` statements resolve to the scalar default.
 2. In progress, in parallel:
    * Generator: use the proved base, coroutine lowering, I/O, `use`;
      lzw, deflate, zlib, gzip.
-   * Base: pixel formats, pixel buffer, pixel swizzler, proved.
-3. First image decoders (netpbm, bmp, gif, png).
-4. Remaining decoders (jpeg + YCCK swizzle, webp, ...), remaining formats.
+   * Base: pixel formats, pixel buffer, pixel swizzler, proved. Done.
+3. Image decoders netpbm, bmp, gif, png (+ wbmp, nie, targa); YCCK swizzle
+   proved, within 1.5x of upstream's scalar C.
+4. JPEG, then the remaining decoders (webp, ...) and formats. SIMD after
+   JPEG works on the scalar paths.
 
 ## Open decisions (owner: project lead)
 

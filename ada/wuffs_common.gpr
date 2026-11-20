@@ -13,4 +13,11 @@ abstract project Wuffs_Common is
       when "checked" => Switches := Common & ("-O2", "-gnata", "-gnato", "-gnatVa", "-fstack-check");
       when "release" => Switches := Common & ("-O2", "-gnatp");
    end case;
+
+   --  GNATprove switches shared by every proved project.  Prover effort is
+   --  bounded by steps, not wall-clock time, so a proof passes or fails the
+   --  same way on a loaded or slow machine (docs/DESIGN.md).  The largest
+   --  step count any check has needed is about 39000.
+   Proof_Switches := ("--level=2", "--timeout=0", "--steps=100000", "--mode=all",
+                      "--checks-as-errors=on", "-j0");
 end Wuffs_Common;

@@ -1,0 +1,18 @@
+--  Test drivers for the YCbCr / YCCK part of the base library
+--  (ada/tests_ycck).  Owner: base-library work.
+--
+--    alr exec -- gprbuild -P wuffs_ycck_tests.gpr [-XWUFFS_PROFILE=release]
+--    bin/ycck_tests        (exit status 0 only if every check passed)
+--    bin/ycck_fuzz < tests_ycck/fuzz/fuzz_cases.txt        (likewise)
+--    tests_ycck/run_all.sh      (both profiles, and the generators' checks)
+with "wuffs_common.gpr";
+project Wuffs_YCCK_Tests is
+   for Source_Dirs use ("src/root", "src/base", "src/pixel", "src/ycck", "tests_ycck");
+   for Object_Dir use "obj/ycck_tests/" & Wuffs_Common.Profile;
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("ycck_tests.adb", "ycck_fuzz.adb");
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+end Wuffs_YCCK_Tests;
