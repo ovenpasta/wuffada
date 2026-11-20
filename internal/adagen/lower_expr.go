@@ -37,6 +37,14 @@ type val struct {
 
 	// variable means that e names an Ada variable (something assignable).
 	variable bool
+
+	// parg is the argument, for a kNptr or kPixBuf value. isNull means that
+	// the value is the literal nullptr.
+	parg   *argInfo
+	isNull bool
+
+	// tableArr is the array that a kTable value's offsets count in.
+	tableArr *variable
 }
 
 // bin makes an eBin, flattening chains of one associative operator.
@@ -228,6 +236,8 @@ func (l *lowerer) index(n *a.Expr) (expr, error) {
 func (l *lowerer) constant(n *a.Expr, cv *big.Int) (val, error) {
 	typ := n.MType()
 	switch {
+	case typ.IsNullptr():
+		return val{typ: &adaType{kind: kNptr}, isNull: true}, nil
 	case typ.IsNumTypeOrIdeal():
 		if cv.Sign() < 0 {
 			return val{}, errNotYet("negative constant %q", n.Str(l.g.tm))
@@ -287,8 +297,18 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 	switch n.Operator() {
 	case 0:
 		id := n.Ident()
+		if io := l.bound[id]; io != nil {
+			typ := typIOReader
+			if io.writer {
+				typ = typIOWriter
+			}
+			return val{typ: typ, io: io}, nil
+		}
+		if l.ioLocals[id] {
+			return val{}, fmt.Errorf("the I/O variable %q is used outside of an io_bind block", n.Str(l.g.tm))
+		}
 		if v := l.locals[id]; v != nil {
-			return val{e: eVar{v}, typ: v.typ, variable: true}, nil
+			return val{e: eVar{v}, typ: v.typ, variable: true, tableArr: l.tableOf[v]}, nil
 		}
 		if id.IsDQStrLiteral(l.g.tm) {
 			if z := l.g.statuses[id]; z != nil {
@@ -297,6 +317,8 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 			return val{}, fmt.Errorf("unrecognized status %s", n.Str(l.g.tm))
 		}
 		switch id {
+		case t.IDNullptr:
+			return val{typ: &adaType{kind: kNptr}, isNull: true}, nil
 		case t.IDThis:
 			return val{e: eVar{l.f.self}, typ: l.fi.recv.typ, variable: l.f.selfInOut}, nil
 		case t.IDCoroutineResumed:
@@ -405,6 +427,9 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 		if lhs.Operator() == 0 {
 			switch lhs.Ident() {
 			case t.IDArgs:
+				if arg := l.ptrs[n.Ident()]; arg != nil {
+					return val{e: eVar{arg.v}, typ: arg.typ, parg: arg}, nil
+				}
 				if io := l.ios[n.Ident()]; io != nil {
 					typ := typIOReader
 					if io.writer {
@@ -538,6 +563,21 @@ func (l *lowerer) binaryOp(n *a.Expr) (val, error) {
 	lv, rv := vs[0], vs[1]
 
 	if adaOp, ok := comparisonOps[op]; ok {
+		// "p == nullptr" and "p <> nullptr" test the pointer's null flag.
+		if lv.typ.kind == kNptr || rv.typ.kind == kNptr {
+			p := lv
+			if lv.isNull {
+				p = rv
+			}
+			if lv.isNull == rv.isNull || p.parg == nil || p.parg.null == nil || (adaOp != "=" && adaOp != "/=") {
+				return val{}, errNotYet("comparison %q", n.Str(l.g.tm))
+			}
+			null := expr(eVar{p.parg.null})
+			if adaOp == "/=" {
+				null = eUn{"not", null}
+			}
+			return val{e: null, typ: typBool}, nil
+		}
 		switch {
 		case lv.typ.kind == kNum:
 			if err := checkNum(rv, lv.typ.bits); err != nil {

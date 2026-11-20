@@ -164,6 +164,47 @@ func TestCheckedIn(tt *testing.T) {
 		outDir: "ada/gen",
 		files:  []string{"wuffs/std/gzip/decode_gzip.wuffs"},
 	}, {
+		name:   "netpbm",
+		outDir: "ada/gen",
+		files:  []string{"wuffs/std/netpbm/decode_netpbm.wuffs"},
+	}, {
+		name:   "bmp",
+		outDir: "ada/gen",
+		files:  []string{"wuffs/std/bmp/decode_bmp.wuffs"},
+	}, {
+		name:   "gif",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/gif/common_consts.wuffs",
+			"wuffs/std/gif/decode_gif.wuffs",
+			"wuffs/std/gif/decode_lzw.wuffs",
+			"wuffs/std/gif/decode_quirks.wuffs",
+		},
+	}, {
+		name:   "png",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/png/common_consts.wuffs",
+			"wuffs/std/png/decode_filter_arm_neon.wuffs",
+			"wuffs/std/png/decode_filter_fallback.wuffs",
+			"wuffs/std/png/decode_filter_x86_sse42.wuffs",
+			"wuffs/std/png/decode_png.wuffs",
+			"wuffs/std/png/decode_swizzle_default.wuffs",
+			"wuffs/std/png/decode_swizzle_tricky.wuffs",
+		},
+	}, {
+		name:   "wbmp",
+		outDir: "ada/gen",
+		files:  []string{"wuffs/std/wbmp/decode_wbmp.wuffs"},
+	}, {
+		name:   "nie",
+		outDir: "ada/gen",
+		files:  []string{"wuffs/std/nie/decode_nie.wuffs"},
+	}, {
+		name:   "targa",
+		outDir: "ada/gen",
+		files:  []string{"wuffs/std/targa/decode_targa.wuffs"},
+	}, {
 		name:   "m1test",
 		outDir: "ada/tests",
 		files:  []string{"internal/adagen/testdata/m1test.wuffs"},
@@ -270,7 +311,118 @@ func TestRejects(tt *testing.T) {
 				}
 				this.x = c as base.u32
 			}`,
-		want: "not yet supported: io_bind blocks",
+		want: "not yet supported: a suspension inside an io_bind block",
+	}, {
+		what: "io_limit with a suspension",
+		src: prelude + `
+			pub func foo.bar?(src: base.io_reader) {
+				var c : base.u8
+				io_limit (io: args.src, limit: 4 as base.u64) {
+					c = args.src.read_u8?()
+				}
+				this.x = c as base.u32
+			}`,
+		want: "not yet supported: a suspension inside an io_limit block",
+	}, {
+		what: "return out of io_limit",
+		src: prelude + `
+			pub func foo.bar?(src: base.io_reader) {
+				var i : base.u32
+				while i < 4 {
+					io_limit (io: args.src, limit: 4 as base.u64) {
+						if args.src.length() > 2 {
+							return ok
+						}
+					}
+					i += 1
+				}
+			}`,
+		want: "not yet supported: a return out of an io_limit block",
+	}, {
+		what: "break out of io_limit",
+		src: prelude + `
+			pub func foo.bar?(src: base.io_reader) {
+				var i : base.u32
+				while i < 4 {
+					io_limit (io: args.src, limit: 4 as base.u64) {
+						if args.src.length() > 2 {
+							break
+						}
+					}
+					i += 1
+				}
+			}`,
+		want: "not yet supported: a break out of an io_limit block",
+	}, {
+		what: "continue out of io_limit",
+		src: prelude + `
+			pub func foo.bar?(src: base.io_reader) {
+				var i : base.u32
+				while i < 4 {
+					io_limit (io: args.src, limit: 4 as base.u64) {
+						if args.src.length() > 2 {
+							continue
+						}
+					}
+					i += 1
+				}
+			}`,
+		want: "not yet supported: a continue out of an io_limit block",
+	}, {
+		what: "yield out of io_limit",
+		src: prelude + `
+			pub func foo.bar?(src: base.io_reader) {
+				io_limit (io: args.src, limit: 4 as base.u64) {
+					yield? base."$short read"
+				}
+			}`,
+		want: "out of an io_limit block",
+	}, {
+		what: "io_limit of a writer",
+		src: prelude + `
+			pub func foo.bar?(dst: base.io_writer) {
+				io_limit (io: args.dst, limit: 4 as base.u64) {
+					if args.dst.length() > 0 {
+						args.dst.write_u8_fast!(a: 1)
+					}
+				}
+			}`,
+		want: "not yet supported: io_limit of a writer",
+	}, {
+		what: "io_forget_history",
+		src: prelude + `
+			pub func foo.bar?(dst: base.io_writer) {
+				io_forget_history (io: args.dst) {
+					if args.dst.length() > 0 {
+						args.dst.write_u8_fast!(a: 1)
+					}
+				}
+			}`,
+		want: "not yet supported: io_forget_history blocks",
+	}, {
+		what: "an I/O variable outside of io_bind",
+		src: prelude + `
+			pub func foo.bar?(src: base.io_reader) {
+				var r : base.io_reader
+				this.x = (r.length() & 0xFF) as base.u32
+			}`,
+		want: "is used outside of an io_bind block",
+	}, {
+		what: "a plane other than plane 0",
+		src: prelude + `
+			pub func foo.bar!(dst: ptr base.pixel_buffer) {
+				var tab : table base.u8
+				tab = args.dst.plane(p: 1)
+				this.x = (tab.width() & 0xFF) as base.u32
+			}`,
+		want: "not yet supported",
+	}, {
+		what: "a pointer to something else",
+		src: prelude + `
+			pub func foo.bar!(dst: nptr base.pixel_config) {
+				this.x = 1
+			}`,
+		want: "is not yet supported",
 	}, {
 		what: "assigning to an argument in a coroutine",
 		src: prelude + `
@@ -1320,5 +1472,71 @@ func TestDuplicateNameChecks(tt *testing.T) {
 		if err := checkSubprogramNames(&g); err == nil {
 			tt.Errorf("subprogram with %v: no error", extra)
 		}
+	}
+}
+
+// A call of a library subprogram with two or more arguments must name them,
+// unless the subprogram is on the list of those whose parameter types differ.
+func TestCheckCalls(tt *testing.T) {
+	ok := []stmt{
+		sCall{callNamed("Wuffs.Runtime.Copy_Message", "Text", raw("T"), "Buffer", raw("B"), "Length", raw("L"))},
+		sCall{call("Wuffs.Base.IO.Save", raw("M"), raw("R"))},
+		sAssign{raw("X"), call("Wuffs.U64", raw("Y"))},
+		sAssign{raw("X"), call("Local_Function", raw("Self"), raw("Y"))},
+		sAssign{raw("X"), call("Wuffs.Std.Zlib.Something", raw("Self"), raw("Y"))},
+		sIf{branches: []ifBranch{{call("Wuffs.Runtime.Valid_Buffer", raw("D"), raw("M")), nil}}},
+	}
+	if err := checkCalls(ok); err != nil {
+		tt.Errorf("unexpected error: %v", err)
+	}
+	for _, bad := range []stmt{
+		sCall{call("Wuffs.Runtime.Copy_Message", raw("T"), raw("B"), raw("L"))},
+		sAssign{raw("X"), call("Wuffs.Base.Ints.Min_U64", raw("A"), raw("B"))},
+		sIf{branches: []ifBranch{{raw("C"), []stmt{
+			sLoop{body: []stmt{sReturn{call("Wuffs.Base.Slices.Peek_U8", raw("A"), raw("I"))}}}}}}},
+		sCall{eCall{eRaw{"Wuffs.Runtime.Set"}, []expr{eNamed{"M", raw("M")}, raw("F")}}},
+	} {
+		if err := checkCalls([]stmt{bad}); err == nil {
+			tt.Errorf("no error for a positional call: %#v", bad)
+		}
+	}
+}
+
+// Every public function checks, before anything else, that no array argument
+// lies in the receiver, and every tagged type has the do-nothing Put_Image.
+func TestEntryChecks(tt *testing.T) {
+	src := `
+		pub struct bar? implements base.hasher_u32(
+			x : base.u32,
+		)
+		pub func bar.get_quirk(key: base.u32) base.u64 {
+			return 0
+		}
+		pub func bar.set_quirk!(key: base.u32, value: base.u64) base.status {
+			return base."#unsupported option"
+		}
+		pub func bar.update!(x: roslice base.u8) {
+			this.x = (args.x.length() & 0xFF) as base.u32
+		}
+		pub func bar.update_u32!(x: roslice base.u8) base.u32 {
+			return this.x
+		}
+		pub func bar.checksum_u32() base.u32 {
+			return this.x
+		}
+	`
+	out, err := generate(Options{PackageName: "foo", PackageID: 60000}, []string{"test.wuffs"}, [][]byte{[]byte(src)})
+	if err != nil {
+		tt.Fatal(err)
+	}
+	body := string(out.Body)
+	if n := strings.Count(body, "Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address,"); n != 2 {
+		tt.Errorf("%d receiver-overlap checks, want 2:\n%s", n, body)
+	}
+	if !strings.Contains(body, "Self.Magic := Wuffs.Runtime.Magic_Disabled;\n         return 0;") {
+		tt.Errorf("update_u32 does not disable and return zero:\n%s", body)
+	}
+	if !strings.Contains(string(out.Spec), "with Put_Image => G_Put_Image;") {
+		tt.Errorf("no Put_Image aspect:\n%s", out.Spec)
 	}
 }

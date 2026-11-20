@@ -3,14 +3,26 @@
 # Exits non-zero on the first failure. Needs Go, a C compiler (cc, for the
 # cross-check against upstream's C back-end), Alire (alr) with the project's
 # GNAT toolchain, and the Wuffs checkout at ./wuffs.
+#
+# Everything temporary (about 150 MB: the test corpora and traces) goes to
+# one directory under ${TMPDIR:-/tmp}, which is removed at the end.
+#
+# With WUFFS_ASAN=1 in the environment, it also builds the image tests a
+# third time, for the release profile with -fsanitize=address (in the
+# temporary directory), and runs them: the hostile-caller tests, the chaos
+# runs and the whole image corpus (compared with upstream's C again).
 set -eu
 cd "$(dirname "$0")"
 
 say() { printf '\n==== %s\n' "$*"; }
 die() { printf 'test.sh: FAIL: %s\n' "$*" >&2; exit 1; }
 
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)" || die "cannot make a temporary directory"
 trap 'rm -rf "$tmp"' EXIT
+# Fail now, and clearly, rather than half way with a truncated file.
+avail_kb="$(df -Pk "$tmp" | awk 'NR == 2 { print $4 }')"
+[ "${avail_kb:-0}" -ge 524288 ] ||
+    die "less than 512 MB free in $tmp (${avail_kb:-?} KB): set TMPDIR to a directory with more room"
 
 say "Go: build, vet, gofmt"
 go build ./...
@@ -90,6 +102,23 @@ echo "$(wc -l < "$tmp/decode.c32.trace" | tr -d ' ') runs traced from C"
 cmp -s "$tmp/decode.c.trace" "$tmp/decode.c32.trace" ||
     echo "(the 32-bit trace differs from the 64-bit one, as expected where the fast paths consume input differently)"
 
+say "Corpus for the image decoders (Go's image/png and image/gif as the independent implementation)"
+mkdir "$tmp/imgcorpus"
+go run ./ada/tests/imgcorpus -data wuffs/test/data -out "$tmp/imgcorpus" -chaos "$tmp/chaos.manifest" \
+    > "$tmp/image.manifest" || die "imgcorpus failed"
+nchaos="$(wc -l < "$tmp/chaos.manifest" | tr -d ' ')"
+[ "$nchaos" -ge 3000 ] || die "only $nchaos chaos runs"
+nimgcases="$(wc -l < "$tmp/image.manifest" | tr -d ' ')"
+nimgrefs="$(grep -c -v ' - [^ ]*$' "$tmp/image.manifest" || true)"
+echo "$nimgcases runs, $nimgrefs of them with reference pixels"
+[ "$nimgcases" -ge 30000 ] || die "only $nimgcases image test runs"
+[ "$nimgrefs" -ge 800 ] || die "only $nimgrefs image test runs with reference pixels"
+
+say "Cross-check: upstream's C image decoders over the corpus"
+ada/tests/crosscheck/run_image.sh < "$tmp/image.manifest" > "$tmp/image.c.trace"
+echo "$(wc -l < "$tmp/image.c.trace" | tr -d ' ') lines traced from C"
+[ -s "$tmp/image.c.trace" ] || die "empty C trace"
+
 # The tests run with a deliberately small main stack: the library must not
 # need more (docs/DESIGN.md, "Stack and heap").
 stack_kib=256
@@ -116,6 +145,21 @@ for profile in checked release; do
     fi
     sort -t "$(printf '\t')" -k2,2nr "$tmp/su" | head -n 5
     awk -F '\t' '$2 > 8192 { bad = 1; print } END { exit bad }' "$tmp/su" || die "a frame exceeds 8192 bytes"
+    # Per package: the largest frame of a generated subprogram and the
+    # largest of what the compiler adds (type initialization and the like;
+    # "<built-in>" in the .su files). The limits are far below the 8192 that
+    # the build enforces, so that growth shows up here first: a frame that
+    # grows with the size of a decoder's record (as the Put_Image procedure
+    # that Ada 2022 gives a tagged type did) would pass them soon.
+    echo "package: largest frame, largest compiler-generated frame (bytes)"
+    for su in "ada/obj/gen/$profile"/wuffs-std-*.su; do
+        pkg="$(basename "$su" .su)"
+        own="$(grep -v '^<built-in>' "$su" | awk -F '\t' '$2 > m { m = $2 } END { print m + 0 }')"
+        implicit="$(grep '^<built-in>' "$su" | awk -F '\t' '$2 > m { m = $2 } END { print m + 0 }')"
+        echo "$pkg: $own, $implicit"
+        [ "$own" -le 2048 ] || die "$pkg: a subprogram's frame exceeds 2048 bytes ($profile)"
+        [ "$implicit" -le 128 ] || die "$pkg: a compiler-generated frame exceeds 128 bytes ($profile)"
+    done
 
     say "Ada: run tests ($profile), with a ${stack_kib} KiB stack"
     (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_runtime) || die "test_runtime ($profile)"
@@ -169,6 +213,88 @@ for profile in checked release; do
         die "test_decode's force32 trace differs from upstream's C ($profile)"
     }
     echo "test_decode, force32: trace ($(wc -l < "$tmp/decode32.ada.trace" | tr -d ' ') runs) is identical to upstream's C"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_hostile) || die "test_hostile ($profile)"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_entry) || die "test_entry ($profile)"
+
+    # The chaos runs: other arguments at every resumption. No trace to
+    # compare; the program checks what it can and must not raise.
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_image < "$tmp/chaos.manifest") > "$tmp/chaos.out" ||
+        { grep -v '^= ' "$tmp/chaos.out" | head -n 50; die "test_image, chaos runs ($profile)"; }
+    grep -q "^test_image: cases: $nchaos," "$tmp/chaos.out" || die "test_image did not run all $nchaos chaos runs ($profile)"
+    echo "test_image, chaos runs: $(grep -v '^= ' "$tmp/chaos.out" | tr '\n' ' ')"
+
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_image < "$tmp/image.manifest") > "$tmp/image.out" ||
+        { grep -v '^= ' "$tmp/image.out" | head -n 50; die "test_image ($profile)"; }
+    grep -v '^= ' "$tmp/image.out"
+    grep -q "^test_image: cases: $nimgcases, compared with the reference decoder: $nimgrefs\$" "$tmp/image.out" ||
+        die "test_image did not run all $nimgcases runs, or did not compare all $nimgrefs references ($profile)"
+    grep '^= ' "$tmp/image.out" > "$tmp/image.ada.trace" || true
+    cmp "$tmp/image.c.trace" "$tmp/image.ada.trace" || {
+        diff "$tmp/image.c.trace" "$tmp/image.ada.trace" | head -n 20
+        die "test_image's trace differs from upstream's C ($profile)"
+    }
+    echo "test_image: trace ($(wc -l < "$tmp/image.ada.trace" | tr -d ' ') lines) is identical to upstream's C"
+
+    say "Example: examples/decode_image ($profile), with a ${stack_kib} KiB stack"
+    (cd ada && alr exec -- gprbuild -f -P ../examples/decode_image.gpr -XWUFFS_PROFILE="$profile") > "$tmp/build.example" 2>&1 ||
+        { cat "$tmp/build.example"; die "the example does not build ($profile)"; }
+    if grep -i -E 'warning|\(style\)' "$tmp/build.example"; then
+        die "the example's build has warnings ($profile)"
+    fi
+    for f in bricks-color.png bricks-dither.png hibiscus.primitive.png hippopotamus.interlaced.png \
+        animated-red-blue.gif hippopotamus.interlaced.gif; do
+        (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "wuffs/test/data/$f" "$tmp/example.pnm") ||
+            die "decode_image $f ($profile)"
+        go run ./ada/tests/pnmcheck "wuffs/test/data/$f" "$tmp/example.pnm" || die "decode_image $f: wrong pixels ($profile)"
+    done
+    for f in hippopotamus.bmp hippopotamus.ppm; do
+        (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "wuffs/test/data/$f" "$tmp/example.pnm") ||
+            die "decode_image $f ($profile)"
+        echo "decode_image: $f: $(wc -c < "$tmp/example.pnm" | tr -d ' ') bytes written"
+    done
+    # Errors are reported with the status' message.
+    head -c 3000 wuffs/test/data/bricks-color.png > "$tmp/truncated.png"
+    head -c 300 wuffs/test/data/animated-red-blue.gif > "$tmp/truncated.gif"
+    printf 'BMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' > "$tmp/bad.bmp"
+    expect_failure() {
+        if (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "$1" "$tmp/example.pnm") 2> "$tmp/example.err"; then
+            die "decode_image $1 did not fail ($profile)"
+        fi
+        cat "$tmp/example.err"
+        [ "$(cat "$tmp/example.err")" = "$2" ] || die "decode_image $1: expected the message: $2 ($profile)"
+    }
+    expect_failure "$tmp/truncated.png" "decode_frame: deflate: truncated input"
+    expect_failure "$tmp/truncated.gif" "decode_image_config: gif: truncated input"
+    expect_failure "$tmp/bad.bmp" "decode_image_config: bmp: bad header"
+    expect_failure go.mod "the input is not a PNG, GIF, BMP or Netpbm file"
+    # A file name longer than the program accepts (and so nowhere near the
+    # run-time library's own limits).
+    if (examples/bin/decode_image wuffs/test/data/hippopotamus.bmp \
+        "$tmp/$(awk 'BEGIN { while (n++ < 1100) printf "a" }')") 2> "$tmp/example.err"; then
+        die "decode_image accepted a 1100 character file name ($profile)"
+    fi
+    grep -q "a file name is empty or longer than 1024 characters" "$tmp/example.err" ||
+        die "decode_image: the wrong message for a long file name ($profile)"
+    [ -z "$(find "$tmp" -maxdepth 1 -name 'aaaa*')" ] || die "decode_image created a file for a long name"
 done
+
+if [ "${WUFFS_ASAN:-}" = 1 ]; then
+    say "Ada: the image tests with AddressSanitizer (release profile)"
+    (cd ada && alr exec -- gprbuild -q -P wuffs_gen.gpr -XWUFFS_PROFILE=release --relocate-build-tree="$tmp/asan" \
+        test_hostile.adb test_entry.adb test_image.adb -cargs -fsanitize=address -g -largs -fsanitize=address) \
+        > "$tmp/build.asan" 2>&1 || { cat "$tmp/build.asan"; die "the AddressSanitizer build failed"; }
+    export ASAN_OPTIONS=detect_leaks=0
+    timeout "$run_limit" "$tmp/asan/bin/test_hostile" || die "test_hostile (ASan)"
+    timeout "$run_limit" "$tmp/asan/bin/test_entry" || die "test_entry (ASan)"
+    timeout "$run_limit" "$tmp/asan/bin/test_image" < "$tmp/chaos.manifest" > "$tmp/chaos.out" 2> "$tmp/asan.err" ||
+        { cat "$tmp/asan.err" | head -n 50; grep -v '^= ' "$tmp/chaos.out" | head -n 20; die "test_image, chaos runs (ASan)"; }
+    echo "test_image, chaos runs: $(grep -v '^= ' "$tmp/chaos.out" | tr '\n' ' ')"
+    timeout 3600 "$tmp/asan/bin/test_image" < "$tmp/image.manifest" > "$tmp/image.out" 2> "$tmp/asan.err" ||
+        { cat "$tmp/asan.err" | head -n 50; grep -v '^= ' "$tmp/image.out" | head -n 20; die "test_image (ASan)"; }
+    grep -v '^= ' "$tmp/image.out"
+    grep '^= ' "$tmp/image.out" | cmp - "$tmp/image.c.trace" || die "test_image's trace differs from upstream's C (ASan)"
+    [ ! -s "$tmp/asan.err" ] || { head -n 50 "$tmp/asan.err"; die "AddressSanitizer reported something"; }
+    echo "AddressSanitizer: nothing reported; trace identical to upstream's C"
+fi
 
 say "ALL PASS"

@@ -11,3 +11,5 @@ gnatprove/
 *.su
 __pycache__/
 *.pyc
+/examples/obj/
+/examples/bin/

@@ -47,6 +47,32 @@ package body Wuffs.Std.M1test is
    --  Wuffs: const G_I1_POS
    W_G_I1_POS : constant Wuffs.U32 := 5;
 
+   function Message_Length (S : Wuffs.Status) return Natural is
+   begin
+      if S = Error_Widget_Error then
+         return 20;
+      elsif S = Note_Widget_Note then
+         return 19;
+      else
+         return 0;
+      end if;
+   end Message_Length;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is
+   begin
+      if S = Error_Widget_Error then
+         Wuffs.Runtime.Copy_Message (Text => "m1test: widget error",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Note_Widget_Note then
+         Wuffs.Runtime.Copy_Message (Text => "m1test: widget note",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      else
+         Wuffs.Runtime.Copy_Message (Text => "", Buffer => Buffer, Length => Length);
+      end if;
+   end Get_Message;
+
    procedure Initialize (Self : in out Widget) is
    begin
       Self.F_Total := 0;
@@ -69,6 +95,7 @@ package body Wuffs.Std.M1test is
       for G_I0 in Self.F_Marks'Range loop
          Self.F_Marks (G_I0) := False;
       end loop;
+      Self.G_Choosy_Mix := 0;
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
@@ -290,6 +317,11 @@ package body Wuffs.Std.M1test is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return 0;
       end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address, Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return 0;
+      end if;
       V_S := Sum4 (Self, A_X);
       if Wuffs.U64 (A_X'Length) >= 4 then
          G_T1 :=
@@ -378,6 +410,11 @@ package body Wuffs.Std.M1test is
       G_T1 : Wuffs.Runtime.RO_Slice_U8;
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return 0;
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address, Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
          return 0;
       end if;
       G_I1_Src := (Base => A_X'Unrestricted_Access, First => A_X'First, Length => A_X'Length);
@@ -507,6 +544,11 @@ package body Wuffs.Std.M1test is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return 0;
       end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address, Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return 0;
+      end if;
       V_I := 0;
       while V_I < 32 loop
          Self.F_Buf (Wuffs.Index (V_I)) := Wuffs.U8 (V_I * 7 and 16#FF#);
@@ -631,5 +673,58 @@ package body Wuffs.Std.M1test is
       end if;
       return V_T * 31 + Sum_Buf (Self);
    end Slices;
+
+   function G_Choosy_Default_Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32 is
+   begin
+      Self.F_Total := Self.F_Total + 1;
+      return A_V + 1;
+   end G_Choosy_Default_Mix;
+
+   function Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32 is
+   begin
+      if Self.G_Choosy_Mix = 1 then
+         return Mix_Square (Self => Self, A_V => A_V);
+      elsif Self.G_Choosy_Mix = 2 then
+         return Mix_Double (Self => Self, A_V => A_V);
+      else
+         return G_Choosy_Default_Mix (Self => Self, A_V => A_V);
+      end if;
+   end Mix;
+
+   function Mix_Double (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32 is
+   begin
+      Self.F_Total := Self.F_Total + 2;
+      return A_V * 2;
+   end Mix_Double;
+
+   function Mix_Square (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32 is
+   begin
+      Self.F_Total := Self.F_Total + 3;
+      return A_V * A_V;
+   end Mix_Square;
+
+   procedure Choose_Mix (Self : in out Widget; A_Which : Wuffs.U32) is
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return;
+      end if;
+      if A_Which = 1 then
+         Self.G_Choosy_Mix := 2;
+      elsif A_Which = 2 then
+         Self.G_Choosy_Mix := 1;
+      elsif A_Which = 3 then
+         Self.G_Choosy_Mix := 0;
+      end if;
+   end Choose_Mix;
+
+   function Call_Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32 is
+      V_R : Wuffs.U32 := 0;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return 0;
+      end if;
+      V_R := Mix (Self, A_V);
+      return V_R;
+   end Call_Mix;
 
 end Wuffs.Std.M1test;

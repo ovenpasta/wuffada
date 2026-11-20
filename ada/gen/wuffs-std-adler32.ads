@@ -9,6 +9,7 @@
 --    hasher.up_arm_neon
 --    hasher.up_x86_sse42
 
+with Ada.Strings.Text_Buffers;
 with Wuffs.Runtime;
 
 package Wuffs.Std.Adler32 with Preelaborate is
@@ -43,7 +44,14 @@ private
       Magic : Wuffs.U32 := 0;
       F_State : Wuffs.U32 := 0;
       F_Started : Boolean := False;
-   end record;
+   end record
+   with Put_Image => G_Put_Image;
+
+   --  Not for use: it stands in for the procedure that the compiler would
+   --  otherwise generate for Hasher'Image.
+   procedure G_Put_Image
+     (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Hasher)
+   is null;
 
    --  Wuffs: func hasher.up
    procedure Up (Self : in out Hasher; A_X : Wuffs.Bytes);

@@ -13,6 +13,24 @@ package body Wuffs.Std.Tiny is
    --  Wuffs: const MASK
    MASK : constant Wuffs.U32 := 65535;
 
+   function Message_Length (S : Wuffs.Status) return Natural is
+   begin
+      if S = Error_Too_Big then
+         return 13;
+      else
+         return 0;
+      end if;
+   end Message_Length;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is
+   begin
+      if S = Error_Too_Big then
+         Wuffs.Runtime.Copy_Message (Text => "tiny: too big", Buffer => Buffer, Length => Length);
+      else
+         Wuffs.Runtime.Copy_Message (Text => "", Buffer => Buffer, Length => Length);
+      end if;
+   end Get_Message;
+
    procedure Initialize (Self : in out Summer) is
    begin
       Self.F_State := 0;
@@ -57,6 +75,11 @@ package body Wuffs.Std.Tiny is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return;
       end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address, Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return;
+      end if;
       V_N := Self.F_State and MASK;
       G_I1_Src := (Base => A_X'Unrestricted_Access, First => A_X'First, Length => A_X'Length);
       G_I1_Pos := 0;
@@ -76,6 +99,11 @@ package body Wuffs.Std.Tiny is
    overriding function Update_U32 (Self : in out Summer; A_X : Wuffs.Bytes) return Wuffs.U32 is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return 0;
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address, Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
          return 0;
       end if;
       Update (Self, A_X);

@@ -200,7 +200,12 @@ func (l *lowerer) assembleCoroutine(head []stmt, body []stmt) []stmt {
 			}
 			id := o.AsVar().Name()
 			v := l.locals[id]
-			if !l.resumables[id] || v.typ.kind == kROSliceU8 || v.typ.kind == kSliceU8 {
+			if v == nil && l.ioLocals[id] {
+				continue
+			}
+			// C does not save a variable whose type has pointers (a slice
+			// or a table) either.
+			if !l.resumables[id] || v.typ.kind == kROSliceU8 || v.typ.kind == kSliceU8 || v.typ.kind == kTable {
 				continue
 			}
 			name := l.stateName("S", mangle(id.Str(l.g.tm)))
@@ -601,9 +606,32 @@ func (fl *flattener) rewriteList(ss []stmt) []stmt {
 	return out
 }
 
-// dropUnusedLabels removes the labels that nothing jumps to (GNAT warns
-// about them), at the top level of ss.
+// dropUnusedLabels removes the labels that nothing jumps to and the jumps
+// that nothing reaches (GNAT warns about both), at the top level of ss. One
+// removal can enable another (a flattened endless loop that nothing breaks
+// out of leaves "goto head; <<done>>; goto fi"), so it repeats until
+// nothing changes.
 func dropUnusedLabels(ss []stmt) []stmt {
+	for {
+		n := len(ss)
+		ss = dropUnusedLabelsOnce(ss)
+		out := []stmt(nil)
+		for _, s := range ss {
+			if _, ok := s.(sGoto); ok && len(out) > 0 {
+				if _, ok := out[len(out)-1].(sGoto); ok {
+					continue
+				}
+			}
+			out = append(out, s)
+		}
+		ss = out
+		if len(ss) == n {
+			return ss
+		}
+	}
+}
+
+func dropUnusedLabelsOnce(ss []stmt) []stmt {
 	used := map[string]bool{}
 	var visit func(ss []stmt)
 	visit = func(ss []stmt) {

@@ -1,0 +1,24 @@
+--  Part of wuffada (wuffs-ada: Wuffs to Ada).
+--  SPDX-License-Identifier: Apache-2.0 OR MIT
+
+--  The example program decode_image: see decode_image/decode_image.adb.
+--
+--    cd ada && alr exec -- gprbuild -P ../examples/decode_image.gpr -XWUFFS_PROFILE=release
+--    ../examples/bin/decode_image INPUT OUTPUT
+
+with "../ada/wuffs_common.gpr";
+project Decode_Image is
+
+   for Source_Dirs use
+     ("../ada/src/root", "../ada/src/base", "../ada/src/pixel", "../ada/src/runtime",
+      "../ada/src/runtime/target", "../ada/gen", "decode_image");
+   for Object_Dir use "obj/" & Wuffs_Common.Profile;
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("decode_image.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+
+end Decode_Image;

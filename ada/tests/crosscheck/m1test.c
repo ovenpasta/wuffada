@@ -184,5 +184,19 @@ int main(void) {
       wuffs_m1test__widget__get_hist(&w, (uint32_t)i));
   }
   v("loops after initialize", 0, wuffs_m1test__widget__loops(&w, 5));
+
+  v("mix, default", 0, wuffs_m1test__widget__call_mix(&w, 5));
+  wuffs_m1test__widget__choose_mix(&w, 1);
+  v("mix, double", 0, wuffs_m1test__widget__call_mix(&w, 5));
+  wuffs_m1test__widget__choose_mix(&w, 2);
+  v("mix, square", 0, wuffs_m1test__widget__call_mix(&w, 5));
+  wuffs_m1test__widget__choose_mix(&w, 0);
+  v("mix, unchanged", 0, wuffs_m1test__widget__call_mix(&w, 6));
+  wuffs_m1test__widget__choose_mix(&w, 3);
+  v("mix, default again", 0, wuffs_m1test__widget__call_mix(&w, 6));
+  v("mix, total", 0, wuffs_m1test__widget__get_total(&w));
+  wuffs_m1test__widget__choose_mix(&w, 2);
+  initialize();
+  v("mix after initialize", 0, wuffs_m1test__widget__call_mix(&w, 7));
   return 0;
 }

@@ -57,6 +57,9 @@
 with System;
 with Wuffs.Base.Ints;
 with Wuffs.Base.IO;
+with Wuffs.Base.Pixel_Buffers;
+with Wuffs.Base.Pixel_Formats;
+with Wuffs.Base.Pixel_Swizzler;
 with Wuffs.Base.Ranges;
 with Wuffs.Base.Slices;
 
@@ -254,6 +257,208 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    with Pre => Wuffs.Base.IO.Valid (Data, W) and then Wuffs.Base.IO.Valid (Src_Data, R);
 
    ---------------------------------------------------------------------------
+   --  Pixel buffers and the pixel swizzler.
+   --
+   --  A `ptr base.pixel_buffer` argument of a Wuffs function is three Ada
+   --  parameters: the Wuffs.Base.Pixel_Buffers.Pixel_Buffer descriptor and
+   --  the two arrays that it describes, Pixels (plane 0) and Palette (plane
+   --  3; see the model in wuffs-base-pixel_buffers.ads).
+   --
+   --  Arguments: what every public function of a generated package checks
+   --  first (after looking at Magic, to see that the object is initialized
+   --  and not disabled), before it reads or writes anything else, at every
+   --  call (also
+   --  when the call resumes a suspended coroutine, whose arguments may
+   --  differ from those of the call that was suspended).  Whatever fails,
+   --  the function returns Wuffs.Base.Error_Bad_Argument (or, if it does not
+   --  return a status, zero or nothing) and disables the object: its Magic
+   --  component, and nothing else in it, is written, and every later call
+   --  returns "disabled by previous error" until Initialize.  (A function
+   --  that cannot change its object returns zero and leaves it as it is.)
+   --  The same in every profile.
+   --
+   --  a. Every Boolean argument holds False or True ('Valid): the "null"
+   --     flags of the nullable pointers, and Wuffs bool arguments.
+   --  b. NO array argument, written or only read (a source or destination
+   --     buffer, a work buffer, a slice, pixels, a palette) shares storage
+   --     with the object that the function is called on (Shares_Storage,
+   --     with the object's 'Address and 'Size).  Otherwise the function
+   --     would overwrite its own state through the array, or the caller's
+   --     data through its state.
+   --  c. Every I/O buffer's meta describes its array (Valid_Buffer).
+   --  d. A pixel buffer is valid for its two arrays (Valid_Pixel_Buffer),
+   --     and Pixels and Palette, the two arrays that pixel operations
+   --     write, are each apart from each other and from every other array
+   --     argument (the source buffer, the work buffer).
+   --  e. Every argument of a refined type (base.u32[..= 9]) is in range.
+   --
+   --  Overlap between array arguments other than under (d) is NOT an error
+   --  at entry: a destination buffer, a source buffer and a work buffer may
+   --  share elements with each other (as upstream's C allows).  It is dealt
+   --  with at each operation that takes two arrays, in this package:
+   --
+   --     Copy_From_Slice, Writer_Copy_From_Slice,
+   --     Writer_Limited_Copy_U32_From_Slice,
+   --     Writer_Limited_Copy_U32_From_Reader,
+   --     Reader_Limited_Copy_U32_To_Slice
+   --        look at the addresses and call the proved operation's form for
+   --        disjoint arrays or its _Within form (memmove semantics);
+   --     Swizzler_Prepare, Swizzle_Interleaved_From_Slice,
+   --     Swizzle_Interleaved_From_Reader,
+   --     Limited_Swizzle_U32_Interleaved_From_Reader,
+   --     Swizzle_Interleaved_Transparent_Black
+   --        have no _Within form: they do nothing if the array that they
+   --        write shares an element with one that they read (see below).
+   --
+   --  Generated code calls no other operation of the proved libraries with
+   --  two arrays (copies within one array use Wuffs.Base.Slices.Copy_Within
+   --  or the writer's history copies), and reads and writes of single
+   --  elements are in program order whatever overlaps.
+   --
+   --  Aliasing of pixel operations (docs/DESIGN.md).  The proved pixel
+   --  operations have no same-array forms: the array that an operation
+   --  WRITES must not share an element with any array that it reads.  That
+   --  is enforced in two places:
+   --
+   --  1. At every public entry that takes a pixel buffer: (d) above, and
+   --     (b) for the decoder object itself.
+   --
+   --  2. In each operation below, again, for its own operands: this is what
+   --     makes the proved code's requirement hold whatever generated code
+   --     passes.  An operation whose written array shares an element with
+   --     one that it reads does nothing: Prepare returns
+   --     Wuffs.Base.Error_Bad_Argument, and a swizzle converts no pixels
+   --     (N = 0).  With the entry check in place this cannot happen for the
+   --     decoders of Wuffs' standard library, whose swizzles write the
+   --     caller's pixel memory and read decoder state, the source buffer or
+   --     the work buffer.
+   --
+   --  Arrays that are only read may overlap each other (std/bmp passes
+   --  parts of one array as destination palette and as source of a
+   --  swizzle), and nothing here forbids that.
+   ---------------------------------------------------------------------------
+
+   --  True if A has an element in the Size_In_Bits bits of storage that
+   --  start at Address (a decoder object: Self'Address and Self'Size).
+   function Shares_Storage
+     (A : Wuffs.Bytes; Address : System.Address; Size_In_Bits : Long_Long_Integer)
+      return Boolean;
+
+   --  The total validation of a caller's pixel buffer: every field of every
+   --  plane's table has a value of its subtype (see Valid_Buffer about
+   --  'Valid) and the buffer is valid for the two arrays.
+   function Valid_Pixel_Buffer
+     (PB      : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      Pixels  : Wuffs.Bytes;
+      Palette : Wuffs.Bytes) return Boolean;
+
+   --  Wuffs `pb.palette()`: the first Palette_Length (PB, Palette) elements
+   --  of Palette, which is 1024 or (if PB has no palette, or Palette is too
+   --  short for one) none.
+   function Palette_Length
+     (PB : Wuffs.Base.Pixel_Buffers.Pixel_Buffer; Palette : Wuffs.Bytes) return Wuffs.Index
+   is (if Wuffs.Base.Pixel_Buffers.Has_Palette (PB)
+         and then Palette'Length >= Wuffs.Base.Pixel_Formats.Palette_Byte_Length
+       then Wuffs.Base.Pixel_Formats.Palette_Byte_Length
+       else 0)
+   with Inline;
+
+   --  Wuffs `swizzler.prepare!(etc)`.  Proved: Pixel_Swizzler.Prepare.
+   procedure Swizzler_Prepare
+     (S           : out Wuffs.Base.Pixel_Swizzler.Swizzler;
+      Dst_Pixfmt  : Wuffs.Base.Pixel_Formats.Pixel_Format;
+      Dst_Palette : in out Wuffs.Bytes;
+      Src_Pixfmt  : Wuffs.Base.Pixel_Formats.Pixel_Format;
+      Src_Palette : Wuffs.Bytes;
+      Blend       : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      Result      : out Wuffs.Status);
+
+   --  Wuffs `swizzler.swizzle_interleaved_from_slice!(etc)`.
+   procedure Swizzle_Interleaved_From_Slice
+     (S           : Wuffs.Base.Pixel_Swizzler.Swizzler;
+      Dst         : in out Wuffs.Bytes;
+      Dst_Palette : Wuffs.Bytes;
+      Src         : Wuffs.Bytes;
+      N           : out Wuffs.U64);
+
+   --  Wuffs `swizzler.swizzle_interleaved_from_reader!(etc)`.
+   procedure Swizzle_Interleaved_From_Reader
+     (S           : Wuffs.Base.Pixel_Swizzler.Swizzler;
+      Dst         : in out Wuffs.Bytes;
+      Dst_Palette : Wuffs.Bytes;
+      Src_Data    : Wuffs.Bytes;
+      R           : in out Wuffs.Base.IO.Reader;
+      N           : out Wuffs.U64)
+   with Pre => Wuffs.Base.IO.Valid (Src_Data, R);
+
+   --  Wuffs `swizzler.limited_swizzle_u32_interleaved_from_reader!(etc)`.
+   procedure Limited_Swizzle_U32_Interleaved_From_Reader
+     (S                : Wuffs.Base.Pixel_Swizzler.Swizzler;
+      Up_To_Num_Pixels : Wuffs.U32;
+      Dst              : in out Wuffs.Bytes;
+      Dst_Palette      : Wuffs.Bytes;
+      Src_Data         : Wuffs.Bytes;
+      R                : in out Wuffs.Base.IO.Reader;
+      N                : out Wuffs.U64)
+   with Pre => Wuffs.Base.IO.Valid (Src_Data, R);
+
+   --  Wuffs `swizzler.swizzle_interleaved_transparent_black!(etc)`.
+   procedure Swizzle_Interleaved_Transparent_Black
+     (S           : Wuffs.Base.Pixel_Swizzler.Swizzler;
+      Dst         : in out Wuffs.Bytes;
+      Dst_Palette : Wuffs.Bytes;
+      Num_Pixels  : Wuffs.U64;
+      N           : out Wuffs.U64);
+
+   --  Wuffs `r.limited_copy_u32_to_slice!(etc)`, for a reader of Data: the
+   --  two arrays may overlap (C: memmove).
+   procedure Reader_Limited_Copy_U32_To_Slice
+     (Data  : Wuffs.Bytes;
+      R     : in out Wuffs.Base.IO.Reader;
+      Up_To : Wuffs.U32;
+      Dst   : in out Wuffs.Bytes;
+      N     : out Wuffs.U32)
+   with Pre => Wuffs.Base.IO.Valid (Data, R);
+
+   ---------------------------------------------------------------------------
+   --  TEMPORARY: types of Wuffs' base package that the proved library does
+   --  not have yet.  They hold no proved computation.
+   ---------------------------------------------------------------------------
+
+   --  C: wuffs_base__more_information (image-public.h).
+   type More_Information is record
+      Flavor : Wuffs.U32 := 0;
+      W      : Wuffs.U32 := 0;
+      X      : Wuffs.U64 := 0;
+      Y      : Wuffs.U64 := 0;
+      Z      : Wuffs.U64 := 0;
+   end record;
+
+   --  C: wuffs_base__more_information__set.
+   procedure Set
+     (M      : out More_Information;
+      Flavor : Wuffs.U32;
+      W      : Wuffs.U32;
+      X      : Wuffs.U64;
+      Y      : Wuffs.U64;
+      Z      : Wuffs.U64)
+   with Inline;
+
+   --  C: wuffs_base__decode_frame_options (it has no fields yet).
+   type Decode_Frame_Options is null record;
+
+   ---------------------------------------------------------------------------
+   --  Status messages.
+   ---------------------------------------------------------------------------
+
+   --  What a generated package's Get_Message does once it has found the
+   --  text: copies the first Length characters of Text to the start of
+   --  Buffer, where Length is Text'Length or Buffer'Length if that is
+   --  smaller, and sets the rest of Buffer to spaces (as
+   --  Wuffs.Base.Get_Message does).
+   procedure Copy_Message (Text : String; Buffer : out String; Length : out Natural);
+
+   ---------------------------------------------------------------------------
    --  Wuffs `base.hasher_u32`.
    ---------------------------------------------------------------------------
 
@@ -303,6 +508,83 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    is abstract;
 
    function Workbuf_Len (Self : IO_Transformer) return Wuffs.Base.Ranges.Range_II_U64
+   is abstract;
+
+   ---------------------------------------------------------------------------
+   --  Wuffs `base.image_decoder`.
+   --
+   --  A nullable pointer argument (`nptr base.image_config` and the like) is
+   --  two Ada parameters: an object, which always exists, and a Boolean
+   --  that says that the Wuffs pointer is null, in which case the object is
+   --  neither read nor written.  There is no pointer to dereference.
+   ---------------------------------------------------------------------------
+
+   type Image_Decoder is limited interface;
+
+   function Decode_Frame
+     (Self          : in out Image_Decoder;
+      A_Dst         : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels  : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src         : Wuffs.Bytes;
+      A_Src_Meta    : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend       : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf     : in out Wuffs.Bytes;
+      A_Opts        : in out Decode_Frame_Options;
+      A_Opts_Null   : Boolean) return Wuffs.Status
+   is abstract;
+
+   function Decode_Frame_Config
+     (Self       : in out Image_Decoder;
+      A_Dst      : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src      : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta) return Wuffs.Status
+   is abstract;
+
+   function Decode_Image_Config
+     (Self       : in out Image_Decoder;
+      A_Dst      : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src      : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta) return Wuffs.Status
+   is abstract;
+
+   function Frame_Dirty_Rect (Self : Image_Decoder) return Wuffs.Base.Ranges.Rect_IE_U32
+   is abstract;
+
+   function Get_Quirk (Self : Image_Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is abstract;
+
+   function Num_Animation_Loops (Self : Image_Decoder) return Wuffs.U32 is abstract;
+
+   function Num_Decoded_Frame_Configs (Self : Image_Decoder) return Wuffs.U64 is abstract;
+
+   function Num_Decoded_Frames (Self : Image_Decoder) return Wuffs.U64 is abstract;
+
+   function Restart_Frame
+     (Self : in out Image_Decoder; A_Index : Wuffs.U64; A_Io_Position : Wuffs.U64)
+      return Wuffs.Status
+   is abstract;
+
+   function Set_Quirk
+     (Self : in out Image_Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
+   is abstract;
+
+   procedure Set_Report_Metadata
+     (Self : in out Image_Decoder; A_Fourcc : Wuffs.U32; A_Report : Boolean)
+   is abstract;
+
+   function Tell_Me_More
+     (Self         : in out Image_Decoder;
+      A_Dst        : in out Wuffs.Bytes;
+      A_Dst_Meta   : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Minfo      : in out More_Information;
+      A_Minfo_Null : Boolean;
+      A_Src        : Wuffs.Bytes;
+      A_Src_Meta   : in out Wuffs.Base.IO.Buffer_Meta) return Wuffs.Status
+   is abstract;
+
+   function Workbuf_Len (Self : Image_Decoder) return Wuffs.Base.Ranges.Range_II_U64
    is abstract;
 
 private

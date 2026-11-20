@@ -9,6 +9,7 @@
 --    ieee_hasher.up_arm_crc32
 --    ieee_hasher.up_x86_sse42
 
+with Ada.Strings.Text_Buffers;
 with Wuffs.Runtime;
 
 package Wuffs.Std.Crc32 with Preelaborate is
@@ -45,7 +46,14 @@ private
       --  Whether Initialize has been called (C: private_impl.magic).
       Magic : Wuffs.U32 := 0;
       F_State : Wuffs.U32 := 0;
-   end record;
+   end record
+   with Put_Image => G_Put_Image;
+
+   --  Not for use: it stands in for the procedure that the compiler would
+   --  otherwise generate for Ieee_Hasher'Image.
+   procedure G_Put_Image
+     (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Ieee_Hasher)
+   is null;
 
    --  Wuffs: func ieee_hasher.up
    procedure Up (Self : in out Ieee_Hasher; A_X : Wuffs.Bytes);

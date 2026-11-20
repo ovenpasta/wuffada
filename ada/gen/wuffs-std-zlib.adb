@@ -18,6 +18,62 @@ package body Wuffs.Std.Zlib is
    --  Wuffs: const QUIRKS_COUNT
    QUIRKS_COUNT : constant Wuffs.U32 := 1;
 
+   function Message_Length (S : Wuffs.Status) return Natural is
+   begin
+      if S = Note_Dictionary_Required then
+         return 25;
+      elsif S = Error_Bad_Checksum then
+         return 18;
+      elsif S = Error_Bad_Compression_Method then
+         return 28;
+      elsif S = Error_Bad_Compression_Window_Size then
+         return 33;
+      elsif S = Error_Bad_Parity_Check then
+         return 22;
+      elsif S = Error_Incorrect_Dictionary then
+         return 26;
+      elsif S = Error_Truncated_Input then
+         return 21;
+      else
+         return 0;
+      end if;
+   end Message_Length;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is
+   begin
+      if S = Note_Dictionary_Required then
+         Wuffs.Runtime.Copy_Message (Text => "zlib: dictionary required",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Checksum then
+         Wuffs.Runtime.Copy_Message (Text => "zlib: bad checksum",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Compression_Method then
+         Wuffs.Runtime.Copy_Message (Text => "zlib: bad compression method",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Compression_Window_Size then
+         Wuffs.Runtime.Copy_Message (Text => "zlib: bad compression window size",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Parity_Check then
+         Wuffs.Runtime.Copy_Message (Text => "zlib: bad parity check",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Incorrect_Dictionary then
+         Wuffs.Runtime.Copy_Message (Text => "zlib: incorrect dictionary",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Truncated_Input then
+         Wuffs.Runtime.Copy_Message (Text => "zlib: truncated input",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      else
+         Wuffs.Runtime.Copy_Message (Text => "", Buffer => Buffer, Length => Length);
+      end if;
+   end Get_Message;
+
    procedure Initialize (Self : in out Decoder) is
    begin
       Self.G_Active_Coroutine := 0;
@@ -54,6 +110,13 @@ package body Wuffs.Std.Zlib is
    procedure Add_Dictionary (Self : in out Decoder; A_Dict : in out Wuffs.Bytes) is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return;
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_Dict,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
          return;
       end if;
       if Self.F_Header_Complete then
@@ -156,7 +219,18 @@ package body Wuffs.Std.Zlib is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;

@@ -13,6 +13,13 @@ lzw 3
 deflate 4
 zlib 5
 gzip 6
+netpbm 7
+bmp 8
+gif 9
+png 10
+wbmp 11
+nie 12
+targa 13
 
 # Test-only packages count down from 65535.
 m1test 65535

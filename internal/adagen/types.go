@@ -34,6 +34,10 @@ const (
 	kIOWriter // Wuffs "base.io_writer": likewise, writable.
 	kMeta     // Wuffs.Base.IO.Buffer_Meta.
 	kCursor   // Wuffs.Base.IO.Reader or Writer.
+	kNptr     // A nullable pointer to a base value type: an object plus a "null" flag.
+	kPixBuf   // Wuffs "ptr base.pixel_buffer": a descriptor plus two arrays.
+	kTable    // Wuffs "table base.u8": a Pixel_Buffers.Table, bound to an array.
+	kSwizzler // Wuffs "base.pixel_swizzler".
 )
 
 // adaType is the Ada type of a Wuffs type, variable or expression.
@@ -65,6 +69,7 @@ var (
 
 	typIdeal  = &adaType{kind: kIdeal, name: "universal_integer"}
 	typIndex  = &adaType{kind: kIndex, name: "Wuffs.Index"}
+	typOffset = &adaType{kind: kIndex, name: "Wuffs.Offset"}
 	typBool   = &adaType{kind: kBool, name: "Boolean"}
 	typStatus = &adaType{kind: kStatus, name: "Wuffs.Status"}
 	typU8     = &adaType{kind: kNum, name: "Wuffs.U8", bits: 8}
@@ -82,6 +87,22 @@ var (
 	typMeta      = &adaType{kind: kMeta, name: ioPkg + ".Buffer_Meta"}
 	typReader    = &adaType{kind: kCursor, name: ioPkg + ".Reader"}
 	typWriter    = &adaType{kind: kCursor, name: ioPkg + ".Writer"}
+
+	typPixelFormat = &adaType{kind: kOpaque, name: formatsPkg + ".Pixel_Format",
+		zero: formatsPkg + ".Make_Pixel_Format (Repr => 0)"}
+	typPixelBlend = &adaType{kind: kOpaque, name: formatsPkg + ".Pixel_Blend", zero: "0"}
+	typRectIEU32  = &adaType{kind: kOpaque, name: rangesPkg + ".Rect_IE_U32",
+		zero: rangesPkg + ".Empty_Rect_IE_U32"}
+	typReaderLimit = &adaType{kind: kOpaque, name: ioPkg + ".Reader_Limit_State"}
+	typTable       = &adaType{kind: kTable, name: buffersPkg + ".Table"}
+	typSwizzler    = &adaType{kind: kSwizzler, name: swizzlerPkg + ".Swizzler"}
+	typPixBuf      = &adaType{kind: kPixBuf, name: buffersPkg + ".Pixel_Buffer"}
+
+	// The nullable pointers.
+	typNptrImageConfig = &adaType{kind: kNptr, name: formatsPkg + ".Image_Config"}
+	typNptrFrameConfig = &adaType{kind: kNptr, name: formatsPkg + ".Frame_Config"}
+	typNptrMoreInfo    = &adaType{kind: kNptr, name: "Wuffs.Runtime.More_Information"}
+	typNptrFrameOpts   = &adaType{kind: kNptr, name: "Wuffs.Runtime.Decode_Frame_Options"}
 
 	typOptionalU63 = &adaType{kind: kOpaque, name: intsPkg + ".Optional_U63",
 		zero: intsPkg + ".Make_Optional_U63 (Has_Value => False, Value => 0)"}
@@ -195,6 +216,14 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 				return typIOReader, nil
 			case t.IDIOWriter:
 				return typIOWriter, nil
+			case t.IDPixelFormat:
+				return typPixelFormat, nil
+			case t.IDPixelBlend:
+				return typPixelBlend, nil
+			case t.IDRectIEU32:
+				return typRectIEU32, nil
+			case t.IDPixelSwizzler:
+				return typSwizzler, nil
 			}
 		}
 		if x.IsCPUArchType() || x.IsEtcUtilityType() {
@@ -246,6 +275,33 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 			return typSliceU8, nil
 		}
 		return nil, fmt.Errorf("slice type %q is not yet supported (only \"slice base.u8\" is)", x.Str(g.tm))
+
+	case t.IDNptr:
+		if in := x.Inner(); in.Decorator() == 0 && in.QID()[0] == t.IDBase {
+			switch in.QID()[1] {
+			case t.IDImageConfig:
+				return typNptrImageConfig, nil
+			case t.IDFrameConfig:
+				return typNptrFrameConfig, nil
+			case t.IDMoreInformation:
+				return typNptrMoreInfo, nil
+			case t.IDDecodeFrameOptions:
+				return typNptrFrameOpts, nil
+			}
+		}
+		return nil, fmt.Errorf("pointer type %q is not yet supported", x.Str(g.tm))
+
+	case t.IDPtr:
+		if in := x.Inner(); in.Decorator() == 0 && in.QID() == (t.QID{t.IDBase, t.IDPixelBuffer}) {
+			return typPixBuf, nil
+		}
+		return nil, fmt.Errorf("pointer type %q is not yet supported", x.Str(g.tm))
+
+	case t.IDTable:
+		if uintBits(x.Inner().QID()) == 8 && x.Inner().Decorator() == 0 && !x.Inner().IsRefined() {
+			return typTable, nil
+		}
+		return nil, fmt.Errorf("table type %q is not yet supported", x.Str(g.tm))
 
 	case t.IDArray, t.IDRoarray:
 		length := x.ArrayLength().ConstValue()

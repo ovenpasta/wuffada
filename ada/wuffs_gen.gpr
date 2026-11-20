@@ -1,7 +1,7 @@
 --  Generated Ada (from Wuffs std) plus its non-SPARK runtime glue and tests.
 --  Owner: generator work. Must not add sources under src/base. It compiles
 --  the proved base library's sources (src/base, read-only here) into its own
---  object directory; it does not include src/pixel.
+--  object directory, and likewise the proved pixel library's (src/pixel).
 with "wuffs_common.gpr";
 project Wuffs_Gen is
 
@@ -15,7 +15,7 @@ project Wuffs_Gen is
    --  (test.sh compiles the generator's golden outputs this way).
    Extra_Src := external ("WUFFS_EXTRA_SRC", "");
 
-   Dirs := ("src/root", "src/base", "src/runtime", "gen", "tests");
+   Dirs := ("src/root", "src/base", "src/pixel", "src/runtime", "gen", "tests");
    Obj_Suffix := "";
    Exec := "bin";
    case Target is
@@ -38,7 +38,7 @@ project Wuffs_Gen is
    for Exec_Dir use Exec;
    for Create_Missing_Dirs use "True";
    for Main use
-     ("test_hashers.adb", "test_m1.adb", "test_runtime.adb", "test_decode.adb", "test_adv.adb");
+     ("test_hashers.adb", "test_m1.adb", "test_runtime.adb", "test_decode.adb", "test_adv.adb", "test_image.adb", "test_hostile.adb", "test_entry.adb");
    package Compiler is
       for Default_Switches ("Ada") use Wuffs_Common.Switches;
    end Compiler;

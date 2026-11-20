@@ -235,5 +235,21 @@ begin
    end loop;
    V ("loops after initialize", 0, Wuffs.U64 (M.Loops (W, 5)), 408);
 
+   --  A choosy function: its own body, each alternative, no change, its own
+   --  body again, and its own body after Initialize.
+   V ("mix, default", 0, Wuffs.U64 (M.Call_Mix (W, 5)), 6);
+   M.Choose_Mix (W, 1);
+   V ("mix, double", 0, Wuffs.U64 (M.Call_Mix (W, 5)), 10);
+   M.Choose_Mix (W, 2);
+   V ("mix, square", 0, Wuffs.U64 (M.Call_Mix (W, 5)), 25);
+   M.Choose_Mix (W, 0);
+   V ("mix, unchanged", 0, Wuffs.U64 (M.Call_Mix (W, 6)), 36);
+   M.Choose_Mix (W, 3);
+   V ("mix, default again", 0, Wuffs.U64 (M.Call_Mix (W, 6)), 7);
+   V ("mix, total", 0, Wuffs.U64 (M.Get_Total (W)), 10);
+   M.Choose_Mix (W, 2);
+   M.Initialize (W);
+   V ("mix after initialize", 0, Wuffs.U64 (M.Call_Mix (W, 7)), 8);
+
    Test_Support.Finish ("test_m1");
 end Test_M1;

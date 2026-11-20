@@ -15,6 +15,32 @@ package body Wuffs.Std.Advtest is
    use type Wuffs.U32;
    use type Wuffs.U64;
 
+   function Message_Length (S : Wuffs.Status) return Natural is
+   begin
+      if S = Error_Bad_Thing then
+         return 18;
+      elsif S = Error_Inner_Failed then
+         return 21;
+      else
+         return 0;
+      end if;
+   end Message_Length;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is
+   begin
+      if S = Error_Bad_Thing then
+         Wuffs.Runtime.Copy_Message (Text => "advtest: bad thing",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Inner_Failed then
+         Wuffs.Runtime.Copy_Message (Text => "advtest: inner failed",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      else
+         Wuffs.Runtime.Copy_Message (Text => "", Buffer => Buffer, Length => Length);
+      end if;
+   end Get_Message;
+
    procedure Initialize (Self : in out Thing) is
    begin
       Self.G_Active_Coroutine := 0;
@@ -178,7 +204,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -217,7 +243,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -535,7 +572,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -554,7 +591,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -879,7 +927,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -896,7 +944,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -1078,7 +1137,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -1093,7 +1152,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -1179,7 +1249,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -1196,7 +1266,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -1319,7 +1400,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -1334,7 +1415,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -1437,7 +1529,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -1453,7 +1545,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -1559,7 +1662,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -1583,7 +1686,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -1743,7 +1857,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -1758,7 +1872,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -1845,7 +1970,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -1862,7 +1987,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -2060,7 +2196,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -2077,7 +2213,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -2239,7 +2386,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -2391,7 +2549,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -2410,7 +2568,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -2548,7 +2717,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -2588,7 +2757,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -2886,7 +3066,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -2913,7 +3093,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -3220,7 +3411,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -3378,7 +3580,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -3396,7 +3598,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -3652,7 +3865,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -3822,7 +4046,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -3842,7 +4066,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -4095,7 +4330,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -4115,7 +4350,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -4259,7 +4505,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -4277,7 +4523,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -4456,7 +4713,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -4472,7 +4729,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -4593,7 +4861,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -4749,7 +5028,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -4766,7 +5045,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -4872,7 +5162,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -4889,7 +5179,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -5023,7 +5324,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -5041,7 +5342,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -5181,7 +5493,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -5196,7 +5508,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
@@ -5293,7 +5616,7 @@ package body Wuffs.Std.Advtest is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status
    is
-      pragma Unreferenced (A_Workbuf);
+      pragma Unmodified (A_Workbuf);
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_W_Dst : Wuffs.Base.IO.Writer;
       G_R_Src : Wuffs.Base.IO.Reader;
@@ -5309,7 +5632,18 @@ package body Wuffs.Std.Advtest is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;

@@ -78,6 +78,129 @@ package body Wuffs.Std.Deflate is
    --  Wuffs: const HUFFS_TABLE_MASK
    HUFFS_TABLE_MASK : constant Wuffs.U32 := 1023;
 
+   function Message_Length (S : Wuffs.Status) return Natural is
+   begin
+      if S = Error_Bad_Huffman_Code_Over_Subscribed then
+         return 43;
+      elsif S = Error_Bad_Huffman_Code_Under_Subscribed then
+         return 44;
+      elsif S = Error_Bad_Huffman_Code_Length_Count then
+         return 38;
+      elsif S = Error_Bad_Huffman_Code_Length_Repetition then
+         return 43;
+      elsif S = Error_Bad_Huffman_Code then
+         return 25;
+      elsif S = Error_Bad_Huffman_Minimum_Code_Length then
+         return 40;
+      elsif S = Error_Bad_Block then
+         return 18;
+      elsif S = Error_Bad_Distance then
+         return 21;
+      elsif S = Error_Bad_Distance_Code_Count then
+         return 32;
+      elsif S = Error_Bad_Literal_Length_Code_Count then
+         return 38;
+      elsif S = Error_Inconsistent_Stored_Block_Length then
+         return 41;
+      elsif S = Error_Missing_End_Of_Block_Code then
+         return 34;
+      elsif S = Error_No_Huffman_Codes then
+         return 25;
+      elsif S = Error_Truncated_Input then
+         return 24;
+      elsif S = Error_Internal_Error_Inconsistent_Huffman_Decoder_State then
+         return 59;
+      elsif S = Error_Internal_Error_Inconsistent_I_O then
+         return 41;
+      elsif S = Error_Internal_Error_Inconsistent_Distance then
+         return 46;
+      elsif S = Error_Internal_Error_Inconsistent_N_Bits then
+         return 44;
+      else
+         return 0;
+      end if;
+   end Message_Length;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is
+   begin
+      if S = Error_Bad_Huffman_Code_Over_Subscribed then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad Huffman code (over-subscribed)",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Huffman_Code_Under_Subscribed then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad Huffman code (under-subscribed)",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Huffman_Code_Length_Count then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad Huffman code length count",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Huffman_Code_Length_Repetition then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad Huffman code length repetition",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Huffman_Code then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad Huffman code",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Huffman_Minimum_Code_Length then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad Huffman minimum code length",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Block then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad block",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Distance then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad distance",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Distance_Code_Count then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad distance code count",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_Literal_Length_Code_Count then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: bad literal/length code count",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Inconsistent_Stored_Block_Length then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: inconsistent stored block length",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Missing_End_Of_Block_Code then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: missing end-of-block code",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_No_Huffman_Codes then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: no Huffman codes",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Truncated_Input then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: truncated input",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Internal_Error_Inconsistent_Huffman_Decoder_State then
+         Wuffs.Runtime.Copy_Message
+           (Text => "deflate: internal error: inconsistent Huffman decoder state",
+            Buffer => Buffer,
+            Length => Length);
+      elsif S = Error_Internal_Error_Inconsistent_I_O then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: internal error: inconsistent I/O",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Internal_Error_Inconsistent_Distance then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: internal error: inconsistent distance",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Internal_Error_Inconsistent_N_Bits then
+         Wuffs.Runtime.Copy_Message (Text => "deflate: internal error: inconsistent n_bits",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      else
+         Wuffs.Runtime.Copy_Message (Text => "", Buffer => Buffer, Length => Length);
+      end if;
+   end Get_Message;
+
    procedure Initialize (Self : in out Decoder) is
    begin
       Self.G_Active_Coroutine := 0;
@@ -144,6 +267,13 @@ package body Wuffs.Std.Deflate is
       pragma Warnings (Off, G_T4);
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return;
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_Hist,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
          return;
       end if;
       V_S := (Base => A_Hist'Unrestricted_Access, First => A_Hist'First, Length => A_Hist'Length);
@@ -255,7 +385,18 @@ package body Wuffs.Std.Deflate is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
            or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
       then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;

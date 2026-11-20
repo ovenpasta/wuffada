@@ -224,6 +224,30 @@ procedure Test_Runtime is
             Test_Support.Check
               (Buf = Want and then N64 = Wuffs.U64 (Count), "Copy_From_Slice, layout", K);
 
+            --  Reader to slice: with the reader at the start of the source
+            --  and one byte in, and with limits below and above what fits.
+            for At_R in Wuffs.Index range 0 .. Wuffs.Index'Min (1, L.Src_Length) loop
+               for Up_To in Wuffs.U32 range 0 .. 2 loop
+                  Reset;
+                  Count :=
+                    Wuffs.Index'Min
+                      (Wuffs.Index'Min (L.Dst_Length, L.Src_Length - At_R),
+                       Wuffs.Index (Up_To) * 11);
+                  Expect (L.Dst_First, L.Src_First + At_R, Count);
+                  R := IO.To_Reader ((Wi => L.Src_Length, Ri => At_R, Pos => 0, Closed => False));
+                  RT.Reader_Limited_Copy_U32_To_Slice
+                    (Data  => Src.Base (Src.First .. RT.Last (Src)),
+                     R     => R,
+                     Up_To => Up_To * 11,
+                     Dst   => Buf (Dst_Lo .. Dst_Hi),
+                     N     => N32);
+                  Test_Support.Check
+                    (Buf = Want and then Wuffs.Index (N32) = Count and then R.Iop = At_R + Count,
+                     "Reader_Limited_Copy_U32_To_Slice, layout",
+                     K);
+               end loop;
+            end loop;
+
             --  Slice to writer, with the writer's cursor at each offset of
             --  three that fit.
             for At_W in Wuffs.Index range 0 .. 2 loop

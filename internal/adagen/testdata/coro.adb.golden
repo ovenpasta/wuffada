@@ -11,6 +11,24 @@ package body Wuffs.Std.Coro is
    use type Wuffs.U32;
    use type Wuffs.U64;
 
+   function Message_Length (S : Wuffs.Status) return Natural is
+   begin
+      if S = Error_Bad then
+         return 9;
+      else
+         return 0;
+      end if;
+   end Message_Length;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is
+   begin
+      if S = Error_Bad then
+         Wuffs.Runtime.Copy_Message (Text => "coro: bad", Buffer => Buffer, Length => Length);
+      else
+         Wuffs.Runtime.Copy_Message (Text => "", Buffer => Buffer, Length => Length);
+      end if;
+   end Get_Message;
+
    procedure Initialize (Self : in out Foo) is
    begin
       Self.G_Active_Coroutine := 0;
@@ -44,7 +62,11 @@ package body Wuffs.Std.Coro is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
-      if not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta) then
+      if Wuffs.Runtime.Shares_Storage (A => A_Src,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
+      then
          Self.Magic := Wuffs.Runtime.Magic_Disabled;
          return Wuffs.Base.Error_Bad_Argument;
       end if;

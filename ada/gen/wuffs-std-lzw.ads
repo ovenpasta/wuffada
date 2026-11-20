@@ -4,6 +4,7 @@
 --    wuffs/std/lzw/decode_lzw.wuffs
 --    wuffs/std/lzw/decode_quirks.wuffs
 
+with Ada.Strings.Text_Buffers;
 with Wuffs.Base.IO;
 with Wuffs.Base.Ints;
 with Wuffs.Base.Ranges;
@@ -16,6 +17,16 @@ package Wuffs.Std.Lzw with Preelaborate is
 
    --  Wuffs: status "#truncated input"
    Error_Truncated_Input : constant Wuffs.Status := (Error, 16#0003_0002#);
+
+   --  The message of a status of this package (a public or a private one), as
+   --  the base library's Get_Message gives it for a base status: the C
+   --  string without its leading '@', '$' or '#', such as "lzw: bad code".
+   --  Message_Length is zero for any other status.  Get_Message copies as much
+   --  of the message as fits to the start of Buffer, sets the rest of Buffer to
+   --  spaces and Length to the number of characters copied.
+   function Message_Length (S : Wuffs.Status) return Natural;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural);
 
    --  Wuffs: const DECODER_DST_HISTORY_RETAIN_LENGTH_MAX_INCL_WORST_CASE
    DECODER_DST_HISTORY_RETAIN_LENGTH_MAX_INCL_WORST_CASE : constant Wuffs.U64 := 0;
@@ -108,7 +119,14 @@ private
       F_Output : Wuffs.Bytes (0 .. 8198);
       G_P_5_Transform_Io : Wuffs.U32 := 0;
       G_P_7_Write_To : Wuffs.U32 := 0;
-   end record;
+   end record
+   with Put_Image => G_Put_Image;
+
+   --  Not for use: it stands in for the procedure that the compiler would
+   --  otherwise generate for Decoder'Image.
+   procedure G_Put_Image
+     (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Decoder)
+   is null;
 
    --  Wuffs: func decoder.read_from
    procedure Read_From

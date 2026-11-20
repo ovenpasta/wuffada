@@ -29,8 +29,12 @@ type loopInfo struct {
 
 // ioArg is an io_reader or io_writer argument of the function being lowered.
 type ioArg struct {
-	arg    *argInfo
+	arg    *argInfo // nil for a local variable bound by io_bind.
 	writer bool
+
+	// data is the buffer's array and meta is its Buffer_Meta.
+	data expr
+	meta *variable
 
 	// cursor is the function's Wuffs.Base.IO.Reader or Writer for the
 	// buffer (C: the iop, io0, io1 and io2 "derived variables"), or nil if
@@ -48,7 +52,19 @@ type lowerer struct {
 	args   map[t.ID]*variable // What a non-I/O "args.foo" denotes: a parameter or its mutable copy.
 	ios    map[t.ID]*ioArg
 	ioList []*ioArg
-	loops  map[a.Loop]*loopInfo
+	nBinds int
+
+	// ptrs are the pointer-typed arguments: nullable pointers and pixel
+	// buffers. tableOf says which array each table-typed local variable's
+	// offsets count in (the one array that it is ever assigned a table of).
+	ptrs    map[t.ID]*argInfo
+	tableOf map[*variable]*variable
+
+	// ioLocals are the local variables of an I/O type and bound are those
+	// that an enclosing io_bind block gives a buffer.
+	ioLocals map[t.ID]bool
+	bound    map[t.ID]*ioArg
+	loops    map[a.Loop]*loopInfo
 
 	// pre holds statements that must run before the statement that is
 	// currently being lowered: they assign temporaries that its expressions
@@ -79,6 +95,11 @@ func (g *gen) lowerFunc(fi *funcInfo) error {
 		args:   map[t.ID]*variable{},
 		ios:    map[t.ID]*ioArg{},
 		loops:  map[a.Loop]*loopInfo{},
+
+		ptrs:     map[t.ID]*argInfo{},
+		tableOf:  map[*variable]*variable{},
+		ioLocals: map[t.ID]bool{},
+		bound:    map[t.ID]*ioArg{},
 	}
 	n := fi.ast
 
@@ -108,7 +129,7 @@ func (g *gen) lowerFunc(fi *funcInfo) error {
 		if io.cursor == nil {
 			continue
 		}
-		data, meta := eVar{io.arg.v}, eVar{io.arg.meta}
+		data, meta := io.data, eVar{io.meta}
 		if io.writer {
 			head = append(head, sAssign{eVar{io.cursor},
 				callNamed(ioPkg+".To_Writer", "M", meta, "Data_Length", eAttr{data, "Length"})})
@@ -153,8 +174,8 @@ func (l *lowerer) saveCursors() []stmt {
 	ret := []stmt(nil)
 	for _, io := range l.ioList {
 		if io.cursor != nil {
-			io.arg.meta.writes++
-			ret = append(ret, sCall{call(ioPkg+".Save", eVar{io.arg.meta}, eVar{io.cursor})})
+			io.meta.writes++
+			ret = append(ret, sCall{call(ioPkg+".Save", eVar{io.meta}, eVar{io.cursor})})
 		}
 	}
 	return ret
@@ -208,7 +229,7 @@ func (l *lowerer) declareArgs() error {
 			if assigned[id] {
 				return errNotYet("assigning to args.%s", id.Str(l.g.tm))
 			}
-			io := &ioArg{arg: arg, writer: arg.typ.kind == kIOWriter}
+			io := &ioArg{arg: arg, writer: arg.typ.kind == kIOWriter, data: eVar{arg.v}, meta: arg.meta}
 			need, err := l.needCursor(id)
 			if err != nil {
 				return err
@@ -222,6 +243,12 @@ func (l *lowerer) declareArgs() error {
 			}
 			l.ios[id] = io
 			l.ioList = append(l.ioList, io)
+			continue
+		case kNptr, kPixBuf:
+			if assigned[id] {
+				return errNotYet("assigning to args.%s", id.Str(l.g.tm))
+			}
+			l.ptrs[id] = arg
 			continue
 		}
 		if !assigned[id] {
@@ -268,7 +295,8 @@ func (l *lowerer) needCursor(name t.ID) (bool, error) {
 				}
 				return nil
 			}
-			if recv.MType().IsIOType() {
+			if rt := recv.MType(); rt.IsIOType() ||
+				(rt.Decorator() == 0 && rt.QID() == t.QID{t.IDBase, t.IDPixelSwizzler}) {
 				for _, x := range args {
 					if x.AsArg().Value().IsArgsDotFoo() == name {
 						need = true
@@ -276,7 +304,9 @@ func (l *lowerer) needCursor(name t.ID) (bool, error) {
 				}
 			}
 		case a.KIOManip:
-			return errNotYet("%s blocks", o.AsIOManip().Keyword().Str(l.g.tm))
+			if o.AsIOManip().IO().IsArgsDotFoo() == name {
+				need = true
+			}
 		}
 		return nil
 	})
@@ -343,8 +373,15 @@ func (l *lowerer) declareLocals() error {
 				}
 			}
 			l.locals[id] = v
-		case kBool, kStatus:
+		case kBool, kStatus, kOpaque:
 			l.locals[id] = l.newLocal(name, typ, typ.zeroValue())
+		case kIOReader, kIOWriter:
+			// It means something only inside an io_bind block.
+			l.ioLocals[id] = true
+		case kTable:
+			// The default initial value is the empty table. Like a slice, a
+			// table is not saved across a suspension.
+			l.locals[id] = l.newLocal(name, typ, nil)
 		case kROSliceU8, kSliceU8:
 			// The default initial value is the empty slice.
 			l.locals[id] = l.newLocal(name, typ, nil)
@@ -451,9 +488,60 @@ func (l *lowerer) prologue() ([]stmt, error) {
 	// of Wuffs code and everything after this trusts it, so check here that
 	// it describes the array (which C leaves to the caller).
 	conds := []expr(nil)
+	// First, before anything looks at an argument's value: every Boolean
+	// that the caller supplies holds False or True, and no array argument,
+	// written or only read, lies in the storage of the receiver itself
+	// (what the function writes to its state would change the array, or
+	// the reverse). See "Arguments" in wuffs-runtime.ads.
+	for _, arg := range l.fi.args {
+		for _, v := range arg.vars() {
+			switch {
+			case v.typ.kind == kBool:
+				conds = append(conds, eUn{"not", eAttr{eVar{v}, "Valid"}})
+			case v.typ.kind == kStatus:
+				conds = append(conds, eUn{"not", eAttr{eSel{eVar{v}, "Category"}, "Valid"}})
+			}
+		}
+	}
+	for _, arg := range l.fi.args {
+		for _, v := range arg.vars() {
+			if v.typ.kind == kBytes || v.typ.kind == kBytesVar {
+				conds = append(conds, callNamed("Wuffs.Runtime.Shares_Storage",
+					"A", expr(eVar{v}),
+					"Address", expr(eAttr{eVar{l.f.self}, "Address"}),
+					"Size_In_Bits", expr(eAttr{eVar{l.f.self}, "Size"})))
+			}
+		}
+	}
 	for _, io := range l.ioList {
 		conds = append(conds, eUn{"not",
-			call("Wuffs.Runtime.Valid_Buffer", eVar{io.arg.v}, eVar{io.arg.meta})})
+			call("Wuffs.Runtime.Valid_Buffer", io.data, eVar{io.meta})})
+	}
+	// A pixel buffer must be valid for its two arrays, and those two arrays
+	// (which pixel operations write) must be apart from each other and from
+	// every other array argument: see "Aliasing" in wuffs-runtime.ads.
+	arrays := []*variable(nil)
+	for _, arg := range l.fi.args {
+		switch arg.typ.kind {
+		case kBytes, kBytesVar, kIOReader, kIOWriter:
+			arrays = append(arrays, arg.v)
+		}
+	}
+	for _, arg := range l.fi.args {
+		if arg.typ.kind != kPixBuf {
+			continue
+		}
+		pixels, palette := eVar{arg.pixels}, eVar{arg.palette}
+		conds = append(conds,
+			eUn{"not", callNamed("Wuffs.Runtime.Valid_Pixel_Buffer",
+				"PB", expr(eVar{arg.v}), "Pixels", expr(pixels), "Palette", expr(palette))},
+			callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(pixels), "B", expr(palette)))
+		for _, written := range []eVar{pixels, palette} {
+			for _, other := range arrays {
+				conds = append(conds,
+					callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(written), "B", expr(eVar{other})))
+			}
+		}
 	}
 	for i, v := range l.fi.argChecks {
 		b := l.fi.argBounds[i]
@@ -466,22 +554,30 @@ func (l *lowerer) prologue() ([]stmt, error) {
 		}
 	}
 	if len(conds) > 0 {
-		if !l.fi.coroutine && l.f.ret != nil {
-			return nil, errNotYet("a public function with an I/O parameter that is not a coroutine but returns a value")
-		}
 		cond = conds[0]
 		if len(conds) > 1 {
 			cond = bin("or else", conds...)
 		}
-		l.f.self.writes++
+		// C: the object is disabled and the function returns "#bad
+		// argument" or, if it does not return a status, zero. (A function
+		// that cannot change the object just returns zero.)
 		ret := sReturn{}
-		if l.fi.coroutine {
+		switch {
+		case l.f.ret == nil:
+			// No-op.
+		case l.f.ret.kind == kStatus:
 			ret.value = raw(basePkg + ".Error_Bad_Argument")
+		default:
+			if ret.value = l.f.ret.zeroValue(); ret.value == nil {
+				return nil, errNotYet("a public function with arguments to check that returns %s", l.f.ret.name)
+			}
 		}
-		out = append(out, sIf{branches: []ifBranch{{cond, []stmt{
-			sAssign{magic, raw(rtMagicDisabled)},
-			ret,
-		}}}})
+		body := []stmt{ret}
+		if l.f.selfInOut {
+			l.f.self.writes++
+			body = []stmt{sAssign{magic, raw(rtMagicDisabled)}, ret}
+		}
+		out = append(out, sIf{branches: []ifBranch{{cond, body}}})
 	}
 
 	// A public coroutine refuses to run while another one of the same
@@ -568,7 +664,7 @@ func (l *lowerer) statement1(n *a.Node) ([]stmt, error) {
 	case a.KChoose:
 		return l.choose(n.AsChoose())
 	case a.KIOManip:
-		return nil, errNotYet("%s blocks", n.AsIOManip().Keyword().Str(l.g.tm))
+		return l.ioManip(n.AsIOManip())
 	case a.KIf:
 		return l.ifStmt(n.AsIf())
 	case a.KIterate:
@@ -742,6 +838,23 @@ func (l *lowerer) assign(n *a.Assign) ([]stmt, error) {
 		if rv.typ.kind != lv.typ.kind {
 			return nil, fmt.Errorf("cannot assign %q to %q: different types", rhs.Str(l.g.tm), lhs.Str(l.g.tm))
 		}
+	case kOpaque:
+		if rv.typ != lv.typ {
+			return nil, fmt.Errorf("cannot assign %q to %q: different types", rhs.Str(l.g.tm), lhs.Str(l.g.tm))
+		}
+	case kTable:
+		// A table's offsets count in one particular array, which the Ada
+		// Table value does not name. So a table variable is tied, when the
+		// function is generated, to the one array that every table assigned
+		// to it lives in.
+		x, ok := lv.e.(eVar)
+		if !ok || rv.typ.kind != kTable || rv.tableArr == nil {
+			return nil, errNotYet("assigning %q to %q", rhs.Str(l.g.tm), lhs.Str(l.g.tm))
+		}
+		if prev := l.tableOf[x.v]; prev != nil && prev != rv.tableArr {
+			return nil, errNotYet("the table variable %q holding tables of different arrays", lhs.Str(l.g.tm))
+		}
+		l.tableOf[x.v] = rv.tableArr
 	case kROSliceU8, kSliceU8:
 		rv, err = l.toHandle(rv, lv.typ.kind == kSliceU8)
 		if err != nil {
@@ -832,16 +945,36 @@ func (l *lowerer) assignSliceElement(n *a.Assign) ([]stmt, error) {
 // choosy function keeps its default body.
 func (l *lowerer) choose(n *a.Choose) ([]stmt, error) {
 	recv := l.fi.ast.Receiver()
+	target := l.g.funcs[t.QQID{recv[0], recv[1], n.Name()}]
 	names := ""
 	for i, o := range n.Args() {
 		id := o.AsExpr().Ident()
 		callee := l.g.funcs[t.QQID{recv[0], recv[1], id}]
-		if callee == nil {
+		if callee == nil || target == nil {
 			return nil, fmt.Errorf("choose: no such function %q", id.Str(l.g.tm))
 		}
 		if !callee.skipped {
-			return nil, errNotYet("choose with an alternative (%s) that has no cpu_arch requirement",
-				id.Str(l.g.tm))
+			// The first alternative without a cpu_arch requirement: C
+			// stores a pointer to it; here, its number (see findChoices).
+			if target.choiceField == "" {
+				if callee != target {
+					return nil, fmt.Errorf("internal error: choose %q was not analyzed", id.Str(l.g.tm))
+				}
+				return []stmt{sComment{fmt.Sprintf(
+					"Wuffs: choose %s = [..., %s]\nNothing to do: it is the only implementation.",
+					n.Name().Str(l.g.tm), id.Str(l.g.tm))}}, nil
+			}
+			number := 0
+			for j, c := range target.candidates {
+				if c == callee {
+					number = j + 1
+				}
+			}
+			if number == 0 && callee != target {
+				return nil, fmt.Errorf("internal error: choose %q was not analyzed", id.Str(l.g.tm))
+			}
+			l.f.self.writes++
+			return []stmt{sAssign{eSel{eVar{l.f.self}, target.choiceField}, raw(fmt.Sprint(number))}}, nil
 		}
 		if i != 0 {
 			names += ", "
@@ -1012,9 +1145,6 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 	if len(assigns) == 0 {
 		return nil, nil
 	}
-	if len(assigns) != 1 {
-		return nil, errNotYet("iterate loops over more than one slice")
-	}
 	for o := n; o != nil; o = o.ElseIterate() {
 		if len(o.Asserts()) != 0 {
 			return nil, errNotYet("iterate loops with assertions")
@@ -1024,9 +1154,21 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 	if o.Operator() != t.IDEq || o.LHS().Operator() != 0 {
 		return nil, fmt.Errorf("unexpected form of iterate assignment")
 	}
-	p := l.locals[o.LHS().Ident()]
-	if p == nil || p.typ.kind != kROSliceU8 {
-		return nil, errNotYet("iterate variable %q of type %q", o.LHS().Str(l.g.tm), o.LHS().MType().Str(l.g.tm))
+	ps := []*variable(nil)
+	for _, x := range assigns {
+		x := x.AsAssign()
+		if x.Operator() != t.IDEq || x.LHS().Operator() != 0 {
+			return nil, fmt.Errorf("unexpected form of iterate assignment")
+		}
+		p := l.locals[x.LHS().Ident()]
+		if p == nil || (p.typ.kind != kROSliceU8 && p.typ.kind != kSliceU8) {
+			return nil, errNotYet("iterate variable %q of type %q", x.LHS().Str(l.g.tm), x.LHS().MType().Str(l.g.tm))
+		}
+		ps = append(ps, p)
+	}
+	iterVars := map[t.ID]bool{}
+	for _, x := range assigns {
+		iterVars[x.AsAssign().LHS().Ident()] = true
 	}
 	// The C back-end advances the iterate variable itself, so assigning to
 	// it in the loop body changes where later iterations look (and can run
@@ -1038,11 +1180,10 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 				if y.Kind() != a.KAssign || y.AsAssign().LHS() == nil {
 					return nil
 				}
-				for lhs := y.AsAssign().LHS(); lhs != nil; lhs = lhsBase(lhs) {
-					if lhs.Operator() == 0 && lhs.Ident() == o.LHS().Ident() {
-						return errNotYet("assigning to the iterate variable %q inside its iterate loop",
-							lhs.Str(l.g.tm))
-					}
+				// (Assigning to an element of it is fine.)
+				if lhs := y.AsAssign().LHS(); lhs.Operator() == 0 && iterVars[lhs.Ident()] {
+					return errNotYet("assigning to the iterate variable %q inside its iterate loop",
+						lhs.Str(l.g.tm))
 				}
 				return nil
 			}); err != nil {
@@ -1050,22 +1191,41 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 			}
 		}
 	}
-	rv, err := l.expr(o.RHS())
-	if err != nil {
-		return nil, err
-	}
-	if rv, err = l.toHandle(rv, false); err != nil {
-		return nil, err
-	}
-
 	l.nIterates++
 	prefix := fmt.Sprintf("%sI%d_", prefixGen, l.nIterates)
-	src := eVar{l.newLocal(prefix+"Src", typROSliceU8, nil)}
+	srcs := []eVar(nil)
+	init := []stmt(nil)
+	for i, x := range assigns {
+		rv, err := l.expr(x.AsAssign().RHS())
+		if err != nil {
+			return nil, err
+		}
+		if rv, err = l.toHandle(rv, ps[i].typ.kind == kSliceU8); err != nil {
+			return nil, fmt.Errorf("%q: %v", x.AsAssign().RHS().Str(l.g.tm), err)
+		}
+		name := prefix + "Src"
+		if i > 0 {
+			name = fmt.Sprintf("%sSrc_%d", prefix, i)
+		}
+		src := eVar{l.newLocal(name, ps[i].typ, nil)}
+		srcs = append(srcs, src)
+		init = append(init, sAssign{src, rv.e})
+	}
 	pos := eVar{l.newLocal(prefix+"Pos", typIndex, raw("0"))}
 	end := eVar{l.newLocal(prefix+"End", typIndex, raw("0"))}
-	srcLen := eSel{src, "Length"}
-
-	ret := l.flush(sAssign{src, rv.e}, sAssign{pos, raw("0")})
+	// With several variables, the loops run over the shortest slice.
+	srcLen := expr(eSel{srcs[0], "Length"})
+	if len(srcs) > 1 {
+		shortest := eVar{l.newLocal(prefix+"Len", typIndex, raw("0"))}
+		init = append(init, sAssign{shortest, srcLen})
+		for _, src := range srcs[1:] {
+			init = append(init, sIf{branches: []ifBranch{{
+				rel("<", eSel{src, "Length"}, shortest), []stmt{sAssign{shortest, eSel{src, "Length"}}}}}})
+		}
+		srcLen = shortest
+	}
+	init = append(init, sAssign{pos, raw("0")})
+	ret := l.flush(init...)
 
 	for ; n != nil; n = n.ElseIterate() {
 		info := &loopInfo{isIterate: true}
@@ -1099,8 +1259,10 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 
 			loop := sLoop{cond: bin("<", pos, end)}
 			for i := 0; i < unroll; i++ {
-				loop.body = append(loop.body, sAssign{eVar{p},
-					callNamed("Wuffs.Runtime.Subslice_IJ", "S", src, "I", pos, "J", bin("+", pos, lit(length)))})
+				for j, p := range ps {
+					loop.body = append(loop.body, sAssign{eVar{p}, callNamed("Wuffs.Runtime.Subslice_IJ",
+						"S", srcs[j], "I", pos, "J", bin("+", pos, lit(length)))})
+				}
 				body, err := l.block(n.Body())
 				if err != nil {
 					return nil, err
@@ -1121,8 +1283,11 @@ func (l *lowerer) iterate(n *a.Iterate) ([]stmt, error) {
 	// The C back-end leaves the iterate variable as an empty slice. That is
 	// only observable if something reads the variable outside of the loops
 	// that bind it; otherwise, omit the dead store (which GNAT warns about).
-	if l.readOutsideItsIterates(o.LHS().Ident()) {
-		ret = append(ret, sAssign{eVar{p}, callNamed("Wuffs.Runtime.Subslice_IJ", "S", src, "I", pos, "J", pos)})
+	for j, p := range ps {
+		if l.readOutsideItsIterates(assigns[j].AsAssign().LHS().Ident()) {
+			ret = append(ret, sAssign{eVar{p},
+				callNamed("Wuffs.Runtime.Subslice_IJ", "S", srcs[j], "I", pos, "J", pos)})
+		}
 	}
 	return ret, nil
 }
@@ -1244,4 +1409,172 @@ func (l *lowerer) ret(n *a.Ret) ([]stmt, error) {
 		return nil, fmt.Errorf("internal error: unexpected return type")
 	}
 	return l.flush(append(l.saveCursors(), sReturn{v.e})...), nil
+}
+
+// ioManip lowers an io_bind or io_limit block, by the protocols of
+// wuffs-base-io.ads ("Protocols for generated code").
+func (l *lowerer) ioManip(n *a.IOManip) ([]stmt, error) {
+	keyword := n.Keyword().Str(l.g.tm)
+	switch n.Keyword() {
+	case t.IDIOBind:
+		// io_bind (io: x, data: d, history_position: h) { body }: for the
+		// body, the local variable x is a new buffer whose data is d.
+		x := n.IO()
+		id := x.Ident()
+		if x.Operator() != 0 || !l.ioLocals[id] {
+			return nil, errNotYet("io_bind of %q, which is not a local variable", x.Str(l.g.tm))
+		}
+		if l.bound[id] != nil {
+			return nil, errNotYet("io_bind of %q inside an io_bind of it", x.Str(l.g.tm))
+		}
+		writer := x.MType().QID() == t.QID{t.IDBase, t.IDIOWriter}
+		dv, err := l.expr(n.Arg1())
+		if err != nil {
+			return nil, err
+		}
+		if !dv.typ.isSlice() {
+			return nil, fmt.Errorf("io_bind: %q is not a slice", n.Arg1().Str(l.g.tm))
+		}
+		hv, err := l.expr(n.HistoryPosition())
+		if err != nil {
+			return nil, err
+		}
+		if err := checkNum(hv, 64); err != nil {
+			return nil, fmt.Errorf("io_bind: history_position: %v", err)
+		}
+		// The data, held in a handle for the body.
+		h, err := l.toHandle(dv, writer)
+		if err != nil {
+			return nil, fmt.Errorf("io_bind: %q: %v", n.Arg1().Str(l.g.tm), err)
+		}
+		// (Not a temporary, which may not live from one statement to the
+		// next: the body has no suspension point, which is checked below.)
+		l.nBinds++
+		handle := eVar{l.newLocal(fmt.Sprintf("%sBound_%d", prefixGen, l.nBinds), h.typ, nil)}
+		data, err := l.toBytes(val{e: handle, typ: h.typ}, writer)
+		if err != nil {
+			return nil, err
+		}
+		io := &ioArg{writer: writer, data: data.e}
+		length := expr(eSel{handle, "Length"})
+		setup := []stmt(nil)
+		if writer {
+			io.meta = l.newLocal(fmt.Sprintf("%sW_Meta_%d", prefixGen, l.nBinds), typMeta, nil)
+			io.cursor = l.newLocal(fmt.Sprintf("%sW_Bound_%d", prefixGen, l.nBinds), typWriter, nil)
+			setup = append(setup,
+				sAssign{eVar{io.meta}, callNamed(ioPkg+".Writer_Meta", "History_Position", hv.e)},
+				sAssign{eVar{io.cursor},
+					callNamed(ioPkg+".Writer_Set", "Data_Length", length, "History_Position", hv.e)})
+		} else {
+			io.meta = l.newLocal(fmt.Sprintf("%sR_Meta_%d", prefixGen, l.nBinds), typMeta, nil)
+			io.cursor = l.newLocal(fmt.Sprintf("%sR_Bound_%d", prefixGen, l.nBinds), typReader, nil)
+			setup = append(setup,
+				sAssign{eVar{io.meta}, callNamed(ioPkg+".Reader_Meta",
+					"Data_Length", length, "Closed", expr(raw("False")), "History_Position", hv.e)},
+				sAssign{eVar{io.cursor},
+					callNamed(ioPkg+".Reader_Set", "Data_Length", length, "History_Position", hv.e)})
+		}
+		out := l.flush(sAssign{handle, h.e})
+		out = append(out, setup...)
+
+		l.bound[id] = io
+		body, err := l.block(n.Body())
+		delete(l.bound, id)
+		if err != nil {
+			return nil, err
+		}
+		if anyResume(body) {
+			return nil, errNotYet("a suspension inside an %s block", keyword)
+		}
+		// Nothing is copied back at the end: the bound buffer is a local.
+		return append(out, body...), nil
+
+	case t.IDIOLimit:
+		// io_limit (io: r, limit: n) { body }, for a reader.
+		rv, err := l.expr(n.IO())
+		if err != nil {
+			return nil, err
+		}
+		io := rv.io
+		if io == nil || io.cursor == nil {
+			return nil, errNotYet("io_limit of %q", n.IO().Str(l.g.tm))
+		}
+		if io.writer {
+			return nil, errNotYet("io_limit of a writer")
+		}
+		// The limit ends where the block ends (End_Limit below). Any other
+		// way out of the block would leave the limit in place (as it does
+		// in upstream's C), so there must be none.
+		if err := l.noExits(n.Body(), keyword); err != nil {
+			return nil, err
+		}
+		lv, err := l.expr(n.Arg1())
+		if err != nil {
+			return nil, err
+		}
+		if err := checkNum(lv, 64); err != nil {
+			return nil, fmt.Errorf("io_limit: limit: %v", err)
+		}
+		meta, cursor := expr(eVar{io.meta}), expr(eVar{io.cursor})
+		saved := eVar{l.newTemp(typReaderLimit)}
+		io.meta.writes++
+		out := l.flush(sCall{callNamed(ioPkg+".Begin_Limit",
+			"M", expr(eOut{meta}), "R", expr(eOut{cursor}), "Up_To", lv.e, "Saved", expr(eOut{saved}))})
+		body, err := l.block(n.Body())
+		if err != nil {
+			return nil, err
+		}
+		if anyResume(body) {
+			return nil, errNotYet("a suspension inside an %s block", keyword)
+		}
+		out = append(out, body...)
+		return append(out, sCall{callNamed(ioPkg+".End_Limit",
+			"M", expr(eOut{meta}), "R", expr(eOut{cursor}), "Saved", expr(saved))}), nil
+	}
+	return nil, errNotYet("%s blocks", keyword)
+}
+
+// noExits fails if the block has a way out other than falling off its end:
+// a return or a yield, a break or continue of a loop around the block, or a
+// call that can suspend or fail (a "?" call whose status is not assigned).
+func (l *lowerer) noExits(body []*a.Node, keyword string) error {
+	inside := map[a.Loop]bool{}
+	for _, o := range body {
+		o.Walk(func(o *a.Node) error {
+			switch o.Kind() {
+			case a.KWhile:
+				inside[o.AsWhile()] = true
+			case a.KIterate:
+				inside[o.AsIterate()] = true
+			}
+			return nil
+		})
+	}
+	// The call in "status =? f?()" does not leave the block: its status,
+	// whatever it is, is assigned.
+	assigned := map[*a.Expr]bool{}
+	for _, o := range body {
+		if err := o.Walk(func(o *a.Node) error {
+			switch o.Kind() {
+			case a.KAssign:
+				if o.AsAssign().Operator() == t.IDEqQuestion {
+					assigned[o.AsAssign().RHS()] = true
+				}
+			case a.KRet:
+				return errNotYet("a %s out of an %s block", o.AsRet().Keyword().Str(l.g.tm), keyword)
+			case a.KJump:
+				if !inside[o.AsJump().JumpTarget()] {
+					return errNotYet("a %s out of an %s block", o.AsJump().Keyword().Str(l.g.tm), keyword)
+				}
+			case a.KExpr:
+				if x := o.AsExpr(); x.Operator() == t.IDOpenParen && x.Effect().Coroutine() && !assigned[x] {
+					return errNotYet("a suspension inside an %s block", keyword)
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

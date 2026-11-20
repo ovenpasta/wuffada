@@ -8,6 +8,16 @@ package Wuffs.Std.M1test with Preelaborate is
    --  Wuffs: status "#widget error"
    Error_Widget_Error : constant Wuffs.Status := (Error, 16#FFFF_0001#);
 
+   --  The message of a status of this package (a public or a private one), as
+   --  the base library's Get_Message gives it for a base status: the C
+   --  string without its leading '@', '$' or '#', such as "m1test: widget error".
+   --  Message_Length is zero for any other status.  Get_Message copies as much
+   --  of the message as fits to the start of Buffer, sets the rest of Buffer to
+   --  spaces and Length to the number of characters copied.
+   function Message_Length (S : Wuffs.Status) return Natural;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural);
+
    --  Wuffs: const LIMIT
    LIMIT : constant Wuffs.U32 := 1000;
 
@@ -72,6 +82,12 @@ package Wuffs.Std.M1test with Preelaborate is
    function Slices
      (Self : in out Widget; A_X : in out Wuffs.Bytes; A_K : Wuffs.U32) return Wuffs.U64;
 
+   --  Wuffs: func widget.choose_mix
+   procedure Choose_Mix (Self : in out Widget; A_Which : Wuffs.U32);
+
+   --  Wuffs: func widget.call_mix
+   function Call_Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
 private
 
    subtype G_U32_Range_0_1000 is Wuffs.U32 range 0 .. 1000;
@@ -98,6 +114,7 @@ private
       F_Buf : Wuffs.Bytes (0 .. 31);
       F_Aux : Wuffs.Bytes (0 .. 15);
       F_Marks : G_Array_4_Of_Boolean;
+      G_Choosy_Mix : Wuffs.U8 := 0;
    end record;
 
    --  Wuffs: func widget.low3
@@ -120,5 +137,17 @@ private
 
    --  Wuffs: func widget.sum_buf
    function Sum_Buf (Self : Widget) return Wuffs.U64;
+
+   --  Wuffs: func widget.mix
+   function G_Choosy_Default_Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func widget.mix (the choice of implementation)
+   function Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func widget.mix_double
+   function Mix_Double (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func widget.mix_square
+   function Mix_Square (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
 
 end Wuffs.Std.M1test;

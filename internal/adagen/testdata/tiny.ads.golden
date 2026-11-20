@@ -3,12 +3,23 @@
 --  Sources:
 --    testdata/tiny.wuffs
 
+with Ada.Strings.Text_Buffers;
 with Wuffs.Runtime;
 
 package Wuffs.Std.Tiny with Preelaborate is
 
    --  Wuffs: status "#too big"
    Error_Too_Big : constant Wuffs.Status := (Error, 16#0007_0001#);
+
+   --  The message of a status of this package (a public or a private one), as
+   --  the base library's Get_Message gives it for a base status: the C
+   --  string without its leading '@', '$' or '#', such as "tiny: too big".
+   --  Message_Length is zero for any other status.  Get_Message copies as much
+   --  of the message as fits to the start of Buffer, sets the rest of Buffer to
+   --  spaces and Length to the number of characters copied.
+   function Message_Length (S : Wuffs.Status) return Natural;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural);
 
    --  Wuffs: struct summer
    type Summer is limited new Wuffs.Runtime.Hasher_U32 with private;
@@ -41,6 +52,13 @@ private
       --  Whether Initialize has been called (C: private_impl.magic).
       Magic : Wuffs.U32 := 0;
       F_State : Wuffs.U32 := 0;
-   end record;
+   end record
+   with Put_Image => G_Put_Image;
+
+   --  Not for use: it stands in for the procedure that the compiler would
+   --  otherwise generate for Summer'Image.
+   procedure G_Put_Image
+     (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Summer)
+   is null;
 
 end Wuffs.Std.Tiny;

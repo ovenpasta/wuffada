@@ -402,3 +402,40 @@ pub func widget.slices!(x: slice base.u8, k: base.u32) base.u64 {
     }
     return (t ~mod* 31) ~mod+ this.sum_buf()
 }
+
+// A "choosy" function: which of three bodies runs is chosen at run time,
+// including the choice of its own body again.
+
+pri func widget.mix!(v: base.u32) base.u32,
+        choosy,
+{
+    this.total ~mod+= 1
+    return args.v ~mod+ 1
+}
+
+pri func widget.mix_double!(v: base.u32) base.u32 {
+    this.total ~mod+= 2
+    return args.v ~mod* 2
+}
+
+pri func widget.mix_square!(v: base.u32) base.u32 {
+    this.total ~mod+= 3
+    return args.v ~mod* args.v
+}
+
+pub func widget.choose_mix!(which: base.u32) {
+    if args.which == 1 {
+        choose mix = [mix_double]
+    } else if args.which == 2 {
+        choose mix = [mix_square]
+    } else if args.which == 3 {
+        choose mix = [mix]
+    }
+}
+
+pub func widget.call_mix!(v: base.u32) base.u32 {
+    var r : base.u32
+
+    r = this.mix!(v: args.v)
+    return r
+}

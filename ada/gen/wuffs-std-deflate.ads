@@ -11,6 +11,7 @@
 --  Not generated, as they need a cpu_arch (SIMD) capability:
 --    decoder.decode_huffman_bmi2
 
+with Ada.Strings.Text_Buffers;
 with Wuffs.Base.IO;
 with Wuffs.Base.Ints;
 with Wuffs.Base.Ranges;
@@ -59,6 +60,17 @@ package Wuffs.Std.Deflate with Preelaborate is
 
    --  Wuffs: status "#truncated input"
    Error_Truncated_Input : constant Wuffs.Status := (Error, 16#0004_000E#);
+
+   --  The message of a status of this package (a public or a private one), as
+   --  the base library's Get_Message gives it for a base status: the C
+   --  string without its leading '@', '$' or '#', such as "deflate: bad Huffman code
+   --      (over-subscribed)".
+   --  Message_Length is zero for any other status.  Get_Message copies as much
+   --  of the message as fits to the start of Buffer, sets the rest of Buffer to
+   --  spaces and Length to the number of characters copied.
+   function Message_Length (S : Wuffs.Status) return Natural;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural);
 
    --  Wuffs: const DECODER_DST_HISTORY_RETAIN_LENGTH_MAX_INCL_WORST_CASE
    DECODER_DST_HISTORY_RETAIN_LENGTH_MAX_INCL_WORST_CASE : constant Wuffs.U64 := 0;
@@ -205,7 +217,14 @@ private
       G_S_15_Decode_Huffman_Slow_Redir_Mask : G_U32_Range_0_32767 := 0;
       G_S_15_Decode_Huffman_Slow_Length : G_U32_Range_0_258 := 0;
       G_S_15_Decode_Huffman_Slow_Dist_Minus_1 : G_U32_Range_0_32767 := 0;
-   end record;
+   end record
+   with Put_Image => G_Put_Image;
+
+   --  Not for use: it stands in for the procedure that the compiler would
+   --  otherwise generate for Decoder'Image.
+   procedure G_Put_Image
+     (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Decoder)
+   is null;
 
    --  Wuffs: func decoder.do_transform_io
    function Do_Transform_Io

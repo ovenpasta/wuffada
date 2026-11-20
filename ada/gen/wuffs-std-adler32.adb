@@ -55,6 +55,11 @@ package body Wuffs.Std.Adler32 is
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return;
       end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address, Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return;
+      end if;
       if not Self.F_Started then
          Self.F_Started := True;
          Self.F_State := 1;
@@ -67,6 +72,11 @@ package body Wuffs.Std.Adler32 is
    overriding function Update_U32 (Self : in out Hasher; A_X : Wuffs.Bytes) return Wuffs.U32 is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return 0;
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_X, Address => Self'Address, Size_In_Bits => Self'Size)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
          return 0;
       end if;
       Update (Self, A_X);

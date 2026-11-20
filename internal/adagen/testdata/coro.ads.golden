@@ -10,6 +10,16 @@ package Wuffs.Std.Coro with Preelaborate is
    --  Wuffs: status "#bad"
    Error_Bad : constant Wuffs.Status := (Error, 16#0009_0001#);
 
+   --  The message of a status of this package (a public or a private one), as
+   --  the base library's Get_Message gives it for a base status: the C
+   --  string without its leading '@', '$' or '#', such as "coro: bad".
+   --  Message_Length is zero for any other status.  Get_Message copies as much
+   --  of the message as fits to the start of Buffer, sets the rest of Buffer to
+   --  spaces and Length to the number of characters copied.
+   function Message_Length (S : Wuffs.Status) return Natural;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural);
+
    --  Wuffs: struct foo
    type Foo is limited private;
 

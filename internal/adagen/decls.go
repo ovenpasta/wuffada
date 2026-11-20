@@ -44,7 +44,8 @@ func (g *gen) header() string {
 // not repeat its spec's clauses.
 func (g *gen) withClauses(text string, specText string) string {
 	needs := func(s string, unit string) bool { return strings.Contains(s, unit+".") }
-	candidates := []string{"Interfaces", "Wuffs.Runtime", targetPkg, basePkg, intsPkg, slicesPkg, endianPkg, ioPkg, rangesPkg}
+	candidates := []string{"Ada.Strings.Text_Buffers", "Interfaces", "Wuffs.Runtime", targetPkg, basePkg, intsPkg, slicesPkg, endianPkg, ioPkg,
+		rangesPkg, formatsPkg, buffersPkg, swizzlerPkg}
 	for _, o := range g.usedPackages() {
 		candidates = append(candidates, o)
 	}
@@ -92,6 +93,19 @@ func (g *gen) genSpec() string {
 			p.line("")
 			g.printStatus(p, z)
 		}
+	}
+	if len(g.statusList) > 0 {
+		p.line("")
+		p.comment("The message of a status of this package (a public or a private one), as\n" +
+			"the base library's Get_Message gives it for a base status: the C\n" +
+			"string without its leading '@', '$' or '#', such as \"" + g.opts.PackageName + ": " +
+			g.statusList[0].msg[1:] + "\".\n" +
+			"Message_Length is zero for any other status.  Get_Message copies as much\n" +
+			"of the message as fits to the start of Buffer, sets the rest of Buffer to\n" +
+			"spaces and Length to the number of characters copied.")
+		p.line("function Message_Length (S : Wuffs.Status) return Natural;")
+		p.line("")
+		p.line("procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural);")
 	}
 	for _, c := range g.constList {
 		if c.ast.Public() {
@@ -155,7 +169,8 @@ func (g *gen) genSpec() string {
 			switch {
 			case f.typ.kind == kUtility:
 				// An empty struct.
-			case f.typ.kind == kStruct:
+			case f.typ.kind == kStruct, f.typ.kind == kSwizzler:
+				// These have default-initialized components of their own.
 				p.line(f.name + " : " + f.typ.name + ";")
 			case f.typ.zeroValue() != nil:
 				p.line(f.name + " : " + f.typ.name + " := " + flat(f.typ.zeroValue()) + ";")
@@ -166,13 +181,33 @@ func (g *gen) genSpec() string {
 			}
 		}
 		p.indent -= indentStep
-		p.line("end record;")
+		if len(s.interfaces) == 0 {
+			p.line("end record;")
+		} else {
+			// For a tagged type, Ada 2022 has the compiler write a
+			// Put_Image procedure (for 'Image) that prints every component;
+			// its stack frame grows with the record. Nothing uses it, so
+			// replace it with one that does nothing.
+			p.line("end record")
+			p.line("with Put_Image => " + putImageName + ";")
+			p.line("")
+			p.comment("Not for use: it stands in for the procedure that the compiler would\n" +
+				"otherwise generate for " + s.name + "'Image.")
+			p.line("procedure " + putImageName)
+			p.line("  (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : " + s.name + ")")
+			p.line("is null;")
+		}
 	}
 	for _, fi := range g.funcList {
 		if !fi.ir.public {
 			p.line("")
 			p.comment("Wuffs: func " + fi.ir.wuffsName)
 			p.fnSpec(fi.ir)
+		}
+		if fi.dispatch != nil {
+			p.line("")
+			p.comment("Wuffs: func " + fi.dispatch.wuffsName)
+			p.fnSpec(fi.dispatch)
 		}
 	}
 
@@ -212,6 +247,9 @@ func (g *gen) genBody() string {
 		}
 	}
 
+	if len(g.statusList) > 0 {
+		g.printMessages(p)
+	}
 	for _, s := range g.structList {
 		p.line("")
 		g.printInitialize(p, s)
@@ -219,6 +257,10 @@ func (g *gen) genBody() string {
 	for _, fi := range g.funcList {
 		p.line("")
 		p.fnBody(fi.ir)
+		if fi.dispatch != nil {
+			p.line("")
+			p.fnBody(fi.dispatch)
+		}
 	}
 
 	p.indent -= indentStep
@@ -250,6 +292,10 @@ func (g *gen) printInitialize(p *printer, s *structInfo) {
 		switch f.typ.kind {
 		case kUtility:
 			// An empty struct.
+		case kSwizzler:
+			// An obligation from wuffs-base-pixel_swizzler.ads: the swizzler
+			// must be the default (un-prepared) one, never raw memory.
+			p.line("Self." + f.name + " := (others => <>);")
 		case kStruct:
 			// C: the sub-struct's initialize function.
 			pkg := ""
@@ -344,3 +390,58 @@ func (p *printer) declLine(decl string) {
 	}
 	p.line(decl)
 }
+
+// printMessages prints the bodies of Message_Length and Get_Message.
+func (g *gen) printMessages(p *printer) {
+	text := func(z *statusInfo) string {
+		return g.opts.PackageName + ": " + strings.ReplaceAll(z.msg[1:], "\"", "\"\"")
+	}
+	chain := func(action func(z *statusInfo) stmt, otherwise stmt) {
+		if err := checkCalls([]stmt{otherwise}); err != nil {
+			panic("adagen: " + err.Error())
+		}
+		for i, z := range g.statusList {
+			kw := "if"
+			if i != 0 {
+				kw = "elsif"
+			}
+			p.line(kw + " S = " + z.name + " then")
+			p.indent += indentStep
+			p.stmt(action(z))
+			p.indent -= indentStep
+		}
+		p.line("else")
+		p.indent += indentStep
+		p.stmt(otherwise)
+		p.indent -= indentStep
+		p.line("end if;")
+	}
+
+	p.line("")
+	p.line("function Message_Length (S : Wuffs.Status) return Natural is")
+	p.line("begin")
+	p.indent += indentStep
+	chain(func(z *statusInfo) stmt {
+		return sReturn{raw(fmt.Sprint(len(g.opts.PackageName) + 2 + len(z.msg) - 1))}
+	}, sReturn{raw("0")})
+	p.indent -= indentStep
+	p.line("end Message_Length;")
+
+	p.line("")
+	p.line("procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is")
+	p.line("begin")
+	p.indent += indentStep
+	copyMessage := func(literal string) stmt {
+		return sCall{callNamed("Wuffs.Runtime.Copy_Message",
+			"Text", raw(literal), "Buffer", raw("Buffer"), "Length", raw("Length"))}
+	}
+	chain(func(z *statusInfo) stmt {
+		return copyMessage("\"" + text(z) + "\"")
+	}, copyMessage("\"\""))
+	p.indent -= indentStep
+	p.line("end Get_Message;")
+}
+
+// putImageName is the name of the do-nothing Put_Image procedure of each
+// tagged type.
+const putImageName = prefixGen + "Put_Image"

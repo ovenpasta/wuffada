@@ -1,0 +1,55 @@
+--  Part of wuffada (wuffs-ada: Wuffs to Ada).
+--  SPDX-License-Identifier: Apache-2.0 OR MIT
+
+--  The large objects of test_image.adb: at library level, not on the stack.
+
+with Wuffs.Std.Bmp;
+with Wuffs.Std.Gif;
+with Wuffs.Std.Netpbm;
+with Wuffs.Std.Nie;
+with Wuffs.Std.Png;
+with Wuffs.Std.Targa;
+with Wuffs.Std.Wbmp;
+
+package Image_Support is
+
+   Cap_File : constant := 4 * 1024 * 1024;
+   Cap_Pix  : constant := 40 * 1024 * 1024;
+   Cap_Work : constant := 40 * 1024 * 1024;
+   Window   : constant := 4096;
+   Slack    : constant := 1024 * 1024;
+
+   --  None of the arrays starts at index 0.
+   Src_First : constant := 5;
+   Pix_First : constant := 11;
+   Pal_First : constant := 3;
+
+   File_Last : constant := Cap_File - 1;
+   Src_Last  : constant := Src_First + Cap_File + Window - 1;
+   Pix_Last  : constant := Pix_First + Cap_Pix + Slack - 1;
+   Pal_Last  : constant := Pal_First + 1023;
+
+   File     : Wuffs.Bytes (0 .. File_Last);
+   Src      : Wuffs.Bytes (Src_First .. Src_Last);
+   Pix      : Wuffs.Bytes (Pix_First .. Pix_Last);
+   Pal      : Wuffs.Bytes (Pal_First .. Pal_Last);
+   Work     : Wuffs.Bytes (1 .. Cap_Work);
+   --  (The destination of tell_me_more is the first 4096 bytes or less.)
+   Out_Data : Wuffs.Bytes (2 .. 4161);
+
+   --  For a chaos run of test_image.adb.
+   Chaos_Pal : Wuffs.Bytes (0 .. 4095);
+   Expected : Wuffs.Bytes (0 .. File_Last);
+
+   --  For test_hostile.adb.
+   Arena : Wuffs.Bytes (100 .. 8291);
+
+   Netpbm_Decoder : Wuffs.Std.Netpbm.Decoder;
+   Bmp_Decoder    : Wuffs.Std.Bmp.Decoder;
+   Gif_Decoder    : Wuffs.Std.Gif.Decoder;
+   Png_Decoder    : Wuffs.Std.Png.Decoder;
+   Wbmp_Decoder   : Wuffs.Std.Wbmp.Decoder;
+   Nie_Decoder    : Wuffs.Std.Nie.Decoder;
+   Targa_Decoder  : Wuffs.Std.Targa.Decoder;
+
+end Image_Support;

@@ -49,6 +49,11 @@ const (
 	ioPkg     = "Wuffs.Base.IO"     // io_reader and io_writer primitives.
 	rangesPkg = "Wuffs.Base.Ranges" // range_ii_u64 and friends.
 
+	// The proved pixel library.
+	formatsPkg  = "Wuffs.Base.Pixel_Formats"
+	buffersPkg  = "Wuffs.Base.Pixel_Buffers"
+	swizzlerPkg = "Wuffs.Base.Pixel_Swizzler"
+
 	// targetPkg answers questions about the machine: see its spec.
 	targetPkg = "Wuffs.Runtime.Target"
 )
@@ -150,6 +155,9 @@ func Generate(tm *t.Map, files []*a.File, opts Options) (*Output, error) {
 	if err := g.analyze(); err != nil {
 		return nil, fmt.Errorf("adagen: %v", err)
 	}
+	if err := g.findChoices(); err != nil {
+		return nil, fmt.Errorf("adagen: %v", err)
+	}
 	for _, fi := range g.funcList {
 		if err := g.lowerFunc(fi); err != nil {
 			filename, line := fi.ast.Filename(), fi.ast.Line()
@@ -157,11 +165,37 @@ func Generate(tm *t.Map, files []*a.File, opts Options) (*Output, error) {
 				fi.ast.QQID().Str(g.tm), filename, line, err)
 		}
 		countUses(fi.ir)
+		if err := checkCalls(fi.ir.body); err != nil {
+			return nil, fmt.Errorf("adagen: func %s: %v", fi.ast.QQID().Str(g.tm), err)
+		}
 		if err := checkSubprogramNames(fi.ir); err != nil {
 			return nil, fmt.Errorf("adagen: func %s: %v", fi.ast.QQID().Str(g.tm), err)
 		}
 	}
+	for _, fi := range g.funcList {
+		if fi.dispatch != nil {
+			countUses(fi.dispatch)
+			if err := checkSubprogramNames(fi.dispatch); err != nil {
+				return nil, fmt.Errorf("adagen: func %s: %v", fi.ast.QQID().Str(g.tm), err)
+			}
+		}
+	}
 	for _, s := range g.structList {
+		// Initialize must be able to give every component a value.
+		for _, f := range append(append([]fieldInfo(nil), s.fields...), s.extra...) {
+			typ := f.typ
+			for typ.kind == kArray {
+				typ = typ.elem
+			}
+			switch typ.kind {
+			case kUtility, kSwizzler, kStruct:
+				continue
+			}
+			if typ.zeroValue() == nil {
+				return nil, fmt.Errorf("adagen: struct %s: not yet supported: a component (%s) of type %s",
+					s.ast.QID().Str(g.tm), f.name, typ.name)
+			}
+		}
 		if err := checkRecordNames(s); err != nil {
 			return nil, fmt.Errorf("adagen: struct %s: %v", s.ast.QID().Str(g.tm), err)
 		}

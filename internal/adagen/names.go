@@ -30,6 +30,7 @@ var adaTaken = map[string]bool{
 	"wuffs": true, "interfaces": true, "standard": true, "boolean": true,
 	"true": true, "false": true, "natural": true, "integer": true,
 	"self": true, "initialize": true, "magic": true, "std": true,
+	"get_message": true, "message_length": true,
 }
 
 // Ada has one flat, case-insensitive namespace per declarative region, and a

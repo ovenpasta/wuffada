@@ -50,6 +50,29 @@ gen "$tmp/gen" zlib \
     wuffs/std/zlib/decode_zlib.wuffs
 gen "$tmp/gen" gzip \
     wuffs/std/gzip/decode_gzip.wuffs
+gen "$tmp/gen" netpbm \
+    wuffs/std/netpbm/decode_netpbm.wuffs
+gen "$tmp/gen" bmp \
+    wuffs/std/bmp/decode_bmp.wuffs
+gen "$tmp/gen" gif \
+    wuffs/std/gif/common_consts.wuffs \
+    wuffs/std/gif/decode_gif.wuffs \
+    wuffs/std/gif/decode_lzw.wuffs \
+    wuffs/std/gif/decode_quirks.wuffs
+gen "$tmp/gen" png \
+    wuffs/std/png/common_consts.wuffs \
+    wuffs/std/png/decode_filter_arm_neon.wuffs \
+    wuffs/std/png/decode_filter_fallback.wuffs \
+    wuffs/std/png/decode_filter_x86_sse42.wuffs \
+    wuffs/std/png/decode_png.wuffs \
+    wuffs/std/png/decode_swizzle_default.wuffs \
+    wuffs/std/png/decode_swizzle_tricky.wuffs
+gen "$tmp/gen" wbmp \
+    wuffs/std/wbmp/decode_wbmp.wuffs
+gen "$tmp/gen" nie \
+    wuffs/std/nie/decode_nie.wuffs
+gen "$tmp/gen" targa \
+    wuffs/std/targa/decode_targa.wuffs
 
 # A test-only package that exercises what the standard packages above do not
 # (see the comment in the .wuffs file). Its driver is ada/tests/test_m1.adb.
@@ -60,6 +83,11 @@ gen "$tmp/tests" m1test internal/adagen/testdata/m1test.wuffs
 gen "$tmp/tests" advtest internal/adagen/testdata/advtest.wuffs
 
 # Success: replace the checked-in output.
-rm -f ada/gen/*.ads ada/gen/*.adb ada/tests/wuffs-std-*.ads ada/tests/wuffs-std-*.adb
+# (ada/tests also holds hand-written children of generated packages, the
+# wuffs-std-*-probe.ads files: only the generated test packages go.)
+rm -f ada/gen/*.ads ada/gen/*.adb
+for f in "$tmp"/tests/*; do
+    rm -f "ada/tests/$(basename "$f")"
+done
 cp "$tmp"/gen/* ada/gen/
 cp "$tmp"/tests/* ada/tests/

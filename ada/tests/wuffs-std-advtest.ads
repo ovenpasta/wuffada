@@ -13,6 +13,16 @@ package Wuffs.Std.Advtest with Preelaborate is
    --  Wuffs: status "#inner failed"
    Error_Inner_Failed : constant Wuffs.Status := (Error, 16#FFFE_0002#);
 
+   --  The message of a status of this package (a public or a private one), as
+   --  the base library's Get_Message gives it for a base status: the C
+   --  string without its leading '@', '$' or '#', such as "advtest: bad thing".
+   --  Message_Length is zero for any other status.  Get_Message copies as much
+   --  of the message as fits to the start of Buffer, sets the rest of Buffer to
+   --  spaces and Length to the number of characters copied.
+   function Message_Length (S : Wuffs.Status) return Natural;
+
+   procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural);
+
    --  Wuffs: struct thing
    type Thing is limited private;
 
