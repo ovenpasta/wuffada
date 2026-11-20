@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 // imgcorpus builds the test corpus for the generated image decoders
-// (netpbm, bmp, gif, png, and without images of this program's own: wbmp,
-// nie, targa).
+// (netpbm, bmp, gif, png, jpeg, and without images of this program's own:
+// wbmp, nie, targa, qoi, etc2, thumbhash, handsum).
 //
-// Usage: imgcorpus -data wuffs/test/data -out DIR [-chaos FILE] > manifest
+// Usage: imgcorpus -data wuffs/test/data -jpegs ada/tests/jpegcorpus -out DIR [-chaos FILE] > manifest
 //
 // It takes every image of those formats in upstream's test data, writes
 // images of its own to DIR (PNGs of every colour type and bit depth,
@@ -17,8 +17,10 @@
 //
 // See ada/tests/test_image.adb for what the fields mean. EXPECTED is "-" or
 // a file of the first frame's pixels as an independent decoder gives them:
-// Go's image/png and image/gif for PNG and GIF, and for the BMP and Netpbm
-// images that this program writes, the pixels that it encoded. Every run
+// Go's image/png and image/gif for PNG and GIF, Go's image/jpeg for JPEG
+// (compared with a tolerance, given with the flags tN and kCATEGORY: see
+// jpeg.go), and for the BMP and Netpbm images that this program writes, the
+// pixels that it encoded. Every run
 // must also behave exactly as upstream's C decoder does, which is all there
 // is to check for the truncated and corrupted inputs.
 package main
@@ -78,6 +80,19 @@ type file struct {
 	data     []byte
 	expected string // The reference pixels' file, or "".
 	upstream bool
+
+	// For a JPEG with reference pixels: the comparison's category and
+	// tolerance, and those for lower quality (box filter upsampling) if
+	// they differ.
+	jpegCat    string
+	jpegTol    int
+	jpegBoxCat string
+	jpegBoxTol int
+
+	// jpegWholeWorkbuf means a JPEG that needs all of its work buffer even
+	// for lower quality: a progressive one, or a sequential one in several
+	// scans.
+	jpegWholeWorkbuf bool
 }
 
 var (
@@ -758,6 +773,18 @@ func emit(f *file, pixfmt uint32, blend int, sched string, flags string, script 
 	e := "-"
 	if expected && f.expected != "" {
 		e = f.expected
+		if f.jpegCat != "" {
+			cat, tol := f.jpegCat, f.jpegTol
+			if strings.Contains(flags, "Q2") && f.jpegBoxCat != "" {
+				cat, tol = f.jpegBoxCat, f.jpegBoxTol
+			}
+			jf := fmt.Sprintf("t%d,a%d,k%s", tol, jpegMeanLimit(cat), cat)
+			if flags == "-" {
+				flags = jf
+			} else {
+				flags += "," + jf
+			}
+		}
 	}
 	fmt.Printf("%s %08X %d %s %s %s %s %s\n", f.format, pixfmt, blend, sched, flags, script, e, f.path)
 }
@@ -784,6 +811,7 @@ func positions(size int, n int) []int {
 
 func main() {
 	dataDir := flag.String("data", "wuffs/test/data", "upstream's test data")
+	jpegDir := flag.String("jpegs", "ada/tests/jpegcorpus", "the checked-in JPEG files")
 	flag.StringVar(&outDir, "out", "", "the directory to write files to")
 	chaosName := flag.String("chaos", "", "a file to write the manifest of chaos runs to")
 	flag.Parse()
@@ -796,6 +824,7 @@ func main() {
 		".pnm": "netpbm", ".pam": "netpbm",
 		".wbmp": "wbmp", ".nie": "nie", ".tga": "targa",
 		".qoi": "qoi", ".pkm": "etc2", ".th": "thumbhash", ".handsum": "handsum",
+		".jpeg": "jpeg", ".jpg": "jpeg",
 	}
 	paths := []string(nil)
 	filepath.WalkDir(*dataDir, func(path string, d fs.DirEntry, err error) error {
@@ -814,7 +843,9 @@ func main() {
 			continue
 		}
 		f := &file{format: formats[strings.ToLower(filepath.Ext(path))], path: path, data: data, upstream: true}
-		if ref := goReference(f.format, data); ref != nil {
+		if f.format == "jpeg" {
+			setJPEGReference(f, fmt.Sprintf("upstream-%d", len(files)))
+		} else if ref := goReference(f.format, data); ref != nil {
 			f.expected = writeReference(fmt.Sprintf("upstream-%d", len(files)), ref)
 		}
 		files = append(files, f)
@@ -824,6 +855,7 @@ func main() {
 	makeGIFs()
 	makeBMPs()
 	makeNetpbms()
+	nEncoded, nCheckedIn := makeJPEGs(*jpegDir)
 	whole := append([]*file(nil), files...)
 
 	// The chaos runs (see test_image.adb): Ada only, so in a manifest of
@@ -896,6 +928,22 @@ func main() {
 			emit(f, 0x82008888, 1, "C97", all+"m", "I*R*", false)
 		case "png":
 			emit(f, bgraNonpremul, 0, "W", "q1", "I*R*", false)
+		case "jpeg":
+			// Rejecting progressive JPEGs; lower quality (base.QUIRK_QUALITY:
+			// box filter upsampling, and with a work buffer shorter than
+			// workbuf_len's maximum, a sequential image's MCUs are
+			// converted as they are decoded), also with the pixels compared.
+			emit(f, bgraNonpremul, 0, "W", "q1162824704", "I*R*", false)
+			emit(f, bgraNonpremul, 0, "W", "Q2", "I*R*", true)
+			emit(f, bgraNonpremul, 0, "W", "Q2,w", "I*R*", !f.jpegWholeWorkbuf)
+			emit(f, pixfmts[i%len(pixfmts)], i%2, "C97", "Q2,w,l", "I*R*", false)
+			emit(f, 0x20000008, 0, "K61", "Q2,w", "I*", false)
+			emit(f, 0x80000888, 1, "W", "Q2,w,p", "I*", false)
+			emit(f, 0xA0000888, 0, "W", "Q2,p", "I*", false)
+			if len(f.data) <= 3000 {
+				emit(f, bgraNonpremul, 0, "C1", "Q2,w", "I*", !f.jpegWholeWorkbuf)
+				emit(f, 0x81040008, 1, "K1", "Q2", "I*R*", false)
+			}
 		}
 		emit(f, bgraNonpremul, 0, "W", "q1,q2,q3,q12345", "I*", false)
 		// Other call sequences.
@@ -908,6 +956,15 @@ func main() {
 		// Truncated and corrupted copies of some of the small files.
 		if len(f.data) > 6000 || (!f.upstream && i%7 != 0) || (f.upstream && damaged >= 40 && i%3 != 0) {
 			continue
+		}
+		if f.format == "jpeg" {
+			for k, p := range jpegDamage(fmt.Sprintf("damaged-%d", i), f.data) {
+				d := &file{format: "jpeg", path: p}
+				emit(d, bgraNonpremul, 0, "W", "-", "I*R*", false)
+				if k%4 == 0 {
+					emit(d, 0xA0000888, 1, "C7", "Q2,w", "I*", false)
+				}
+			}
 		}
 		damaged++
 		base := fmt.Sprintf("damaged-%d", i)
@@ -940,6 +997,6 @@ func main() {
 			}
 		}
 	}
-	fmt.Fprintf(os.Stderr, "imgcorpus: %d upstream images, %d generated images, %d of them damaged in turn\n",
-		nUpstream, len(whole)-nUpstream, damaged)
+	fmt.Fprintf(os.Stderr, "imgcorpus: %d upstream images, %d generated images (%d JPEGs encoded here, %d checked-in JPEGs), %d of them damaged in turn\n",
+		nUpstream, len(whole)-nUpstream, nEncoded, nCheckedIn, damaged)
 }

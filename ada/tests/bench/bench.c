@@ -20,6 +20,7 @@
 #define WUFFS_CONFIG__MODULE__GIF
 #define WUFFS_CONFIG__MODULE__GZIP
 #define WUFFS_CONFIG__MODULE__PNG
+#define WUFFS_CONFIG__MODULE__JPEG
 #define WUFFS_CONFIG__MODULE__ZLIB
 #include "wuffs-unsupported-snapshot.c"
 
@@ -36,6 +37,7 @@ static wuffs_adler32__hasher g_adler;
 static wuffs_crc32__ieee_hasher g_crc;
 static wuffs_gzip__decoder g_gzip;
 static wuffs_png__decoder g_png;
+static wuffs_jpeg__decoder g_jpeg;
 static wuffs_gif__decoder g_gif;
 
 static uint64_t fnv(uint64_t h, const uint8_t* p, size_t n) {
@@ -121,6 +123,11 @@ static void once(const char* kind) {
       g_failed = 1;
     }
     decode_image(wuffs_gif__decoder__upcast_as__wuffs_base__image_decoder(&g_gif));
+  } else if (!strcmp(kind, "jpeg")) {
+    if (wuffs_jpeg__decoder__initialize(&g_jpeg, sizeof g_jpeg, WUFFS_VERSION, 0).repr) {
+      g_failed = 1;
+    }
+    decode_image(wuffs_jpeg__decoder__upcast_as__wuffs_base__image_decoder(&g_jpeg));
   }
 }
 
@@ -152,7 +159,7 @@ int main(void) {
     uint64_t check = 0xCBF29CE484222325ull;
     if (!strcmp(kind, "gzip")) {
       check = fnv(check, g_pix, (size_t)g_result);
-    } else if (!strcmp(kind, "png") || !strcmp(kind, "gif")) {
+    } else if (!strcmp(kind, "png") || !strcmp(kind, "gif") || !strcmp(kind, "jpeg")) {
       check = fnv(check, g_pix, (size_t)(g_result / 1000)) + g_result % 1000;
     } else {
       check = g_result;

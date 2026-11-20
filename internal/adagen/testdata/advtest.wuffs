@@ -15,7 +15,8 @@
 // that only a loop invariant mentions after a suspension) now guard
 // against. The w functions cover writable slices of a field passed next to
 // the receiver and element writes through a slice argument; the x functions
-// (x1 .. x11) are from a second review.
+// (x1 .. x11) are from a second review. The z functions (milestone jpeg)
+// cover the bulk methods (z1) and pointers to rows of a field (z2).
 //
 // Every public coroutine has the same signature, so that the drivers can
 // treat them alike.
@@ -29,6 +30,11 @@ pub struct thing? (
         buf  : array[16] base.u8,
         st   : base.u32,
         util : base.utility,
+        rows : array[3] array[4] base.u16,
+        u16s : array[6] base.u16,
+        u32s : array[3] base.u32,
+        u64s : array[2] base.u64,
+        buf2 : array[24] base.u8,
 )
 
 pub func thing.get_sum() base.u32 {
@@ -968,4 +974,109 @@ pub func thing.y1?(dst: base.io_writer, src: base.io_reader, workbuf: slice base
         i += 1
     }
     this.sum ~mod+= k
+}
+
+// z1: the bulk methods, on bytes (with source and destination overlapping
+// in one field, both ways round), on arrays of u16, u32 and u64 and on rows
+// of u16; from and to byte slices that are long enough, too short (so
+// nothing at all is copied) or of a length that is not a multiple of the
+// element size; and the caller's work buffer. Everything after a
+// suspension point, so that the temporaries are made after it.
+pub func thing.z1?(dst: base.io_writer, src: base.io_reader, workbuf: slice base.u8) {
+    var c : base.u8
+    var i : base.u32
+    var k : base.u64[..= 7]
+    var n : base.u64[..= 3]
+
+    while i < 16 {
+        c = args.src.read_u8?()
+        this.buf[i] = c
+        i += 1
+    }
+    k = ((c >> 2) & 7) as base.u64
+    n = (c & 3) as base.u64
+
+    this.rows[1 .. 3].bulk_load_host_endian!(src: this.buf[k ..])
+    this.u16s[n .. 6].bulk_load_host_endian!(src: this.buf[3 ..])
+    this.u32s[.. 2].bulk_load_host_endian!(src: this.buf[k ..])
+    this.u64s[1 .. 2].bulk_load_host_endian!(src: this.buf[(k + 8) ..])
+    this.rows[.. 1].bulk_load_host_endian!(src: args.workbuf)
+    this.buf[2 .. 10].bulk_load_host_endian!(src: this.buf[n ..])
+    this.buf[4 .. 12].bulk_save_host_endian!(dst: this.buf[k ..])
+    this.rows[.. 2].bulk_save_host_endian!(dst: this.buf2[n ..])
+    this.u16s[1 .. 4].bulk_save_host_endian!(dst: this.buf2[(k + 15) ..])
+    this.u32s[.. 3].bulk_save_host_endian!(dst: this.buf2[1 ..])
+    this.u64s[.. 2].bulk_save_host_endian!(dst: args.workbuf)
+    if n <= args.workbuf.length() {
+        this.u64s[.. 1].bulk_save_host_endian!(dst: args.workbuf[n ..])
+    }
+    this.rows[2 .. 3].bulk_memset!(byte_value: c)
+    this.rows[.. 2].bulk_memset!(byte_value: c ~mod+ 3)
+    this.u16s[.. 2].bulk_memset!(byte_value: 0xA5)
+    this.buf2[20 .. 24].bulk_memset!(byte_value: c ~mod+ 1)
+
+    // Bounds and a value that read the receiver itself: they are evaluated
+    // once, before the rows are written.
+    this.rows[.. (((this.rows[0][0] & 1) as base.u64) + 1)].bulk_load_host_endian!(src: this.buf[..])
+    this.rows[.. (((this.rows[0][0] & 1) as base.u64) + 1)].bulk_memset!(byte_value: ((this.rows[0][0] & 0xFF) as base.u8) | 1)
+    this.rows[(((this.rows[1][1] & 1) as base.u64)) .. 3].bulk_save_host_endian!(dst: this.buf2[..])
+
+    i = 0
+    while i < 24 {
+        args.dst.write_u8?(a: this.buf2[i])
+        i += 1
+    }
+    i = 0
+    while i < 16 {
+        args.dst.write_u8?(a: this.buf[i])
+        i += 1
+    }
+    i = 0
+    while i < 4 {
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.rows[0][i] as base.u32)
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.rows[1][i] as base.u32)
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.rows[2][i] as base.u32)
+        i += 1
+    }
+    i = 0
+    while i < 6 {
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.u16s[i] as base.u32)
+        i += 1
+    }
+    this.sum = (this.sum ~mod* 31) ~mod+ (this.u32s[0] ~mod+ (this.u32s[1] ~mod+ this.u32s[2]))
+    this.st = ((this.u64s[0] ^ (this.u64s[1] >> 3) ^ (this.u64s[1] ~mod<< 29)) & 0xFFFF_FFFF) as base.u32
+}
+
+// z2: a pointer to a row of a field, which sees later writes to the row,
+// assigned twice, and its null tests in assertions.
+pub func thing.z2?(dst: base.io_writer, src: base.io_reader, workbuf: slice base.u8) {
+    var c : base.u8
+    var p : nptr roarray[4] base.u16
+    var i : base.u32
+    var j : base.u32[..= 2]
+
+    c = args.src.read_u8?()
+    i = 0
+    while i < 3 {
+        this.rows[i][0] = (c as base.u16) ~mod+ 1
+        this.rows[i][1] = (c as base.u16) ~mod* 3
+        this.rows[i][2] = (i as base.u16) ~mod+ 7
+        this.rows[i][3] = 0xFFFF
+        i += 1
+    }
+    j = ((c & 1) as base.u32) + 1
+    p = this.rows[j][..] as ptr array[4] base.u16
+    while i > 0,
+            inv p <> nullptr,
+    {
+        this.sum ~mod+= p[(i & 3) as base.u32] as base.u32
+        this.rows[j][3] = (c as base.u16) ~mod+ ((i & 0xFF) as base.u16)
+        i -= 1
+    }
+    assert p <> nullptr
+    this.sum ~mod+= p[3] as base.u32
+    j = ((c >> 1) & 1) as base.u32
+    p = this.rows[j][..] as ptr array[4] base.u16
+    this.st ~mod+= p[(c >> 2) & 3] as base.u32
+    args.dst.write_u8?(a: (this.sum & 0xFF) as base.u8)
 }

@@ -20,5 +20,9 @@ trap 'rm -rf "$tmp"' EXIT
 (cd "$root" && go run ./ada/tests/crosscheck/statustable \
     ada/src/base/wuffs-base.ads ada/gen/wuffs-std-*.ads) > "$tmp/statuses"
 cp "$root/wuffs/release/c/wuffs-unsupported-snapshot.c" "$tmp/wuffs-unsupported-snapshot.c"
-"${CC:-cc}" -std=c99 -O2 -Wall -I "$tmp" -o "$tmp/image" "$here/image.c"
+# The scalar code paths: the Ada ports only those, and upstream's x86 AVX2
+# paths for JPEG do not always give the same pixels as its scalar ones (on
+# this corpus: only for corrupted files, 386 of 36760 JPEG runs; on every
+# valid file they agree).
+"${CC:-cc}" -std=c99 -O2 -Wall -DWUFFS_CONFIG__AVOID_CPU_ARCH -I "$tmp" -o "$tmp/image" "$here/image.c"
 "$tmp/image" "$tmp/statuses"

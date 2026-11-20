@@ -351,6 +351,15 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 		switch lv.typ.kind {
 		case kArray:
 			return val{e: eCall{lv.e, []expr{i}}, typ: lv.typ.elem, variable: lv.variable}, nil
+		case kRowPtr:
+			// p[j] is this.f[p][j], for the field f that p points into.
+			x, ok := lv.e.(eVar)
+			f := l.rowOf[x.v]
+			if !ok || f == nil {
+				return val{}, fmt.Errorf("internal error: indexing the pointer %q", lhs.Str(l.g.tm))
+			}
+			row := eCall{eSel{eVar{l.f.self}, f.name}, []expr{lv.e}}
+			return val{e: eCall{row, []expr{i}}, typ: lv.typ.elem}, nil
 		case kROSliceU8, kSliceU8:
 			return val{e: call("Wuffs.Runtime.Get", lv.e, i), typ: typU8}, nil
 		case kBytes, kBytesVar:
@@ -568,6 +577,18 @@ func (l *lowerer) binaryOp(n *a.Expr) (val, error) {
 			p := lv
 			if lv.isNull {
 				p = rv
+			}
+			if p.typ.kind == kRowPtr && lv.isNull != rv.isNull && (adaOp == "=" || adaOp == "/=") {
+				// A row pointer (see rowPtrField) is null when its index
+				// is -1. Only in an assertion, which is printed as a
+				// pragma with GNAT's constant-condition warnings off:
+				// elsewhere, GNAT can often see the value (a row's index
+				// is never -1), and warns, which is an error here.
+				if !l.inAssertion {
+					return val{}, errNotYet("comparing the pointer in %q with nullptr outside of an assertion",
+						n.Str(l.g.tm))
+				}
+				return val{e: rel(adaOp, p.e, raw("-1")), typ: typBool}, nil
 			}
 			if lv.isNull == rv.isNull || p.parg == nil || p.parg.null == nil || (adaOp != "=" && adaOp != "/=") {
 				return val{}, errNotYet("comparison %q", n.Str(l.g.tm))

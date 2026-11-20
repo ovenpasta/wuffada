@@ -49,6 +49,23 @@ package body Wuffs.Std.Advtest is
          Self.F_Buf (G_I0) := 0;
       end loop;
       Self.F_St := 0;
+      for G_I0 in Self.F_Rows'Range loop
+         for G_I1 in Self.F_Rows (G_I0)'Range loop
+            Self.F_Rows (G_I0) (G_I1) := 0;
+         end loop;
+      end loop;
+      for G_I0 in Self.F_U16s'Range loop
+         Self.F_U16s (G_I0) := 0;
+      end loop;
+      for G_I0 in Self.F_U32s'Range loop
+         Self.F_U32s (G_I0) := 0;
+      end loop;
+      for G_I0 in Self.F_U64s'Range loop
+         Self.F_U64s (G_I0) := 0;
+      end loop;
+      for G_I0 in Self.F_Buf2'Range loop
+         Self.F_Buf2 (G_I0) := 0;
+      end loop;
       Self.G_Scratch_3_T1 := 0;
       Self.G_P_3_T1 := 0;
       Self.G_S_3_T1_C := 0;
@@ -172,6 +189,11 @@ package body Wuffs.Std.Advtest is
       Self.G_P_44_Y1 := 0;
       Self.G_S_44_Y1_I := 0;
       Self.G_S_44_Y1_K := 0;
+      Self.G_Scratch_45_Z1 := 0;
+      Self.G_P_45_Z1 := 0;
+      Self.G_S_45_Z1_I := 0;
+      Self.G_Scratch_46_Z2 := 0;
+      Self.G_P_46_Z2 := 0;
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
@@ -5734,5 +5756,517 @@ package body Wuffs.Std.Advtest is
       end if;
       return G_Status;
    end Y1;
+
+   function Z1
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status
+   is
+      G_Status : Wuffs.Status := Wuffs.Ok_Status;
+      G_W_Dst : Wuffs.Base.IO.Writer;
+      G_R_Src : Wuffs.Base.IO.Reader;
+      V_C : Wuffs.U8 := 0;
+      V_I : Wuffs.U32 := 0;
+      V_K : G_U64_Range_0_7 := 0;
+      V_N : G_U64_Range_0_3 := 0;
+      G_T1 : Wuffs.U8;
+      G_Susp : Wuffs.U32;
+      G_T2 : Wuffs.Index;
+      G_T3 : Wuffs.Index;
+      G_T4 : Wuffs.Index;
+      G_T5 : Wuffs.Runtime.RO_Slice_U8;
+      G_T6 : Wuffs.Runtime.RO_Slice_U8;
+      G_T7 : Wuffs.Runtime.RO_Slice_U8;
+      G_T8 : Wuffs.Runtime.RO_Slice_U8;
+      G_T9 : Wuffs.Runtime.RO_Slice_U8;
+      G_T10 : Wuffs.Index;
+      G_T11 : Wuffs.Index;
+      G_T12 : Wuffs.Index;
+      G_T13 : Wuffs.Runtime.RO_Slice_U8;
+      G_T14 : Wuffs.Runtime.RO_Slice_U8;
+      G_T15 : Wuffs.Runtime.RO_Slice_U8;
+      G_T16 : Wuffs.Runtime.RO_Slice_U8;
+      G_T17 : Wuffs.Index;
+      G_T18 : Wuffs.Index;
+      G_T19 : Wuffs.Index;
+      G_T20 : Wuffs.Runtime.Slice_U8;
+      G_T21 : Wuffs.Runtime.Slice_U8;
+      G_T22 : Wuffs.Runtime.Slice_U8;
+      G_T23 : Wuffs.Runtime.Slice_U8;
+      G_T24 : Wuffs.Index;
+      G_T25 : Wuffs.Index;
+      G_T26 : Wuffs.U8;
+      G_T27 : Wuffs.Index;
+      G_T28 : Wuffs.Index;
+      G_T29 : Wuffs.Index;
+      G_T30 : Wuffs.U8;
+      G_T31 : Wuffs.Index;
+      G_T32 : Wuffs.Index;
+      G_T33 : Wuffs.Index;
+      G_T34 : Wuffs.Index;
+      G_T35 : Wuffs.Runtime.RO_Slice_U8;
+      G_T36 : Wuffs.Runtime.RO_Slice_U8;
+      G_T37 : Wuffs.Index;
+      G_T38 : Wuffs.Index;
+      G_T39 : Wuffs.U8;
+      G_T40 : Wuffs.Index;
+      G_T41 : Wuffs.Index;
+      G_T42 : Wuffs.Index;
+      G_T43 : Wuffs.Index;
+      G_T44 : Wuffs.Runtime.Slice_U8;
+      G_T45 : Wuffs.Runtime.Slice_U8;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return
+           (if Self.Magic = Wuffs.Runtime.Magic_Disabled
+            then Wuffs.Base.Error_Disabled_By_Previous_Error
+            else Wuffs.Base.Error_Initialize_Not_Called);
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return Wuffs.Base.Error_Bad_Argument;
+      end if;
+      if Self.G_Active_Coroutine /= 0 and then Self.G_Active_Coroutine /= 29 then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return Wuffs.Base.Error_Interleaved_Coroutine_Calls;
+      end if;
+      Self.G_Active_Coroutine := 0;
+      G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
+      G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
+      G_Susp := Self.G_P_45_Z1;
+      if G_Susp /= 0 then
+         V_I := Self.G_S_45_Z1_I;
+      end if;
+      case G_Susp is
+         when 0 =>
+            null;
+         when 1 =>
+            goto G_Resume_1;
+         when 2 =>
+            goto G_Resume_2;
+         when 3 =>
+            goto G_Resume_3;
+         when others =>
+            goto G_Suspend;
+      end case;
+      <<G_Head_1>>
+      if V_I >= 16 then
+         goto G_Done_2;
+      end if;
+      G_Susp := 1;
+      <<G_Resume_1>>
+      if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
+      V_C := G_T1;
+      Self.F_Buf (Wuffs.Index (V_I)) := V_C;
+      V_I := V_I + 1;
+      goto G_Head_1;
+      <<G_Done_2>>
+      V_K := Wuffs.U64 (Interfaces.Shift_Right (V_C, 2) and 7);
+      V_N := Wuffs.U64 (V_C and 3);
+      G_T2 := 1;
+      G_T3 := 3;
+      G_T5 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  Wuffs.Index (V_K));
+      if Wuffs.Base.Slices.Bulk_Fits (Count => (G_T3 - G_T2) * 4,
+                                      Size => 2,
+                                      Bytes_Length => G_T5.Length)
+      then
+         G_T4 := G_T2;
+         while G_T4 < G_T3 loop
+            G_T6 :=
+              Wuffs.Runtime.Subslice_IJ (S => G_T5,
+                                         I => (G_T4 - G_T2) * 8,
+                                         J => (G_T4 - G_T2) * 8 + 8);
+            Wuffs.Runtime.Bulk_Load_Host_Endian_U16
+              (Dst => Self.F_Rows (G_T4),
+               Src => G_T6.Base (G_T6.First .. Wuffs.Runtime.Last (G_T6)));
+            G_T4 := G_T4 + 1;
+         end loop;
+      end if;
+      G_T7 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  3);
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U16 (Dst => Self.F_U16s (Wuffs.Index (V_N) .. 5),
+                                               Src => G_T7.Base
+                                                        (G_T7.First
+                                                         .. Wuffs.Runtime.Last (G_T7)));
+      G_T8 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  Wuffs.Index (V_K));
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U32 (Dst => Self.F_U32s (0 .. 1),
+                                               Src => G_T8.Base
+                                                        (G_T8.First
+                                                         .. Wuffs.Runtime.Last (G_T8)));
+      G_T9 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  Wuffs.Index (V_K + 8));
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U64 (Dst => Self.F_U64s (1 .. 1),
+                                               Src => G_T9.Base
+                                                        (G_T9.First
+                                                         .. Wuffs.Runtime.Last (G_T9)));
+      G_T10 := 0;
+      G_T11 := 1;
+      G_T13 :=
+        (Base => A_Workbuf'Unrestricted_Access,
+         First => A_Workbuf'First,
+         Length => A_Workbuf'Length);
+      if Wuffs.Base.Slices.Bulk_Fits (Count => G_T11 * 4, Size => 2, Bytes_Length => G_T13.Length)
+      then
+         G_T12 := G_T10;
+         while G_T12 < G_T11 loop
+            G_T14 := Wuffs.Runtime.Subslice_IJ (S => G_T13, I => G_T12 * 8, J => G_T12 * 8 + 8);
+            Wuffs.Runtime.Bulk_Load_Host_Endian_U16
+              (Dst => Self.F_Rows (G_T12),
+               Src => G_T14.Base (G_T14.First .. Wuffs.Runtime.Last (G_T14)));
+            G_T12 := G_T12 + 1;
+         end loop;
+      end if;
+      G_T15 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
+                                   First => Self.F_Buf'First,
+                                   Length => Self.F_Buf'Length),
+                                  Wuffs.Index (V_N));
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U8 (Dst => Self.F_Buf (2 .. 9),
+                                              Src => G_T15.Base
+                                                       (G_T15.First
+                                                        .. Wuffs.Runtime.Last (G_T15)));
+      G_T16 :=
+        Wuffs.Runtime.Subslice_IJ (S => (Base => Self.F_Buf'Unrestricted_Access,
+                                         First => Self.F_Buf'First,
+                                         Length => Self.F_Buf'Length),
+                                   I => 4,
+                                   J => 12);
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U8 (Dst => Self.F_Buf
+                                                       (Wuffs.Index (V_K)
+                                                        .. Self.F_Buf'Last),
+                                              Src => G_T16.Base
+                                                       (G_T16.First
+                                                        .. Wuffs.Runtime.Last (G_T16)));
+      G_T17 := 0;
+      G_T18 := 2;
+      G_T20 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf2'Unrestricted_Access,
+                                   First => Self.F_Buf2'First,
+                                   Length => Self.F_Buf2'Length),
+                                  Wuffs.Index (V_N));
+      if Wuffs.Base.Slices.Bulk_Fits (Count => G_T18 * 4, Size => 2, Bytes_Length => G_T20.Length)
+      then
+         G_T19 := G_T17;
+         while G_T19 < G_T18 loop
+            G_T21 := Wuffs.Runtime.Subslice_IJ (S => G_T20, I => G_T19 * 8, J => G_T19 * 8 + 8);
+            Wuffs.Runtime.Bulk_Save_Host_Endian_U16
+              (Dst => G_T21.Base (G_T21.First .. Wuffs.Runtime.Last (G_T21)),
+               Src => Self.F_Rows (G_T19));
+            G_T19 := G_T19 + 1;
+         end loop;
+      end if;
+      G_T22 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf2'Unrestricted_Access,
+                                   First => Self.F_Buf2'First,
+                                   Length => Self.F_Buf2'Length),
+                                  Wuffs.Index (V_K + 15));
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U16 (Dst => G_T22.Base
+                                                        (G_T22.First
+                                                         .. Wuffs.Runtime.Last (G_T22)),
+                                               Src => Self.F_U16s (1 .. 3));
+      G_T23 :=
+        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf2'Unrestricted_Access,
+                                   First => Self.F_Buf2'First,
+                                   Length => Self.F_Buf2'Length),
+                                  1);
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U32 (Dst => G_T23.Base
+                                                        (G_T23.First
+                                                         .. Wuffs.Runtime.Last (G_T23)),
+                                               Src => Self.F_U32s (0 .. 2));
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U64 (Dst => A_Workbuf, Src => Self.F_U64s (0 .. 1));
+      if V_N <= Wuffs.U64 (A_Workbuf'Length) then
+         Wuffs.Runtime.Bulk_Save_Host_Endian_U64
+           (Dst => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_N) .. A_Workbuf'Last),
+            Src => Self.F_U64s (0 .. 0));
+      end if;
+      G_T24 := 2;
+      G_T25 := 3;
+      G_T26 := V_C;
+      G_T27 := G_T24;
+      while G_T27 < G_T25 loop
+         Wuffs.Base.Slices.Bulk_Memset_U16 (Dst => Self.F_Rows (G_T27), Byte_Value => G_T26);
+         G_T27 := G_T27 + 1;
+      end loop;
+      G_T28 := 0;
+      G_T29 := 2;
+      G_T30 := V_C + 3;
+      G_T31 := G_T28;
+      while G_T31 < G_T29 loop
+         Wuffs.Base.Slices.Bulk_Memset_U16 (Dst => Self.F_Rows (G_T31), Byte_Value => G_T30);
+         G_T31 := G_T31 + 1;
+      end loop;
+      Wuffs.Base.Slices.Bulk_Memset_U16 (Dst => Self.F_U16s (0 .. 1), Byte_Value => 16#A5#);
+      Wuffs.Base.Slices.Bulk_Memset_U8 (Dst => Self.F_Buf2 (20 .. 23), Byte_Value => V_C + 1);
+      G_T32 := 0;
+      G_T33 := Wuffs.Index (Wuffs.U64 (Self.F_Rows (0) (0) and 1) + 1);
+      G_T35 :=
+        (Base => Self.F_Buf'Unrestricted_Access,
+         First => Self.F_Buf'First,
+         Length => Self.F_Buf'Length);
+      if Wuffs.Base.Slices.Bulk_Fits (Count => G_T33 * 4, Size => 2, Bytes_Length => G_T35.Length)
+      then
+         G_T34 := G_T32;
+         while G_T34 < G_T33 loop
+            G_T36 := Wuffs.Runtime.Subslice_IJ (S => G_T35, I => G_T34 * 8, J => G_T34 * 8 + 8);
+            Wuffs.Runtime.Bulk_Load_Host_Endian_U16
+              (Dst => Self.F_Rows (G_T34),
+               Src => G_T36.Base (G_T36.First .. Wuffs.Runtime.Last (G_T36)));
+            G_T34 := G_T34 + 1;
+         end loop;
+      end if;
+      G_T37 := 0;
+      G_T38 := Wuffs.Index (Wuffs.U64 (Self.F_Rows (0) (0) and 1) + 1);
+      G_T39 := Wuffs.U8 (Self.F_Rows (0) (0) and 16#FF#) or 1;
+      G_T40 := G_T37;
+      while G_T40 < G_T38 loop
+         Wuffs.Base.Slices.Bulk_Memset_U16 (Dst => Self.F_Rows (G_T40), Byte_Value => G_T39);
+         G_T40 := G_T40 + 1;
+      end loop;
+      G_T41 := Wuffs.Index (Wuffs.U64 (Self.F_Rows (1) (1) and 1));
+      G_T42 := 3;
+      G_T44 :=
+        (Base => Self.F_Buf2'Unrestricted_Access,
+         First => Self.F_Buf2'First,
+         Length => Self.F_Buf2'Length);
+      if Wuffs.Base.Slices.Bulk_Fits (Count => (G_T42 - G_T41) * 4,
+                                      Size => 2,
+                                      Bytes_Length => G_T44.Length)
+      then
+         G_T43 := G_T41;
+         while G_T43 < G_T42 loop
+            G_T45 :=
+              Wuffs.Runtime.Subslice_IJ (S => G_T44,
+                                         I => (G_T43 - G_T41) * 8,
+                                         J => (G_T43 - G_T41) * 8 + 8);
+            Wuffs.Runtime.Bulk_Save_Host_Endian_U16
+              (Dst => G_T45.Base (G_T45.First .. Wuffs.Runtime.Last (G_T45)),
+               Src => Self.F_Rows (G_T43));
+            G_T43 := G_T43 + 1;
+         end loop;
+      end if;
+      V_I := 0;
+      <<G_Head_3>>
+      if V_I >= 24 then
+         goto G_Done_4;
+      end if;
+      Self.G_Scratch_45_Z1 := Wuffs.U64 (Self.F_Buf2 (Wuffs.Index (V_I)));
+      G_Susp := 2;
+      <<G_Resume_2>>
+      if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
+         G_Status := Wuffs.Base.Suspension_Short_Write;
+         goto G_Suspend;
+      end if;
+      Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
+                                   W => G_W_Dst,
+                                   V => Wuffs.U8 (Self.G_Scratch_45_Z1 and 16#FF#));
+      V_I := V_I + 1;
+      goto G_Head_3;
+      <<G_Done_4>>
+      V_I := 0;
+      <<G_Head_5>>
+      if V_I >= 16 then
+         goto G_Done_6;
+      end if;
+      Self.G_Scratch_45_Z1 := Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_I)));
+      G_Susp := 3;
+      <<G_Resume_3>>
+      if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
+         G_Status := Wuffs.Base.Suspension_Short_Write;
+         goto G_Suspend;
+      end if;
+      Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
+                                   W => G_W_Dst,
+                                   V => Wuffs.U8 (Self.G_Scratch_45_Z1 and 16#FF#));
+      V_I := V_I + 1;
+      goto G_Head_5;
+      <<G_Done_6>>
+      V_I := 0;
+      while V_I < 4 loop
+         Self.F_Sum := Self.F_Sum * 31 + Wuffs.U32 (Self.F_Rows (0) (Wuffs.Index (V_I)));
+         Self.F_Sum := Self.F_Sum * 31 + Wuffs.U32 (Self.F_Rows (1) (Wuffs.Index (V_I)));
+         Self.F_Sum := Self.F_Sum * 31 + Wuffs.U32 (Self.F_Rows (2) (Wuffs.Index (V_I)));
+         V_I := V_I + 1;
+      end loop;
+      V_I := 0;
+      while V_I < 6 loop
+         Self.F_Sum := Self.F_Sum * 31 + Wuffs.U32 (Self.F_U16s (Wuffs.Index (V_I)));
+         V_I := V_I + 1;
+      end loop;
+      Self.F_Sum := Self.F_Sum * 31 + Self.F_U32s (0) + Self.F_U32s (1) + Self.F_U32s (2);
+      Self.F_St :=
+        Wuffs.U32 ((Self.F_U64s (0)
+                      xor Interfaces.Shift_Right (Self.F_U64s (1), 3)
+                      xor Interfaces.Shift_Left (Self.F_U64s (1), 29))
+                     and 16#FFFF_FFFF#);
+      Self.G_P_45_Z1 := 0;
+      goto G_Exit;
+      <<G_Suspend>>
+      Self.G_P_45_Z1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 29 else 0);
+      Self.G_S_45_Z1_I := V_I;
+      <<G_Exit>>
+      Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
+      Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
+      if Wuffs.Is_Error (G_Status) then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+      end if;
+      return G_Status;
+   end Z1;
+
+   function Z2
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status
+   is
+      pragma Unmodified (A_Workbuf);
+      G_Status : Wuffs.Status := Wuffs.Ok_Status;
+      G_W_Dst : Wuffs.Base.IO.Writer;
+      G_R_Src : Wuffs.Base.IO.Reader;
+      V_C : Wuffs.U8 := 0;
+      V_P : Wuffs.Offset := -1;
+      V_I : Wuffs.U32 := 0;
+      V_J : G_U32_Range_0_2 := 0;
+      G_T1 : Wuffs.U8;
+      G_Susp : Wuffs.U32;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return
+           (if Self.Magic = Wuffs.Runtime.Magic_Disabled
+            then Wuffs.Base.Error_Disabled_By_Previous_Error
+            else Wuffs.Base.Error_Initialize_Not_Called);
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Src,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Workbuf,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Dst, A_Dst_Meta)
+           or else not Wuffs.Runtime.Valid_Buffer (A_Src, A_Src_Meta)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return Wuffs.Base.Error_Bad_Argument;
+      end if;
+      if Self.G_Active_Coroutine /= 0 and then Self.G_Active_Coroutine /= 30 then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return Wuffs.Base.Error_Interleaved_Coroutine_Calls;
+      end if;
+      Self.G_Active_Coroutine := 0;
+      G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
+      G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
+      G_Susp := Self.G_P_46_Z2;
+      case G_Susp is
+         when 0 =>
+            null;
+         when 1 =>
+            goto G_Resume_1;
+         when 2 =>
+            goto G_Resume_2;
+         when others =>
+            goto G_Suspend;
+      end case;
+      G_Susp := 1;
+      <<G_Resume_1>>
+      if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
+      V_C := G_T1;
+      V_I := 0;
+      while V_I < 3 loop
+         Self.F_Rows (Wuffs.Index (V_I)) (0) := Wuffs.U16 (V_C) + 1;
+         Self.F_Rows (Wuffs.Index (V_I)) (1) := Wuffs.U16 (V_C) * 3;
+         Self.F_Rows (Wuffs.Index (V_I)) (2) := Wuffs.U16 (V_I) + 7;
+         Self.F_Rows (Wuffs.Index (V_I)) (3) := 16#FFFF#;
+         V_I := V_I + 1;
+      end loop;
+      V_J := Wuffs.U32 (V_C and 1) + 1;
+      V_P := Wuffs.Index (V_J);
+      while V_I > 0 loop
+         pragma Warnings ("C");
+         pragma Loop_Invariant (V_P /= -1);
+         pragma Warnings ("c");
+         Self.F_Sum := Self.F_Sum + Wuffs.U32 (Self.F_Rows (V_P) (Wuffs.Index (V_I and 3)));
+         Self.F_Rows (Wuffs.Index (V_J)) (3) := Wuffs.U16 (V_C) + Wuffs.U16 (V_I and 16#FF#);
+         V_I := V_I - 1;
+      end loop;
+      pragma Warnings ("C");
+      pragma Assert (V_P /= -1);
+      pragma Assert (V_P /= -1);
+      pragma Warnings ("c");
+      Self.F_Sum := Self.F_Sum + Wuffs.U32 (Self.F_Rows (V_P) (3));
+      V_J := Wuffs.U32 (Interfaces.Shift_Right (V_C, 1) and 1);
+      V_P := Wuffs.Index (V_J);
+      Self.F_St :=
+        Self.F_St
+          + Wuffs.U32 (Self.F_Rows (V_P) (Wuffs.Index (Interfaces.Shift_Right (V_C, 2) and 3)));
+      Self.G_Scratch_46_Z2 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
+      G_Susp := 2;
+      <<G_Resume_2>>
+      if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
+         G_Status := Wuffs.Base.Suspension_Short_Write;
+         goto G_Suspend;
+      end if;
+      Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
+                                   W => G_W_Dst,
+                                   V => Wuffs.U8 (Self.G_Scratch_46_Z2 and 16#FF#));
+      Self.G_P_46_Z2 := 0;
+      goto G_Exit;
+      <<G_Suspend>>
+      Self.G_P_46_Z2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 30 else 0);
+      <<G_Exit>>
+      Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
+      Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
+      if Wuffs.Is_Error (G_Status) then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+      end if;
+      return G_Status;
+   end Z2;
 
 end Wuffs.Std.Advtest;

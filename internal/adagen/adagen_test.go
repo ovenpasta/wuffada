@@ -288,9 +288,29 @@ func TestCheckedIn(tt *testing.T) {
 			"wuffs/std/xz/decode_xz.wuffs",
 		},
 	}, {
+		name:   "jpeg",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/jpeg/common_consts.wuffs",
+			"wuffs/std/jpeg/decode_idct_default.wuffs",
+			"wuffs/std/jpeg/decode_idct_x86_avx2.wuffs",
+			"wuffs/std/jpeg/decode_jpeg.wuffs",
+			"wuffs/std/jpeg/decode_load_smooth.wuffs",
+			"wuffs/std/jpeg/decode_mcu_default.wuffs",
+			"wuffs/std/jpeg/decode_mcu_progressive_ac_high_bits.wuffs",
+			"wuffs/std/jpeg/decode_mcu_progressive_ac_low_bit.wuffs",
+			"wuffs/std/jpeg/decode_mcu_progressive_dc_high_bits.wuffs",
+			"wuffs/std/jpeg/decode_mcu_progressive_dc_low_bit.wuffs",
+			"wuffs/std/jpeg/decode_quirks.wuffs",
+		},
+	}, {
 		name:   "m1test",
 		outDir: "ada/tests",
 		files:  []string{"internal/adagen/testdata/m1test.wuffs"},
+	}, {
+		name:   "advtest",
+		outDir: "ada/tests",
+		files:  []string{"internal/adagen/testdata/advtest.wuffs"},
 	}}
 
 	for _, tc := range testCases {

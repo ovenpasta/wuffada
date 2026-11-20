@@ -32,6 +32,7 @@ etc2 22
 handsum 23
 sha256 24
 xz 25
+jpeg 26
 
 # Test-only packages count down from 65535.
 m1test 65535

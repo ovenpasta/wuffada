@@ -316,13 +316,41 @@ package Wuffs.Std.Advtest with Preelaborate is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status;
 
+   --  Wuffs: func thing.z1
+   function Z1
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func thing.z2
+   function Z2
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
 private
+
+   type G_Array_3_Of_Array_4_Of_U16 is array (Wuffs.Index range 0 .. 2) of Wuffs.U16_Array (0 .. 3);
 
    subtype G_U32_Range_0_10 is Wuffs.U32 range 0 .. 10;
 
    subtype G_U32_Range_0_100 is Wuffs.U32 range 0 .. 100;
 
    subtype G_U32_Range_0_20 is Wuffs.U32 range 0 .. 20;
+
+   subtype G_U64_Range_0_7 is Wuffs.U64 range 0 .. 7;
+
+   subtype G_U64_Range_0_3 is Wuffs.U64 range 0 .. 3;
+
+   subtype G_U32_Range_0_2 is Wuffs.U32 range 0 .. 2;
 
    type Thing is limited record
       --  Whether Initialize has been called (C: private_impl.magic).
@@ -332,6 +360,11 @@ private
       F_Sum : Wuffs.U32 := 0;
       F_Buf : Wuffs.Bytes (0 .. 15);
       F_St : Wuffs.U32 := 0;
+      F_Rows : G_Array_3_Of_Array_4_Of_U16;
+      F_U16s : Wuffs.U16_Array (0 .. 5);
+      F_U32s : Wuffs.U32_Array (0 .. 2);
+      F_U64s : Wuffs.U64_Array (0 .. 1);
+      F_Buf2 : Wuffs.Bytes (0 .. 23);
       G_Scratch_3_T1 : Wuffs.U64 := 0;
       G_P_3_T1 : Wuffs.U32 := 0;
       G_S_3_T1_C : Wuffs.U8 := 0;
@@ -453,6 +486,11 @@ private
       G_P_44_Y1 : Wuffs.U32 := 0;
       G_S_44_Y1_I : G_U32_Range_0_10 := 0;
       G_S_44_Y1_K : Wuffs.U32 := 0;
+      G_Scratch_45_Z1 : Wuffs.U64 := 0;
+      G_P_45_Z1 : Wuffs.U32 := 0;
+      G_S_45_Z1_I : Wuffs.U32 := 0;
+      G_Scratch_46_Z2 : Wuffs.U64 := 0;
+      G_P_46_Z2 : Wuffs.U32 := 0;
    end record;
 
    --  Wuffs: func thing.inner

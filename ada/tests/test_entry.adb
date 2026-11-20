@@ -17,6 +17,7 @@
 with Decode_Support;
 with Image_Support;
 with Test_Support;
+with Tiny_Jpeg;
 with Wuffs.Base.IO;
 with Wuffs.Base.Pixel_Buffers;
 with Wuffs.Base.Pixel_Formats;
@@ -27,6 +28,7 @@ with Wuffs.Std.Crc32;
 with Wuffs.Std.Deflate;
 with Wuffs.Std.Gif;
 with Wuffs.Std.Gzip;
+with Wuffs.Std.Jpeg;
 with Wuffs.Std.Lzw;
 with Wuffs.Std.Netpbm;
 with Wuffs.Std.Nie;
@@ -68,9 +70,9 @@ procedure Test_Entry is
    Copy : constant := 7000;  --  A copy of the start of the object.
 
    type Kind is
-     (Adler32, Crc32, Lzw, Deflate, Zlib, Gzip, Netpbm, Bmp, Gif, Png, Wbmp, Nie, Targa);
+     (Adler32, Crc32, Lzw, Deflate, Zlib, Gzip, Netpbm, Bmp, Gif, Png, Wbmp, Nie, Targa, Jpeg);
 
-   subtype Decoder_Kind is Kind range Netpbm .. Targa;
+   subtype Decoder_Kind is Kind range Netpbm .. Jpeg;
 
    subtype Hasher is Wuffs.Runtime.Hasher_U32'Class;
    subtype Transformer is Wuffs.Runtime.IO_Transformer'Class;
@@ -131,7 +133,8 @@ procedure Test_Entry is
    procedure Check_Decoder (Dec : in out Decoder; K : Kind; Size : Long_Long_Integer);
 
    --  Puts a small image at Arena (S ..) and returns its length: a 2 by 2
-   --  PPM, a 2 by 2 24-bit BMP or a 2 by 2 GIF.
+   --  PPM, a 2 by 2 24-bit BMP, a 2 by 2 GIF or a 2 by 2 JPEG (4:2:0, 349
+   --  bytes).
    procedure Make_Image (K : Decoder_Kind; Length : out Wuffs.Index);
 
    --  Suspends decode_frame of the small image and resumes it with
@@ -160,6 +163,7 @@ procedure Test_Entry is
          when Wbmp => Wuffs.Std.Wbmp.Initialize (IMS.Wbmp_Decoder);
          when Nie => Wuffs.Std.Nie.Initialize (IMS.Nie_Decoder);
          when Targa => Wuffs.Std.Targa.Initialize (IMS.Targa_Decoder);
+         when Jpeg => Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
       end case;
    end Initialize;
 
@@ -612,6 +616,10 @@ procedure Test_Entry is
             for B of GIF_File loop
                Put (B);
             end loop;
+         when Jpeg =>
+            for B of Tiny_Jpeg.Data loop
+               Put (B);
+            end loop;
          when others =>
             for C of PPM_Header loop
                Put (Character'Pos (C));
@@ -682,7 +690,35 @@ procedure Test_Entry is
              ": not disabled");
       end Resume_Rejected;
 
-      Src : Wuffs.Bytes renames Arena (S .. S + 35);
+      --  (Long enough for every image: with a source array shorter than its
+      --  meta says, the calls below would be rejected for that reason.)
+      Src : Wuffs.Bytes renames Arena (S .. S + 999);
+
+      --  Resumes with the rest of the input and a valid but other work
+      --  buffer: Work_First .. Work_First + Work_Length - 1 of Arena.  Not
+      --  an argument error; nothing is written outside of the pixels and
+      --  that work buffer, and nothing raises (in the checked profile, a
+      --  failed check in generated code would).
+      procedure Resume_With_Work (Work_First, Work_Length : Wuffs.Index; What : String);
+
+      procedure Resume_With_Work (Work_First, Work_Length : Wuffs.Index; What : String) is
+      begin
+         Suspend;
+         Make_Image (K, Length);
+         St :=
+           Frame
+             (Dec, PB_2x2, Arena (P .. P + 15), Arena (L .. L + 1023), Arena (S .. S + Length - 1),
+              SM, Arena (Work_First .. Work_First + Work_Length - 1));
+         --  (A decoder may answer "bad argument" itself, as upstream's C does
+         --  when std/jpeg's work buffer is too short: but by then it has
+         --  changed its state. A rejection at the entry changes nothing.)
+         Check
+           (St /= Bad_Argument or else not Unchanged (Object), What, Kind'Pos (K), ": rejected");
+         Arena (S .. S + Length - 1) := [others => Fill];
+         Arena (P .. P + 15) := [others => Fill];
+         Arena (Work_First .. Work_First + Work_Length - 1) := [others => Fill];
+         Check (Arena_Is_Intact, What, Kind'Pos (K), ": memory was written");
+      end Resume_With_Work;
    begin
       --  The control: resumed with the rest of the input, it finishes.
       Suspend;
@@ -791,11 +827,20 @@ procedure Test_Entry is
         Frame
           (Dec, Bad, Arena (D .. D + 7), Arena (L .. L - 1), Arena (S .. S + Length - 1), SM,
            Arena (W .. W - 1));
-      Check (St /= Bad_Argument, "resumed with a smaller pixel buffer: rejected", Kind'Pos (K));
+      Check (St /= Bad_Argument or else not Unchanged (Object),
+             "resumed with a smaller pixel buffer: rejected", Kind'Pos (K));
       Arena (S .. S + Length - 1) := [others => Fill];
       Arena (D .. D + 7) := [others => Fill];
       Check (Arena_Is_Intact, "resumed with a smaller pixel buffer: memory was written",
         Kind'Pos (K));
+
+      --  The work buffer swapped for another one (of the same length,
+      --  elsewhere, holding something else), shrunk by a byte, empty, or
+      --  the source that is being read.
+      Resume_With_Work (3100, 1024, "resumed: another work buffer");
+      Resume_With_Work (W, 383, "resumed: a work buffer one byte too short");
+      Resume_With_Work (W, 0, "resumed: no work buffer");
+      Resume_With_Work (S, 400, "resumed: the work buffer is the source");
       Initialize (K);
    end Check_Resume;
 
@@ -1056,14 +1101,17 @@ begin
    Check_Decoder (IMS.Wbmp_Decoder, Wbmp, IMS.Wbmp_Decoder'Size);
    Check_Decoder (IMS.Nie_Decoder, Nie, IMS.Nie_Decoder'Size);
    Check_Decoder (IMS.Targa_Decoder, Targa, IMS.Targa_Decoder'Size);
+   Check_Decoder (IMS.Jpeg_Decoder, Jpeg, IMS.Jpeg_Decoder'Size);
 
    Check_Resume (IMS.Netpbm_Decoder, Netpbm, IMS.Netpbm_Decoder'Size);
    Check_Resume (IMS.Bmp_Decoder, Bmp, IMS.Bmp_Decoder'Size);
    Check_Resume (IMS.Gif_Decoder, Gif, IMS.Gif_Decoder'Size);
+   Check_Resume (IMS.Jpeg_Decoder, Jpeg, IMS.Jpeg_Decoder'Size);
 
    Check_Null_Pointers (IMS.Netpbm_Decoder, Netpbm);
    Check_Null_Pointers (IMS.Bmp_Decoder, Bmp);
    Check_Null_Pointers (IMS.Gif_Decoder, Gif);
+   Check_Null_Pointers (IMS.Jpeg_Decoder, Jpeg);
 
    Check_Tell_Me_More;
 

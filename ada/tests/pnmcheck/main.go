@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 // pnmcheck compares what examples/decode_image wrote with what Go's
-// image/png or image/gif decodes from the same input.
+// image/png, image/gif or image/jpeg decodes from the same input.
 //
 // Usage: pnmcheck INPUT OUTPUT
 //
-// INPUT is a PNG or GIF file and OUTPUT is the PPM (P6) or PAM (P7,
+// INPUT is a PNG, GIF or JPEG file and OUTPUT is the PPM (P6) or PAM (P7,
 // RGB_ALPHA) file that decode_image made from it. For a GIF, the first frame
 // is compared, within its bounds. Fully transparent pixels are equal
-// whatever their colour.
+// whatever their colour. A JPEG's pixels are compared with a tolerance, as
+// ada/tests/imgcorpus does (see jpegCategory there): 2 per channel for a
+// grayscale image, 4 for colour without chroma subsampling, and 96 with it
+// (Wuffs' default triangle upsampling against Go's box filter).
 package main
 
 import (
@@ -19,6 +22,7 @@ import (
 	"image"
 	"image/color"
 	"image/gif"
+	"image/jpeg"
 	"image/png"
 	"io"
 	"log"
@@ -36,7 +40,22 @@ func main() {
 	}
 	var m image.Image
 	var bounds image.Rectangle
-	if bytes.HasPrefix(in, []byte("GIF")) {
+	tolerance := 0
+	if bytes.HasPrefix(in, []byte{0xFF, 0xD8}) {
+		if m, err = jpeg.Decode(bytes.NewReader(in)); err != nil {
+			log.Fatal(err)
+		}
+		bounds = m.Bounds()
+		tolerance = 4
+		switch m := m.(type) {
+		case *image.Gray:
+			tolerance = 2
+		case *image.YCbCr:
+			if m.SubsampleRatio != image.YCbCrSubsampleRatio444 {
+				tolerance = 96
+			}
+		}
+	} else if bytes.HasPrefix(in, []byte("GIF")) {
 		g, err := gif.DecodeAll(bytes.NewReader(in))
 		if err != nil {
 			log.Fatal(err)
@@ -93,22 +112,48 @@ func main() {
 		log.Fatalf("pnmcheck: the output is %d by %d but the reference has bounds %v", w, h, bounds)
 	}
 
-	bad := 0
+	bad, largest := 0, 0
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			want := color.NRGBAModel.Convert(m.At(x, y)).(color.NRGBA)
+			if c, ok := m.(*image.YCbCr); ok {
+				// The 8-bit conversion, not the 16-bit one of At's RGBA.
+				yy := c.YCbCrAt(x, y)
+				r, g, b := color.YCbCrToRGB(yy.Y, yy.Cb, yy.Cr)
+				want = color.NRGBA{r, g, b, 0xFF}
+			}
 			p := pix[(y*w+x)*channels:]
 			got := color.NRGBA{p[0], p[1], p[2], 0xFF}
 			if channels == 4 {
 				got.A = p[3]
 			}
-			if got != want && (got.A != 0 || want.A != 0) {
+			if got.A == 0 && want.A == 0 {
+				continue
+			}
+			d := 0
+			for i, v := range []uint8{got.R, got.G, got.B, got.A} {
+				u := []uint8{want.R, want.G, want.B, want.A}[i]
+				if v > u && int(v-u) > d {
+					d = int(v - u)
+				} else if u > v && int(u-v) > d {
+					d = int(u - v)
+				}
+			}
+			if d > largest {
+				largest = d
+			}
+			if d > tolerance {
 				bad++
 			}
 		}
 	}
 	if bad != 0 {
-		log.Fatalf("pnmcheck: %d pixels differ", bad)
+		log.Fatalf("pnmcheck: %d pixels differ by more than %d", bad, tolerance)
 	}
-	fmt.Printf("pnmcheck: %s: %d by %d, %d channels: same pixels as Go's decoder\n", os.Args[1], w, h, channels)
+	if tolerance == 0 {
+		fmt.Printf("pnmcheck: %s: %d by %d, %d channels: same pixels as Go's decoder\n", os.Args[1], w, h, channels)
+	} else {
+		fmt.Printf("pnmcheck: %s: %d by %d, %d channels: within %d of Go's decoder (at most %d apart)\n",
+			os.Args[1], w, h, channels, tolerance, largest)
+	}
 }

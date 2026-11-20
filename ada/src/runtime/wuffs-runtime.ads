@@ -300,15 +300,22 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    --     Copy_From_Slice, Writer_Copy_From_Slice,
    --     Writer_Limited_Copy_U32_From_Slice,
    --     Writer_Limited_Copy_U32_From_Reader,
-   --     Reader_Limited_Copy_U32_To_Slice
+   --     Reader_Limited_Copy_U32_To_Slice,
+   --     Bulk_Load_Host_Endian_U8, Bulk_Save_Host_Endian_U8
    --        look at the addresses and call the proved operation's form for
    --        disjoint arrays or its _Within form (memmove semantics);
+   --     Bulk_Load_Host_Endian_U16/U32/U64, Bulk_Save_Host_Endian_U16/U32/U64
+   --        have no _Within form (an array of wider numbers and an array of
+   --        bytes are never parts of one Ada array): they do nothing if the
+   --        two arrays share storage, which Wuffs code cannot bring about
+   --        (see there);
    --     Swizzler_Prepare, Swizzle_Interleaved_From_Slice,
    --     Swizzle_Interleaved_From_Reader,
    --     Limited_Swizzle_U32_Interleaved_From_Reader,
-   --     Swizzle_Interleaved_Transparent_Black
-   --        have no _Within form: they do nothing if the array that they
-   --        write shares an element with one that they read (see below).
+   --     Swizzle_Interleaved_Transparent_Black, Swizzle_YCCK
+   --        have no _Within form: they do nothing if an array that they
+   --        write shares an element with one that they read, or (for
+   --        Swizzle_YCCK, which writes two) with the other (see below).
    --
    --  Generated code calls no other operation of the proved libraries with
    --  two arrays (copies within one array use Wuffs.Base.Slices.Copy_Within
@@ -409,6 +416,96 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
       Dst_Palette : Wuffs.Bytes;
       Num_Pixels  : Wuffs.U64;
       N           : out Wuffs.U64);
+
+   --  Wuffs `swizzler.swizzle_ycck!(etc)`.  Proved:
+   --  Pixel_Swizzler_YCCK.Swizzle_YCCK, whose Planes are made from the 20
+   --  per-plane numbers (WidthK, HeightK, StrideK, HK, VK for plane K).  The
+   --  pixel buffer is PB with its two arrays Pixels and Palette, as for any
+   --  other pixel buffer argument.  Swizzle_YCCK writes two arrays, Pixels
+   --  and Scratch_Buffer_2K; the others (Palette, Dst_Palette, Src0 .. Src3)
+   --  are only read and may overlap one another in any way.  Before the
+   --  proved code is called, in every profile:
+   --
+   --    * PB must be valid for Pixels and Palette, its fields checked with
+   --      'Valid (Valid_Pixel_Buffer);
+   --    * Pixels must share no element with Palette, Dst_Palette, Src0 ..
+   --      Src3 or Scratch_Buffer_2K;
+   --    * Scratch_Buffer_2K must share no element with Palette, Dst_Palette
+   --      or Src0 .. Src3.
+   --
+   --  If any of that fails, Result is Wuffs.Base.Error_Bad_Argument and
+   --  nothing is written.  Otherwise Result is the proved operation's (Ok,
+   --  Error_Bad_Argument or Error_Unsupported_Pixel_Swizzler_Option, C's
+   --  statuses for C's reasons).  In std/jpeg Pixels is the caller's pixel
+   --  memory, the scratch buffer is a field of the decoder and the sources
+   --  are parts of the caller's work buffer or of another field of the
+   --  decoder, so after the checks at entry (see "Arguments" above) none of
+   --  this can fail there.
+   procedure Swizzle_YCCK
+     (PB                : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      Pixels            : in out Wuffs.Bytes;
+      Palette           : Wuffs.Bytes;
+      Dst_Palette       : Wuffs.Bytes;
+      X_Min_Incl        : Wuffs.U32;
+      X_Max_Excl        : Wuffs.U32;
+      Y_Min_Incl        : Wuffs.U32;
+      Y_Max_Excl        : Wuffs.U32;
+      Src0              : Wuffs.Bytes;
+      Src1              : Wuffs.Bytes;
+      Src2              : Wuffs.Bytes;
+      Src3              : Wuffs.Bytes;
+      Width0            : Wuffs.U32;
+      Width1            : Wuffs.U32;
+      Width2            : Wuffs.U32;
+      Width3            : Wuffs.U32;
+      Height0           : Wuffs.U32;
+      Height1           : Wuffs.U32;
+      Height2           : Wuffs.U32;
+      Height3           : Wuffs.U32;
+      Stride0           : Wuffs.U32;
+      Stride1           : Wuffs.U32;
+      Stride2           : Wuffs.U32;
+      Stride3           : Wuffs.U32;
+      H0                : Wuffs.U8;
+      H1                : Wuffs.U8;
+      H2                : Wuffs.U8;
+      H3                : Wuffs.U8;
+      V0                : Wuffs.U8;
+      V1                : Wuffs.U8;
+      V2                : Wuffs.U8;
+      V3                : Wuffs.U8;
+      YCC_Model         : Wuffs.U8;
+      YCC_Upsampling    : Wuffs.U8;
+      Scratch_Buffer_2K : in out Wuffs.Bytes;
+      Result            : out Wuffs.Status);
+
+   ---------------------------------------------------------------------------
+   --  Bulk loads and saves (Wuffs `s.bulk_load_host_endian!(src: b)` and
+   --  `s.bulk_save_host_endian!(dst: b)`; see Wuffs.Base.Slices).  As there,
+   --  the destination comes first: for a load the element array, for a
+   --  save the byte array.
+   --
+   --  The U8 forms dispatch on the addresses, as Copy_From_Slice does, to
+   --  the proved form for disjoint arrays or to its _Within form.
+   --
+   --  The U16, U32 and U64 forms have no _Within form.  Wuffs code cannot
+   --  make a byte slice and an array of wider numbers share storage: the
+   --  element array is a field or a local variable of generated code, the
+   --  byte slice is a part of a field, of a local or of a caller's array
+   --  argument, and an argument never shares storage with the object that
+   --  the function is called on (see "Arguments" above).  These procedures
+   --  check it anyway, by address, and copy nothing if the two arrays
+   --  share a storage element (the proved code would not apply).
+   ---------------------------------------------------------------------------
+
+   procedure Bulk_Load_Host_Endian_U8 (Dst : in out Wuffs.Bytes; Src : Wuffs.Bytes);
+   procedure Bulk_Save_Host_Endian_U8 (Dst : in out Wuffs.Bytes; Src : Wuffs.Bytes);
+   procedure Bulk_Load_Host_Endian_U16 (Dst : in out Wuffs.U16_Array; Src : Wuffs.Bytes);
+   procedure Bulk_Save_Host_Endian_U16 (Dst : in out Wuffs.Bytes; Src : Wuffs.U16_Array);
+   procedure Bulk_Load_Host_Endian_U32 (Dst : in out Wuffs.U32_Array; Src : Wuffs.Bytes);
+   procedure Bulk_Save_Host_Endian_U32 (Dst : in out Wuffs.Bytes; Src : Wuffs.U32_Array);
+   procedure Bulk_Load_Host_Endian_U64 (Dst : in out Wuffs.U64_Array; Src : Wuffs.Bytes);
+   procedure Bulk_Save_Host_Endian_U64 (Dst : in out Wuffs.Bytes; Src : Wuffs.U64_Array);
 
    --  Wuffs `r.limited_copy_u32_to_slice!(etc)`, for a reader of Data: the
    --  two arrays may overlap (C: memmove).

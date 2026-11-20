@@ -64,6 +64,10 @@ type lowerer struct {
 	ptrs    map[t.ID]*argInfo
 	tableOf map[*variable]*variable
 
+	// rowOf says which receiver field (an array of arrays) each row-pointer
+	// local variable (kRowPtr) points into: see rowPtr.
+	rowOf map[*variable]*fieldInfo
+
 	// ioLocals are the local variables of an I/O type and bound are those
 	// that an enclosing io_bind block gives a buffer.
 	ioLocals map[t.ID]bool
@@ -80,6 +84,10 @@ type lowerer struct {
 
 	// temps are the generator temporaries (made by newTemp).
 	temps map[*variable]bool
+
+	// inAssertion means that the expression being lowered is the condition
+	// of an assertion (assert, or a loop's pre, inv or post).
+	inAssertion bool
 
 	// For a coroutine: see coroutine.go.
 	status     *variable // G_Status.
@@ -102,6 +110,7 @@ func (g *gen) lowerFunc(fi *funcInfo) error {
 
 		ptrs:     map[t.ID]*argInfo{},
 		tableOf:  map[*variable]*variable{},
+		rowOf:    map[*variable]*fieldInfo{},
 		ioLocals: map[t.ID]bool{},
 		bound:    map[t.ID]*ioArg{},
 	}
@@ -389,6 +398,20 @@ func (l *lowerer) declareLocals() error {
 		case kROSliceU8, kSliceU8:
 			// The default initial value is the empty slice.
 			l.locals[id] = l.newLocal(name, typ, nil)
+		case kRowPtr:
+			if l.fi.coroutine && l.resumables[id] {
+				// C does not save a pointer across a suspension: after one,
+				// it would be null. Wuffs code that relies on that is not
+				// worth supporting.
+				return errNotYet("var %s: a pointer that is live across a suspension point", id.Str(l.g.tm))
+			}
+			v := l.newLocal(name, typ, raw("-1"))
+			f, err := l.rowPtrField(id, typ)
+			if err != nil {
+				return fmt.Errorf("var %s: %v", id.Str(l.g.tm), err)
+			}
+			l.rowOf[v] = f
+			l.locals[id] = v
 		case kArray:
 			// DESIGN.md: no local array above 1 KiB.
 			if typ.elem.kind != kNum {
@@ -406,6 +429,79 @@ func (l *lowerer) declareLocals() error {
 		}
 	}
 	return nil
+}
+
+// rowPtrField finds the receiver field that the pointer-to-array local
+// variable id (of type typ) points into, from the assignments to it, which
+// must all be "id = nullptr" or "id = this.f[i][..] as ptr array[N] T" for
+// one field f, an array of rows of type array[N] T.
+//
+// Such a pointer is then the row's index: id[j] is this.f[i][j], and
+// "id == nullptr" is "index = -1". That is what C does (a pointer to the row,
+// which follows the row's contents, not a copy) with every access checked.
+// As C does not save a pointer across a suspension, neither does this
+// (assembleCoroutine).
+func (l *lowerer) rowPtrField(id t.ID, typ *adaType) (*fieldInfo, error) {
+	found := (*fieldInfo)(nil)
+	err := l.walkBody(func(o *a.Node) error {
+		if o.Kind() != a.KAssign {
+			return nil
+		}
+		n := o.AsAssign()
+		if lhs := n.LHS(); lhs == nil || lhs.Operator() != 0 || lhs.Ident() != id {
+			return nil
+		}
+		rhs := n.RHS()
+		if n.Operator() != t.IDEq {
+			return errNotYet("assigning to a pointer with %q", n.Operator().Str(l.g.tm))
+		}
+		if rhs.Operator() == 0 && rhs.Ident() == t.IDNullptr {
+			return nil
+		}
+		f, _, err := l.rowPtrSource(rhs)
+		if err != nil {
+			return err
+		}
+		if found != nil && found != f {
+			return errNotYet("a pointer variable that points into two different fields")
+		}
+		if f.typ.kind != kArray || f.typ.elem.kind != kArray || f.typ.elem.length.Cmp(typ.length) != 0 ||
+			f.typ.elem.elem.kind != kNum || f.typ.elem.elem.bits != typ.elem.bits {
+			return fmt.Errorf("%q: the field's rows are not of the pointer's type", rhs.Str(l.g.tm))
+		}
+		found = f
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if found == nil {
+		return nil, errNotYet("a pointer variable that is only ever null")
+	}
+	return found, nil
+}
+
+// rowPtrSource matches "this.f[i][..] as ptr array[N] T" and returns the
+// field f and the expression i.
+func (l *lowerer) rowPtrSource(rhs *a.Expr) (*fieldInfo, *a.Expr, error) {
+	bad := errNotYet("a pointer to %q (only \"this.field[i][..] as ptr array[N] T\" is supported)", rhs.Str(l.g.tm))
+	if rhs.Operator() != t.IDXBinaryAs {
+		return nil, nil, bad
+	}
+	arr, lo, hi, ok := rhs.LHS().AsExpr().IsSlice()
+	if !ok || lo != nil || hi != nil || arr.Operator() != t.IDOpenBracket {
+		return nil, nil, bad
+	}
+	field := arr.LHS().AsExpr()
+	if field.Operator() != t.IDDot || field.LHS().AsExpr().Operator() != 0 ||
+		field.LHS().AsExpr().Ident() != t.IDThis {
+		return nil, nil, bad
+	}
+	f := l.fi.recv.field(field.Ident())
+	if f == nil {
+		return nil, nil, bad
+	}
+	return f, arr.RHS().AsExpr(), nil
 }
 
 // narrow gives the numeric local variable v (Wuffs name id) a narrower Ada
@@ -701,7 +797,9 @@ func (l *lowerer) assert(n *a.Assert) ([]stmt, error) {
 	if n.Keyword() != t.IDAssert {
 		return nil, fmt.Errorf("unexpected %q assertion as a statement", n.Keyword().Str(l.g.tm))
 	}
+	l.inAssertion = true
 	cond, err := l.condition(n.Condition())
+	l.inAssertion = false
 	if err != nil {
 		return nil, err
 	}
@@ -802,6 +900,29 @@ func (l *lowerer) assign(n *a.Assign) ([]stmt, error) {
 		return l.flush(sAssign{eVar{discard}, v.e}), nil
 	}
 
+	// A pointer to a row: its index. (rowPtrField has checked the form.)
+	if lhs.Operator() == 0 && l.locals[lhs.Ident()] != nil && l.locals[lhs.Ident()].typ.kind == kRowPtr {
+		v := l.locals[lhs.Ident()]
+		if op != t.IDEq {
+			return nil, fmt.Errorf("unrecognized assignment operator %q", op.Str(l.g.tm))
+		}
+		if rhs.Operator() == 0 && rhs.Ident() == t.IDNullptr {
+			return l.flush(sAssign{eVar{v}, raw("-1")}), nil
+		}
+		f, i, err := l.rowPtrSource(rhs)
+		if err != nil {
+			return nil, err
+		}
+		if f != l.rowOf[v] {
+			return nil, fmt.Errorf("internal error: pointer %q into another field", lhs.Str(l.g.tm))
+		}
+		iv, err := l.index(i)
+		if err != nil {
+			return nil, err
+		}
+		return l.flush(sAssign{eVar{v}, iv}), nil
+	}
+
 	// An assignment to a slice element goes through the slice handle.
 	if lhs.Operator() == t.IDOpenBracket && lhs.LHS().AsExpr().MType().IsEitherSliceType() {
 		return l.assignSliceElement(n)
@@ -864,6 +985,8 @@ func (l *lowerer) assign(n *a.Assign) ([]stmt, error) {
 		if err != nil {
 			return nil, err
 		}
+	case kRowPtr:
+		return nil, fmt.Errorf("internal error: pointer assignment %q", lhs.Str(l.g.tm))
 	case kArray:
 		// An Ada array assignment copies in place, whatever the overlap.
 		if rv.typ.kind != kArray || rv.typ.name != lv.typ.name {
@@ -1038,7 +1161,9 @@ func (l *lowerer) loopAsserts(asserts []*a.Node, pragma string, keywords ...t.ID
 		if !match {
 			continue
 		}
+		l.inAssertion = true
 		cond, err := l.condition(o.Condition())
+		l.inAssertion = false
 		if err != nil {
 			return nil, err
 		}

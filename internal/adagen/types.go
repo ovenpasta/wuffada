@@ -38,6 +38,13 @@ const (
 	kPixBuf   // Wuffs "ptr base.pixel_buffer": a descriptor plus two arrays.
 	kTable    // Wuffs "table base.u8": a Pixel_Buffers.Table, bound to an array.
 	kSwizzler // Wuffs "base.pixel_swizzler".
+
+	// kRowPtr is a local variable of type "nptr roarray[N] T" or "ptr
+	// array[N] T" (only that), which points at one row of a receiver field
+	// that is an array of such arrays: see rowPtr in lower.go. In Ada it is
+	// the row's index (a Wuffs.Offset), -1 for nullptr. elem and length are
+	// the row's element type and length.
+	kRowPtr
 )
 
 // adaType is the Ada type of a Wuffs type, variable or expression.
@@ -139,6 +146,34 @@ func (x *adaType) unrefined() *adaType {
 		return numType(x.bits)
 	}
 	return x
+}
+
+// sameAdaType reports whether x and y denote the same Ada type. typeOf makes
+// a new adaType for each refined numeric type that it meets, so two
+// parameters declared "base.u32[..= 9]" have equal but distinct adaTypes.
+func sameAdaType(x, y *adaType) bool {
+	if x == y {
+		return true
+	}
+	if x == nil || y == nil || x.kind != y.kind || x.name != y.name {
+		return false
+	}
+	switch x.kind {
+	case kNum:
+		return x.bits == y.bits && cmpBig(x.lo, y.lo) && cmpBig(x.hi, y.hi)
+	case kArray:
+		return x.length.Cmp(y.length) == 0 && sameAdaType(x.elem, y.elem)
+	}
+	// Every other kind has one adaType per Ada type (see the variables
+	// above, and structInfo.typ).
+	return false
+}
+
+func cmpBig(x, y *big.Int) bool {
+	if x == nil || y == nil {
+		return x == nil && y == nil
+	}
+	return x.Cmp(y) == 0
 }
 
 // excludesZero reports whether x is a numeric refinement that zero is not in.
@@ -294,11 +329,17 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 				return typNptrFrameOpts, nil
 			}
 		}
+		if in := x.Inner(); in.IsEitherArrayType() {
+			return g.rowPtrType(x, public)
+		}
 		return nil, fmt.Errorf("pointer type %q is not yet supported", x.Str(g.tm))
 
 	case t.IDPtr:
 		if in := x.Inner(); in.Decorator() == 0 && in.QID() == (t.QID{t.IDBase, t.IDPixelBuffer}) {
 			return typPixBuf, nil
+		}
+		if in := x.Inner(); in.IsEitherArrayType() {
+			return g.rowPtrType(x, public)
 		}
 		return nil, fmt.Errorf("pointer type %q is not yet supported", x.Str(g.tm))
 
@@ -341,6 +382,18 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 		return nil, fmt.Errorf("array type %q is not yet supported", x.Str(g.tm))
 	}
 	return nil, fmt.Errorf("type %q is not yet supported", x.Str(g.tm))
+}
+
+// rowPtrType maps "nptr roarray[N] T" (or ptr, or array) to a kRowPtr type.
+func (g *gen) rowPtrType(x *a.TypeExpr, public bool) (*adaType, error) {
+	arr, err := g.typeOf(x.Inner(), public)
+	if err != nil {
+		return nil, err
+	}
+	if arr.kind != kArray || arr.elem.kind != kNum {
+		return nil, fmt.Errorf("pointer type %q is not yet supported", x.Str(g.tm))
+	}
+	return &adaType{kind: kRowPtr, name: "Wuffs.Offset", elem: arr.elem, length: arr.length}, nil
 }
 
 // refinement returns the inclusive bounds of the numeric type x, or nils if

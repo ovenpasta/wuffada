@@ -88,6 +88,10 @@ echo "$(wc -l < "$tmp/adv.c.trace" | tr -d ' ') runs traced from C"
 if grep -l 'pragma Warnings' ada/gen/wuffs-std-adler32.ad[sb] ada/gen/wuffs-std-crc32.ad[sb]; then
     die "adler32 or crc32 suppresses warnings"
 fi
+# Wuffs.Base.Pixel_Buffers.Rows is for proved callers only (docs/DESIGN.md).
+if grep -l 'Pixel_Buffers.Rows' ada/gen/*.ad[sb] ada/src/runtime/*.ad[sb] ada/src/runtime/*/*.ad[sb]; then
+    die "generated code or the runtime shell uses Wuffs.Base.Pixel_Buffers.Rows"
+fi
 
 say "Corpus for the decoders (Go's compress/* as the independent implementation)"
 mkdir "$tmp/corpus"
@@ -116,9 +120,13 @@ nchaos="$(wc -l < "$tmp/chaos.manifest" | tr -d ' ')"
 [ "$nchaos" -ge 3000 ] || die "only $nchaos chaos runs"
 nimgcases="$(wc -l < "$tmp/image.manifest" | tr -d ' ')"
 nimgrefs="$(grep -c -v ' - [^ ]*$' "$tmp/image.manifest" || true)"
-echo "$nimgcases runs, $nimgrefs of them with reference pixels"
+njpeg="$(grep -c '^jpeg ' "$tmp/image.manifest" || true)"
+njpegrefs="$(grep '^jpeg ' "$tmp/image.manifest" | grep -c -v ' - [^ ]*$' || true)"
+echo "$nimgcases runs, $nimgrefs of them with reference pixels; JPEG: $njpeg runs, $njpegrefs with reference pixels"
 [ "$nimgcases" -ge 30000 ] || die "only $nimgcases image test runs"
 [ "$nimgrefs" -ge 800 ] || die "only $nimgrefs image test runs with reference pixels"
+[ "$njpeg" -ge 30000 ] || die "only $njpeg JPEG test runs"
+[ "$njpegrefs" -ge 1000 ] || die "only $njpegrefs JPEG test runs with reference pixels"
 
 say "Cross-check: upstream's C image decoders over the corpus"
 ada/tests/crosscheck/run_image.sh < "$tmp/image.manifest" > "$tmp/image.c.trace"
@@ -253,7 +261,8 @@ for profile in checked release; do
         die "the example's build has warnings ($profile)"
     fi
     for f in bricks-color.png bricks-dither.png hibiscus.primitive.png hippopotamus.interlaced.png \
-        animated-red-blue.gif hippopotamus.interlaced.gif; do
+        animated-red-blue.gif hippopotamus.interlaced.gif bricks-color.jpeg bricks-gray.jpeg \
+        peacock.progressive.jpeg peacock.s1x1-444.jpeg harvesters.jpeg; do
         (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "wuffs/test/data/$f" "$tmp/example.pnm") ||
             die "decode_image $f ($profile)"
         go run ./ada/tests/pnmcheck "wuffs/test/data/$f" "$tmp/example.pnm" || die "decode_image $f: wrong pixels ($profile)"
@@ -266,6 +275,8 @@ for profile in checked release; do
     # Errors are reported with the status' message.
     head -c 3000 wuffs/test/data/bricks-color.png > "$tmp/truncated.png"
     head -c 300 wuffs/test/data/animated-red-blue.gif > "$tmp/truncated.gif"
+    head -c 2000 wuffs/test/data/bricks-color.jpeg > "$tmp/truncated.jpeg"
+    printf '\377\330\377\303\000\013' > "$tmp/lossless.jpeg"
     printf 'BMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' > "$tmp/bad.bmp"
     expect_failure() {
         if (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "$1" "$tmp/example.pnm") 2> "$tmp/example.err"; then
@@ -277,7 +288,9 @@ for profile in checked release; do
     expect_failure "$tmp/truncated.png" "decode_frame: deflate: truncated input"
     expect_failure "$tmp/truncated.gif" "decode_image_config: gif: truncated input"
     expect_failure "$tmp/bad.bmp" "decode_image_config: bmp: bad header"
-    expect_failure go.mod "the input is not a PNG, GIF, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP file"
+    expect_failure "$tmp/truncated.jpeg" "decode_frame: jpeg: truncated input"
+    expect_failure "$tmp/lossless.jpeg" "decode_image_config: jpeg: unsupported lossless coding"
+    expect_failure go.mod "the input is not a PNG, GIF, JPEG, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP file"
     # A file name longer than the program accepts (and so nowhere near the
     # run-time library's own limits).
     if (examples/bin/decode_image wuffs/test/data/hippopotamus.bmp \

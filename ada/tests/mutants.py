@@ -11,8 +11,9 @@ WHERE is "src" (a fault in the generator or in the runtime shell: apply it,
 then run ./gen.sh) or "gen" (a fault in the generated Ada: run ./gen.sh, then
 apply it). PROFILE is the build profile that the mutant is tested with.
 Mutants 01 to 25 are the implementer's of milestone 3, R01 to R20 came from
-the independent review of it, N01 to N08 cover the review's fixes, and M01 to
-M12 are for milestone 4a (run those in both profiles: MUTATION_PROFILE).
+the independent review of it, N01 to N08 cover the review's fixes, M01 to
+M12 are for milestone 4a, and J01 to J15 for the JPEG milestone (run those in
+both profiles: MUTATION_PROFILE).
 """
 
 import glob
@@ -69,6 +70,16 @@ def no_checks_on_resume():
         open(path, "w").write(s)
     if n < 20:
         sys.exit("mutants.py: only %d argument checks found" % n)
+
+
+def idct_constant():
+    """Changes one multiplier of std/jpeg's scalar inverse DCT, everywhere."""
+    path = GEN + "jpeg.adb"
+    s = open(path).read()
+    n = s.count("16#0000_1151#")
+    if n < 8:
+        sys.exit("mutants.py: only %d IDCT constants found" % n)
+    open(path, "w").write(s.replace("16#0000_1151#", "16#0000_1152#"))
 
 
 def null_flag_ignored():
@@ -278,7 +289,7 @@ MUTANTS = {
 
     # Milestone 4a.
     "M01-bulk-memset-ignores-value": ("src", "checked", lambda: rep(
-        G + "lower_call.go", '"Dst", b.e, "Byte_Value", vs[0].e)})',
+        G + "lower_bulk.go", '"Dst", b.e, "Byte_Value", vs[0].e)})',
         '"Dst", b.e, "Byte_Value", expr(raw("0")))})')),
     "M02-sign-extend-rshift-shifts-by-zero": ("src", "checked", lambda: rep(
         G + "lower_call.go",
@@ -320,6 +331,44 @@ MUTANTS = {
     "M12-writer-peek-undo-byte-reads-the-reader-way": ("src", "checked", lambda: rep(
         G + "lower_call.go", 'return val{e: callNamed(ioPkg+".Peek_Undo_Byte", "Data", data, cursor, c), typ: typU8}, nil',
         'return val{e: call("Wuffs.U8", raw("0"+cursor[:0])), typ: typU8}, nil')),
+
+    # The JPEG milestone: the bulk methods, swizzle_ycck, row pointers,
+    # status fields, and std/jpeg's own generated code.
+    "J01-shell-bulk-load-u16-pairs-the-wrong-bytes": ("src", "checked", lambda: rep(
+        RT, "Wuffs.Base.Slices.Bulk_Load_Host_Endian_U16 (Dst => Dst, Src => Src);",
+        "Wuffs.Base.Slices.Bulk_Load_Host_Endian_U16\n           (Dst => Dst, Src => Src (Src'First + 1 .. Src'Last));")),
+    "J02-gen-bulk-rows-all-into-the-first": ("src", "checked", lambda: rep(
+        G + "lower_bulk.go", "row := eCall{arr.e, []expr{k}}", "row := eCall{arr.e, []expr{lo}}")),
+    "J03-gen-bulk-row-offset-ignores-lo": ("src", "checked", lambda: rep(
+        G + "lower_bulk.go", 'rowIndex = bin("-", k, lo)', "rowIndex = k")),
+    "J04-gen-bulk-fits-counts-rows-not-elements": ("src", "checked", lambda: rep(
+        G + "lower_bulk.go", 'count := bin("*", bin("-", hi, lo), raw(rowLen.String()))',
+        'count := bin("-", hi, lo)')),
+    "J05-gen-bulk-memset-rows-every-other-row": ("src", "checked", lambda: rep(
+        G + "lower_bulk.go", '"Dst", expr(row), "Byte_Value", arg.e)})...)',
+        '"Dst", expr(row), "Byte_Value", arg.e)}, sAssign{k, bin("+", k, raw("1"))})...)')),
+    "J06-gen-ycck-planes-1-and-2-swapped": ("src", "checked", lambda: rep(
+        G + "lower_call.go", "src, err := view(vs[6+i], false)",
+        "src, err := view(vs[6+[]int{0, 2, 1, 3}[i]], false)")),
+    "J07-jpeg-ycck-stride0-of-plane-1": ("gen", "checked", lambda: rep(
+        GEN + "jpeg.adb", "Stride0 => V_Width0,", "Stride0 => V_Width1,")),
+    "J08-shell-ycck-scratch-overlap-unchecked": ("src", "checked", lambda: rep(
+        RT, "        or else Touches_A_Source (Scratch_Buffer_2K)\n", "")),
+    "J09-shell-ycck-pixels-scratch-overlap-unchecked": ("src", "checked", lambda: rep(
+        RT, "        or else Share_An_Element (Pixels, Scratch_Buffer_2K)\n", "")),
+    "J10-shell-ycck-pixel-buffer-not-validated": ("src", "checked", lambda: rep(
+        RT, "      if not Valid_Pixel_Buffer (PB => PB, Pixels => Pixels, Palette => Palette)\n",
+        "      if False\n")),
+    "J11-gen-row-pointer-always-row-0": ("src", "checked", lambda: rep(
+        G + "lower.go", "return l.flush(sAssign{eVar{v}, iv}), nil", 'return l.flush(sAssign{eVar{v}, raw("0" + flat(iv)[:0])}), nil')),
+    "J12-jpeg-decode-sos-my-not-saved": ("gen", "checked", lambda: rep(
+        GEN + "jpeg.adb", "      Self.G_S_17_Decode_Sos_My := V_My;\n", "      null;\n")),
+    "J13-jpeg-restart-counter-counts-up": ("gen", "checked", lambda: rep(
+        GEN + "jpeg.adb", "Self.F_Restarts_Remaining := Self.F_Restarts_Remaining - 1;",
+        "Self.F_Restarts_Remaining := Self.F_Restarts_Remaining + 1;")),
+    "J14-jpeg-scalar-idct-constant": ("gen", "checked", idct_constant),
+    "J15-jpeg-swizzle-immediately-status-ignored": ("gen", "checked", lambda: rep(
+        GEN + "jpeg.adb", "G_Status := Self.F_Swizzle_Immediately_Status;", "G_Status := Wuffs.Ok_Status;")),
 }
 
 

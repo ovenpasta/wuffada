@@ -14,14 +14,17 @@ with Ada.Text_IO;
 with Image_Support;
 with Interfaces;
 with System;
+with System.Storage_Elements;
 with Test_Support;
 with Wuffs.Base.IO;
 with Wuffs.Base.Pixel_Buffers;
 with Wuffs.Base.Pixel_Formats;
 with Wuffs.Base.Pixel_Swizzler;
+with Wuffs.Base.Slices;
 with Wuffs.Runtime;
 with Wuffs.Std.Bmp.Probe;
 with Wuffs.Std.Gif.Probe;
+with Wuffs.Std.Jpeg.Probe;
 with Wuffs.Std.Netpbm.Probe;
 with Wuffs.Std.Png.Probe;
 with Wuffs.Std.Wbmp.Probe;
@@ -50,10 +53,10 @@ procedure Test_Hostile is
    BGR  : constant := 16#8000_0888#;
    RGB  : constant := 16#A000_0888#;
 
-   type Kind is (Netpbm, Bmp, Gif, Png, Wbmp, Nie, Targa, Qoi);
+   type Kind is (Netpbm, Bmp, Gif, Png, Jpeg, Wbmp, Nie, Targa, Qoi);
 
    --  The decoders whose status messages Check_Messages looks at.
-   subtype Message_Kind is Kind range Netpbm .. Png;
+   subtype Message_Kind is Kind range Netpbm .. Jpeg;
 
    subtype Decoder is Wuffs.Runtime.Image_Decoder'Class;
 
@@ -96,6 +99,10 @@ procedure Test_Hostile is
 
    procedure Check_Shell;
 
+   procedure Check_Shell_YCCK;
+
+   procedure Check_Shell_Bulk;
+
    procedure Check_Messages;
 
    procedure Check_Tiny_Image;
@@ -107,6 +114,7 @@ procedure Test_Hostile is
          when Bmp => Wuffs.Std.Bmp.Initialize (IMS.Bmp_Decoder);
          when Gif => Wuffs.Std.Gif.Initialize (IMS.Gif_Decoder);
          when Png => Wuffs.Std.Png.Initialize (IMS.Png_Decoder);
+         when Jpeg => Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
          when Wbmp => Wuffs.Std.Wbmp.Initialize (IMS.Wbmp_Decoder);
          when Nie => Wuffs.Std.Nie.Initialize (IMS.Nie_Decoder);
          when Targa => Wuffs.Std.Targa.Initialize (IMS.Targa_Decoder);
@@ -120,6 +128,7 @@ procedure Test_Hostile is
          when Bmp => Wuffs.Std.Bmp.Probe.Swizzler_Is_Default (IMS.Bmp_Decoder),
          when Gif => Wuffs.Std.Gif.Probe.Swizzler_Is_Default (IMS.Gif_Decoder),
          when Png => Wuffs.Std.Png.Probe.Swizzler_Is_Default (IMS.Png_Decoder),
+         when Jpeg => Wuffs.Std.Jpeg.Probe.Swizzler_Is_Default (IMS.Jpeg_Decoder),
          when Wbmp => Wuffs.Std.Wbmp.Probe.Swizzler_Is_Default (IMS.Wbmp_Decoder),
          when Nie => Wuffs.Std.Nie.Probe.Swizzler_Is_Default (IMS.Nie_Decoder),
          when Targa => Wuffs.Std.Targa.Probe.Swizzler_Is_Default (IMS.Targa_Decoder),
@@ -687,6 +696,288 @@ procedure Test_Hostile is
          "Shares_Storage");
    end Check_Shell;
 
+   --  Wuffs.Runtime.Swizzle_YCCK, called directly: 4 by 4 BGRA pixels from
+   --  three 4 by 4 planes (YCbCr 4:4:4).  Two arrays are written, the
+   --  pixels and the scratch buffer; each must be apart from every other
+   --  array, and the arrays that are only read may overlap each other.
+   procedure Check_Shell_YCCK is
+      --  Overlapping actuals are the point of this test.
+      pragma Warnings (Off, "writable actual for * overlaps with actual for *");
+
+      --  Where the arrays are when they are apart.
+      Pix  : constant := 1000;  --  64 bytes.
+      Pal  : constant := 1100;  --  1024 bytes.
+      DPal : constant := 2200;  --  1024 bytes.
+      Src  : constant := 3300;  --  Three planes of 16 bytes, 32 apart.
+      Scr  : constant := 3500;  --  2048 bytes.
+
+      function Swizzle
+        (Pix_At, Pal_At, DPal_At, S0, S1, S2, Scr_At : Wuffs.Index;
+         Scr_Length : Wuffs.Index := 2048;
+         Buf        : PB.Pixel_Buffer := Good_PB) return Wuffs.Status;
+
+      function Swizzle
+        (Pix_At, Pal_At, DPal_At, S0, S1, S2, Scr_At : Wuffs.Index;
+         Scr_Length : Wuffs.Index := 2048;
+         Buf        : PB.Pixel_Buffer := Good_PB) return Wuffs.Status
+      is
+         St : Wuffs.Status;
+      begin
+         Wuffs.Runtime.Swizzle_YCCK
+           (PB                => Buf,
+            Pixels            => Arena (Pix_At .. Pix_At + 63),
+            Palette           => Arena (Pal_At .. Pal_At + 1023),
+            Dst_Palette       => Arena (DPal_At .. DPal_At + 1023),
+            X_Min_Incl        => 0,
+            X_Max_Excl        => 4,
+            Y_Min_Incl        => 0,
+            Y_Max_Excl        => 4,
+            Src0              => Arena (S0 .. S0 + 15),
+            Src1              => Arena (S1 .. S1 + 15),
+            Src2              => Arena (S2 .. S2 + 15),
+            Src3              => Arena (S2 .. S2 - 1),
+            Width0            => 4,
+            Width1            => 4,
+            Width2            => 4,
+            Width3            => 0,
+            Height0           => 4,
+            Height1           => 4,
+            Height2           => 4,
+            Height3           => 0,
+            Stride0           => 4,
+            Stride1           => 4,
+            Stride2           => 4,
+            Stride3           => 0,
+            H0                => 1,
+            H1                => 1,
+            H2                => 1,
+            H3                => 0,
+            V0                => 1,
+            V1                => 1,
+            V2                => 1,
+            V3                => 0,
+            YCC_Model         => 0,
+            YCC_Upsampling    => 0,
+            Scratch_Buffer_2K => Arena (Scr_At .. Scr_At + Scr_Length - 1),
+            Result            => St);
+         return St;
+      end Swizzle;
+
+      procedure Fill;
+
+      procedure Fill is
+      begin
+         for I in Arena'Range loop
+            Arena (I) := Wuffs.U8 (I mod 251);
+         end loop;
+      end Fill;
+
+      function Is_Filled return Boolean
+      is (for all I in Arena'Range => Arena (I) = Wuffs.U8 (I mod 251));
+
+      procedure Rejected (St : Wuffs.Status; What : String);
+
+      procedure Rejected (St : Wuffs.Status; What : String) is
+      begin
+         Check (St = Wuffs.Base.Error_Bad_Argument, What, -1, ": swizzle_ycck did not reject it");
+         Check (Is_Filled, What, -1, ": swizzle_ycck wrote to memory");
+         Fill;
+      end Rejected;
+
+      procedure Accepted (St : Wuffs.Status; What : String);
+
+      procedure Accepted (St : Wuffs.Status; What : String) is
+         Converted : Boolean := False;
+      begin
+         Check (Wuffs.Is_Ok (St), What, -1, ": swizzle_ycck failed");
+         for I in Wuffs.Index range Pix .. Pix + 63 loop
+            Converted := Converted or else Arena (I) /= Wuffs.U8 (I mod 251);
+         end loop;
+         Check (Converted, What, -1, ": swizzle_ycck did not write the pixels");
+         Fill;
+      end Accepted;
+
+      Bad : PB.Pixel_Buffer;
+      type Raw_Table is record
+         Offset, Width, Height, Stride : Interfaces.Integer_64;
+      end record
+      with Convention => C;
+      Raw : Raw_Table
+      with Import, Address => Bad.Planes (0)'Address;
+   begin
+      Fill;
+      --  Apart: it converts (and only the pixels and the scratch buffer
+      --  change).
+      Accepted (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr), "apart");
+      --  Arrays that are only read may overlap one another: the three
+      --  planes the same array, the destination palette over the palette,
+      --  the planes inside the palettes.
+      Accepted (Swizzle (Pix, Pal, DPal, Src, Src, Src, Scr), "one plane three times");
+      Accepted
+        (Swizzle (Pix, Pal, Pal + 7, Src, Src + 8, Src + 4, Scr), "overlapping read-only arrays");
+      Accepted
+        (Swizzle (Pix, Pal, Pal, Pal + 10, DPal + 20, Pal + 1000, Scr), "planes in the palettes");
+      --  Adjacent: no shared element.
+      Accepted (Swizzle (Pix, Pix + 64, Pix + 64, Pix - 16, Pix - 32, Pix - 48, Pix + 1088),
+                "adjacent arrays");
+
+      --  The pixels and each array that is read, and the scratch buffer.
+      Rejected (Swizzle (Pix, Pix + 63, DPal, Src, Src + 32, Src + 64, Scr), "pixels/palette");
+      Rejected (Swizzle (Pix, Pal, Pix + 60, Src, Src + 32, Src + 64, Scr), "pixels/dst palette");
+      Rejected (Swizzle (Pix, Pal, DPal, Pix + 10, Src + 32, Src + 64, Scr), "pixels/plane 0");
+      Rejected (Swizzle (Pix, Pal, DPal, Src, Pix + 48, Src + 64, Scr), "pixels/plane 1");
+      Rejected (Swizzle (Pix, Pal, DPal, Src, Src + 32, Pix - 15, Scr), "pixels/plane 2");
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Pix + 63), "pixels/scratch");
+      Rejected
+        (Swizzle (Scr + 100, Pal, DPal, Src, Src + 32, Src + 64, Scr), "pixels inside scratch");
+      --  The scratch buffer and each array that is read.
+      Rejected
+        (Swizzle (Pix, Scr + 2047, DPal, Src, Src + 32, Src + 64, Scr), "scratch/palette");
+      Rejected
+        (Swizzle (Pix, Pal, Scr - 1023, Src, Src + 32, Src + 64, Scr), "scratch/dst palette");
+      Rejected (Swizzle (Pix, Pal, DPal, Scr + 5, Src + 32, Src + 64, Scr), "scratch/plane 0");
+      Rejected (Swizzle (Pix, Pal, DPal, Src, Scr + 2032, Src + 64, Scr), "scratch/plane 1");
+      Rejected (Swizzle (Pix, Pal, DPal, Src, Src + 32, Scr - 15, Scr), "scratch/plane 2");
+      --  A scratch buffer that is too short: the proved code's own check.
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, Scr_Length => 2047),
+         "short scratch");
+
+      --  Pixel buffers that do not describe the pixels, or hold bit
+      --  patterns that are no values of their types.
+      Bad := Good_PB;
+      Bad.Planes (0).Height := 5;
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, Buf => Bad), "pb: 5 rows");
+      Bad := Good_PB;
+      Raw.Offset := -1;
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, Buf => Bad), "pb: offset -1");
+      Bad := Good_PB;
+      Raw.Width := -16;
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, Buf => Bad), "pb: width -16");
+      Bad := Good_PB;
+      Raw.Stride := Interfaces.Integer_64'Last;
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, Buf => Bad),
+         "pb: stride 2**63 - 1");
+      Arena := [others => 16#5A#];
+   end Check_Shell_YCCK;
+
+   --  The bulk loads and saves of the shell, called directly, also with
+   --  arrays that overlap (which no generated code can make for the U16,
+   --  U32 and U64 forms).
+   procedure Check_Shell_Bulk is
+      pragma Warnings (Off, "writable actual for * overlaps with actual for *");
+      use System.Storage_Elements;
+      use type Wuffs.Bytes;
+      use type Wuffs.U16;
+
+      procedure Fill;
+
+      procedure Fill is
+      begin
+         for I in Arena'Range loop
+            Arena (I) := Wuffs.U8 (I mod 251);
+         end loop;
+      end Fill;
+
+      function Is_Filled return Boolean
+      is (for all I in Arena'Range => Arena (I) = Wuffs.U8 (I mod 251));
+
+      --  An index of Arena whose address is a multiple of 8, for overlays.
+      function Aligned (From : Wuffs.Index) return Wuffs.Index is
+        (From + Wuffs.Index ((8 - To_Integer (Arena (From)'Address) mod 8) mod 8));
+
+      A : constant Wuffs.Index := Aligned (3000);
+      U16s : Wuffs.U16_Array (0 .. 7)
+      with Import, Address => Arena (A)'Address;
+      U32s : Wuffs.U32_Array (0 .. 3)
+      with Import, Address => Arena (A)'Address;
+      U64s : Wuffs.U64_Array (0 .. 1)
+      with Import, Address => Arena (A)'Address;
+      Before : Wuffs.Bytes (0 .. 31);
+      OK     : Boolean;
+      Little : constant Boolean := Wuffs.Base.Slices.Host_Is_Little_Endian;
+   begin
+      --  Bytes: the source and the destination overlap, both ways round:
+      --  the result is a memmove's.
+      Fill;
+      Before := Arena (1000 .. 1031);
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U8
+        (Dst => Arena (1004 .. 1013), Src => Arena (1000 .. 1031));
+      Check
+        (Arena (1004 .. 1013) = Before (0 .. 9) and then Arena (1000 .. 1003) = Before (0 .. 3)
+         and then Arena (1014 .. 1031) = Before (14 .. 31), "bulk load, U8, overlapping forwards");
+      Fill;
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U8
+        (Dst => Arena (1000 .. 1009), Src => Arena (1003 .. 1031));
+      Check
+        (Arena (1000 .. 1009) = Before (3 .. 12) and then Arena (1010 .. 1031) = Before (10 .. 31),
+         "bulk load, U8, overlapping backwards");
+      Fill;
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U8
+        (Dst => Arena (1002 .. 1031), Src => Arena (1000 .. 1009));
+      Check
+        (Arena (1002 .. 1011) = Before (0 .. 9) and then Arena (1012 .. 1031) = Before (12 .. 31),
+         "bulk save, U8, overlapping");
+      Fill;
+      --  All or nothing: a source shorter than the destination.
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U8
+        (Dst => Arena (1000 .. 1009), Src => Arena (1005 .. 1013));
+      Check (Is_Filled, "bulk load, U8, short source: memory was written");
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U8
+        (Dst => Arena (1000 .. 1008), Src => Arena (1004 .. 1013));
+      Check (Is_Filled, "bulk save, U8, short destination: memory was written");
+
+      --  Wider numbers from and to bytes that are apart: host byte order;
+      --  a byte array of an odd length; all or nothing.
+      Fill;
+      Before := Arena (1000 .. 1031);
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U16
+        (Dst => U16s (1 .. 3), Src => Arena (1000 .. 1006));
+      OK := True;
+      for I in Wuffs.Index range 0 .. 2 loop
+         OK := OK and then U16s (1 + I) =
+           (if Little
+            then Wuffs.U16 (Before (2 * I)) + 256 * Wuffs.U16 (Before (2 * I + 1))
+            else Wuffs.U16 (Before (2 * I + 1)) + 256 * Wuffs.U16 (Before (2 * I)));
+      end loop;
+      Check (OK and then Arena (1000 .. 1031) = Before, "bulk load, U16, from 7 bytes");
+      Fill;
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U16
+        (Dst => U16s (1 .. 3), Src => Arena (1000 .. 1004));
+      Check (Is_Filled, "bulk load, U16, from 5 bytes: memory was written");
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U32
+        (Dst => Arena (1000 .. 1006), Src => U32s (0 .. 1));
+      Check (Is_Filled, "bulk save, U32, to 7 bytes: memory was written");
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U64
+        (Dst => Arena (1000 .. 1008), Src => U64s (0 .. 0));
+      Check
+        (Arena (1000 .. 1007) = Arena (A .. A + 7) and then Arena (1008) = Wuffs.U8 (1008 mod 251),
+         "bulk save, U64, to 9 bytes");
+      Fill;
+
+      --  Overlapping: nothing at all is copied.
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U16 (Dst => U16s, Src => Arena (A + 3 .. A + 40));
+      Check (Is_Filled, "bulk load, U16, from an overlapping source: memory was written");
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U16
+        (Dst => Arena (A - 1 .. A + 30), Src => U16s (0 .. 1));
+      Check (Is_Filled, "bulk save, U16, to an overlapping destination: memory was written");
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U32
+        (Dst => U32s (1 .. 2), Src => Arena (A + 4 .. A + 11));
+      Check (Is_Filled, "bulk load, U32, from itself: memory was written");
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U32 (Dst => Arena (A + 15 .. A + 30), Src => U32s);
+      Check (Is_Filled, "bulk save, U32, to an overlapping destination: memory was written");
+      Wuffs.Runtime.Bulk_Load_Host_Endian_U64 (Dst => U64s, Src => Arena (A - 8 .. A + 7));
+      Check (Is_Filled, "bulk load, U64, from an overlapping source: memory was written");
+      Wuffs.Runtime.Bulk_Save_Host_Endian_U64 (Dst => Arena (A .. A + 15), Src => U64s);
+      Check (Is_Filled, "bulk save, U64, to itself: memory was written");
+      Arena := [others => 16#5A#];
+   end Check_Shell_Bulk;
+
    procedure Check_Messages is
       Buffer : String (1 .. 80);
       Short  : String (5 .. 9);
@@ -711,6 +1002,9 @@ procedure Test_Hostile is
                when Png =>
                   L := Wuffs.Std.Png.Message_Length (S);
                   Wuffs.Std.Png.Get_Message (S, Buffer, Length);
+               when Jpeg =>
+                  L := Wuffs.Std.Jpeg.Message_Length (S);
+                  Wuffs.Std.Jpeg.Get_Message (S, Buffer, Length);
             end case;
             if Other = K then
                Check
@@ -738,6 +1032,10 @@ procedure Test_Hostile is
       Expect
         (Wuffs.Std.Png.Error_Bad_Text_Chunk_Not_Latin_1, Png,
          "png: bad text chunk (not Latin-1)");
+      Expect (Wuffs.Std.Jpeg.Error_Bad_DHT_Marker, Jpeg, "jpeg: bad DHT marker");
+      Expect
+        (Wuffs.Std.Jpeg.Error_Unsupported_Precision_12_Bits, Jpeg,
+         "jpeg: unsupported precision (12 bits)");
       --  A buffer that is too short gets the start of the message.
       Wuffs.Std.Png.Get_Message (Wuffs.Std.Png.Error_Bad_Checksum, Short, Length);
       Check (Length = 5 and then Short = "png: ", "message in a short buffer");
@@ -830,6 +1128,7 @@ begin
               when Bmp => IMS.Bmp_Decoder'Address,
               when Gif => IMS.Gif_Decoder'Address,
               when Png => IMS.Png_Decoder'Address,
+              when Jpeg => IMS.Jpeg_Decoder'Address,
               when Wbmp => IMS.Wbmp_Decoder'Address,
               when Nie => IMS.Nie_Decoder'Address,
               when Targa => IMS.Targa_Decoder'Address,
@@ -840,6 +1139,7 @@ begin
               when Bmp => IMS.Bmp_Decoder'Size,
               when Gif => IMS.Gif_Decoder'Size,
               when Png => IMS.Png_Decoder'Size,
+              when Jpeg => IMS.Jpeg_Decoder'Size,
               when Wbmp => IMS.Wbmp_Decoder'Size,
               when Nie => IMS.Nie_Decoder'Size,
               when Targa => IMS.Targa_Decoder'Size,
@@ -855,7 +1155,10 @@ begin
    end loop;
 
    Check_Shell;
+   Check_Shell_YCCK;
+   Check_Shell_Bulk;
    Check_Overlaps (IMS.Netpbm_Decoder, Netpbm, IMS.Netpbm_Decoder'Size);
+   Check_Overlaps (IMS.Jpeg_Decoder, Jpeg, IMS.Jpeg_Decoder'Size);
    Check_Overlaps (IMS.Bmp_Decoder, Bmp, IMS.Bmp_Decoder'Size);
    Check_Overlaps (IMS.Gif_Decoder, Gif, IMS.Gif_Decoder'Size);
    Check_Overlaps (IMS.Png_Decoder, Png, IMS.Png_Decoder'Size);
@@ -867,6 +1170,7 @@ begin
    Check_Descriptors (IMS.Bmp_Decoder, Bmp);
    Check_Descriptors (IMS.Gif_Decoder, Gif);
    Check_Descriptors (IMS.Png_Decoder, Png);
+   Check_Descriptors (IMS.Jpeg_Decoder, Jpeg);
    Check_Descriptors (IMS.Wbmp_Decoder, Wbmp);
    Check_Descriptors (IMS.Nie_Decoder, Nie);
    Check_Descriptors (IMS.Targa_Decoder, Targa);
@@ -875,6 +1179,7 @@ begin
    Check_Metas (IMS.Bmp_Decoder, Bmp);
    Check_Metas (IMS.Gif_Decoder, Gif);
    Check_Metas (IMS.Png_Decoder, Png);
+   Check_Metas (IMS.Jpeg_Decoder, Jpeg);
    Check_Metas (IMS.Wbmp_Decoder, Wbmp);
    Check_Metas (IMS.Nie_Decoder, Nie);
    Check_Metas (IMS.Targa_Decoder, Targa);
@@ -886,6 +1191,7 @@ begin
    Put_Size ("Wuffs.Std.Bmp.Decoder", IMS.Bmp_Decoder'Size);
    Put_Size ("Wuffs.Std.Gif.Decoder", IMS.Gif_Decoder'Size);
    Put_Size ("Wuffs.Std.Png.Decoder", IMS.Png_Decoder'Size);
+   Put_Size ("Wuffs.Std.Jpeg.Decoder", IMS.Jpeg_Decoder'Size);
    Put_Size ("Wuffs.Std.Wbmp.Decoder", IMS.Wbmp_Decoder'Size);
    Put_Size ("Wuffs.Std.Nie.Decoder", IMS.Nie_Decoder'Size);
    Put_Size ("Wuffs.Std.Targa.Decoder", IMS.Targa_Decoder'Size);

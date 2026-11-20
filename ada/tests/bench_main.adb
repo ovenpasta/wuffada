@@ -27,6 +27,7 @@ with Wuffs.Std.Crc32;
 with Wuffs.Std.Gif;
 with Wuffs.Std.Gzip;
 with Wuffs.Std.Png;
+with Wuffs.Std.Jpeg;
 
 procedure Bench_Main is
 
@@ -260,6 +261,9 @@ procedure Bench_Main is
             elsif Kind = "gif" then
                Wuffs.Std.Gif.Initialize (IMS.Gif_Decoder);
                Decode_Image (IMS.Gif_Decoder);
+            elsif Kind = "jpeg" then
+               Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
+               Decode_Image (IMS.Jpeg_Decoder);
             end if;
             Elapsed := Ada.Real_Time.Clock - Start;
             if Elapsed < Best then
@@ -269,7 +273,7 @@ procedure Bench_Main is
          --  What was computed: the checksum, or the bytes produced.
          if Kind = "gzip" then
             Fnv (Check, IMS.Pix (IMS.Pix_First .. IMS.Pix_First + Wuffs.Index (Result) - 1));
-         elsif Kind = "png" or else Kind = "gif" then
+         elsif Kind = "png" or else Kind = "gif" or else Kind = "jpeg" then
             Fnv (Check, IMS.Pix (IMS.Pix_First .. IMS.Pix_First + Wuffs.Index (Result / 1000) - 1));
             Check := Check + Result mod 1000;
          else

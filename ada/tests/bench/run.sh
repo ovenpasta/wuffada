@@ -2,8 +2,8 @@
 # A performance baseline (a report, not a test; not part of ./test.sh): the
 # generated Ada decoders, release profile, against upstream's C, for CRC-32
 # and Adler-32 of a 4 MiB buffer, gzip decompression of a few megabytes, and
-# decoding the largest PNGs and the largest GIF of wuffs/test/data to
-# BGRA_PREMUL.
+# decoding the largest PNGs, the largest GIF and the largest JPEGs of
+# wuffs/test/data to BGRA_PREMUL.
 #
 # usage: ada/tests/bench/run.sh
 #
@@ -35,6 +35,7 @@ cat wuffs/test/data/*.txt wuffs/test/data/*.bmp wuffs/test/data/*.json 2> /dev/n
     echo "gzip 10 $tmp/data.gz"
     ls -S wuffs/test/data/*.png | head -n 4 | sed 's/^/png 10 /'
     ls -S wuffs/test/data/*.gif | head -n 1 | sed 's/^/gif 20 /'
+    ls -S wuffs/test/data/*.jpeg | head -n 3 | sed 's/^/jpeg 10 /'
 } > "$tmp/list"
 
 (cd ada && alr exec -- gprbuild -q -P wuffs_gen.gpr -XWUFFS_PROFILE=release bench_main.adb)
@@ -48,13 +49,24 @@ ada/bin/bench_main < "$tmp/list" > "$tmp/ada.out"
 "$tmp/c-scalar" < "$tmp/list" > "$tmp/c-scalar.out"
 "$tmp/c-simd" < "$tmp/list" > "$tmp/c-simd.out"
 
+# (Upstream's x86 AVX2 code for JPEG does not always give the same pixels as
+# its scalar code, which is what the Ada ports (in test.sh's corpus, only for
+# corrupted files): JPEG results are compared with c-scalar only, and a
+# difference from c-simd is reported.)
 for other in ada-O3 c-scalar c-simd; do
-    if ! awk '{ print $1, $2, $3, $5 }' "$tmp/ada.out" | cmp -s - "$(awk '{ print $1, $2, $3, $5 }' "$tmp/$other.out" > "$tmp/cmp"; echo "$tmp/cmp")"; then
+    filter='{ print $1, $2, $3, $5 }'
+    if [ "$other" = c-simd ]; then
+        filter='$1 != "jpeg" { print $1, $2, $3, $5 }'
+    fi
+    if ! awk "$filter" "$tmp/ada.out" | cmp -s - "$(awk "$filter" "$tmp/$other.out" > "$tmp/cmp"; echo "$tmp/cmp")"; then
         echo "bench: the results of ada and $other differ" >&2
         exit 1
     fi
 done
-echo "results (checksums of everything computed) are identical in all four builds"
+if ! awk '$1 == "jpeg" { print $2, $5 }' "$tmp/ada.out" | cmp -s - "$(awk '$1 == "jpeg" { print $2, $5 }' "$tmp/c-simd.out" > "$tmp/cmp"; echo "$tmp/cmp")"; then
+    echo "(for JPEG, c-simd's pixels differ from c-scalar's and ada's, as expected)"
+fi
+echo "results (checksums of everything computed) are identical in all four builds (JPEG: but c-simd)"
 echo
 printf '%-8s %-28s %9s | %8s %8s %8s %8s | %7s %7s %7s\n' kind input bytes ada ada-O3 c-scalar c-simd ada/sc ada/simd O3/O2
 echo "(ns per input byte; for png and gif, ms per image in the second line)"
@@ -64,6 +76,6 @@ paste -d ' ' "$tmp/ada.out" "$tmp/ada-O3.out" "$tmp/c-scalar.out" "$tmp/c-simd.o
         a = $4; o = $9; s = $14; v = $19
         printf "%-8s %-28s %9d | %8.3f %8.3f %8.3f %8.3f | %7.2f %7.2f %7.2f\n",
             $1, substr(name, 1, 28), bytes, a / bytes, o / bytes, s / bytes, v / bytes, a / s, a / v, o / a
-        if ($1 == "png" || $1 == "gif")
+        if ($1 == "png" || $1 == "gif" || $1 == "jpeg")
             printf "%-8s %-28s %9s | %8.2f %8.2f %8.2f %8.2f |\n", "", "  ms per image", "", a / 1e6, o / 1e6, s / 1e6, v / 1e6
     }'

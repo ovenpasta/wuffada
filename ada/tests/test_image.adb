@@ -1,7 +1,7 @@
 --  Part of wuffada (wuffs-ada: Wuffs to Ada).
 --  SPDX-License-Identifier: Apache-2.0 OR MIT
 
---  Runs the generated image decoders (netpbm, bmp, gif, png, wbmp, nie, targa) over a
+--  Runs the generated image decoders (netpbm, bmp, gif, png, wbmp, nie, targa, jpeg, ...) over a
 --  manifest of test cases (from ada/tests/imgcorpus) and prints a trace of
 --  what they did, which test.sh compares, line for line, with the trace of
 --  upstream's C decoders (ada/tests/crosscheck/image.c: keep the two in
@@ -21,10 +21,17 @@
 --  differ).  FLAGS is "-" or a comma-separated list of: m (report
 --  metadata), p (a pixel buffer for half the width and height), w (a work
 --  buffer that is too short), l (pixel rows at an offset and with a gap
---  between them: Ada only), qN (set quirk N).  SCRIPT is the calls to make:
---  I and C (decode_image_config and decode_frame_config; i and c: with a
---  null destination), F (decode_frame), * (C and F until one fails), R and
---  r (restart_frame, with good and with bad arguments), T (tell_me_more).
+--  between them: Ada only), qN (set quirk N to 1), QN (set quirk N to
+--  16#8000_0000_0000_0000#: for base.QUIRK_QUALITY, lower quality), tN and
+--  kNAME (compare with the reference pixels with a tolerance of N per
+--  channel, not exactly, and count the comparison in category NAME: for
+--  JPEG, whose decoders legitimately differ in rounding and upsampling), aN
+--  (also require the mean of the per-channel differences to be at most N
+--  hundredths).
+--  SCRIPT is the calls to make: I and C (decode_image_config and
+--  decode_frame_config; i and c: with a null destination), F (decode_frame),
+--  * (C and F until one fails), R and r (restart_frame, with good and with
+--  bad arguments), T (tell_me_more).
 --
 --  One more flag, xN, makes a "chaos" run with seed N: whenever a call is
 --  suspended, the next call may get other arguments than the first: another
@@ -57,6 +64,7 @@ with Wuffs.Std.Qoi;
 with Wuffs.Std.Etc2;
 with Wuffs.Std.Thumbhash;
 with Wuffs.Std.Handsum;
+with Wuffs.Std.Jpeg;
 
 procedure Test_Image is
 
@@ -80,6 +88,7 @@ procedure Test_Image is
    Max_Quirks : constant := 8;
 
    type Quirk_List is array (1 .. Max_Quirks) of Wuffs.U32;
+   type Quirk_Values is array (1 .. Max_Quirks) of Wuffs.U64;
 
    type Run_Case is record
       Id         : Natural := 0;
@@ -92,11 +101,21 @@ procedure Test_Image is
       Small_Work : Boolean := False;
       Layout     : Boolean := False;
       Quirks     : Quirk_List := [others => 0];
+      Values     : Quirk_Values := [others => 1];
       Num_Quirks : Natural := 0;
       Chaos      : Boolean := False;
       Has_Expect : Boolean := False;
       Exp_Length : Wuffs.Index := 0;
+      Tolerance  : Natural := 0;
+      Mean_Limit : Natural := Natural'Last;  --  In hundredths.
+      Category   : Natural := 0;  --  In Categories; 0 for none.
    end record;
+
+   --  The comparisons with a tolerance, by category (in Image_Support).
+   Max_Categories : constant := IMS.Max_Categories;
+   subtype Category_Stats is IMS.Category_Stats;
+   Categories     : IMS.Category_Table renames IMS.Categories;
+   Num_Categories : Natural := 0;
 
    Fourccs : constant array (1 .. 7) of Wuffs.U32 :=
      [16#4348_524D#, 16#4558_4946#, 16#4741_4D41#, 16#4943_4350#, 16#4B56_5020#,
@@ -441,6 +460,10 @@ procedure Test_Image is
       X0, Y0, X1, Y1 : Wuffs.Index;
       E, P           : Wuffs.Index;
       Bad            : Natural := 0;
+      Diff, Largest  : Natural := 0;
+      Total          : Long_Long_Integer := 0;
+      Channels       : Long_Long_Integer := 0;
+      Mean           : Natural := 0;
    begin
       if Run.Exp_Length < 16 then
          Test_Support.Check (False, "short reference file, case", Run.Id);
@@ -465,7 +488,12 @@ procedure Test_Image is
             --  transparent black, and Go's decoder keeps their colour.
             if IMS.Pix (P + X * 4 + 3) /= 0 or else IMS.Expected (E + X * 4 + 3) /= 0 then
                for I in X * 4 .. X * 4 + 3 loop
-                  if IMS.Pix (P + I) /= IMS.Expected (E + I) then
+                  Diff :=
+                    abs (Natural (IMS.Pix (P + I)) - Natural (IMS.Expected (E + I)));
+                  Largest := Natural'Max (Largest, Diff);
+                  Total := Total + Long_Long_Integer (Diff);
+                  Channels := Channels + 1;
+                  if Diff > Run.Tolerance then
                      Bad := Bad + 1;
                   end if;
                end loop;
@@ -474,6 +502,25 @@ procedure Test_Image is
          E := E + (X1 - X0) * 4;
       end loop;
       References := References + 1;
+      if Channels > 0 then
+         Mean := Natural ((100 * Total + Channels - 1) / Channels);
+      end if;
+      if Run.Category /= 0 then
+         declare
+            C : Category_Stats renames Categories (Run.Category);
+         begin
+            C.Runs := C.Runs + 1;
+            C.Tolerance := Natural'Max (C.Tolerance, Run.Tolerance);
+            C.Largest := Natural'Max (C.Largest, Largest);
+            if Largest > 0 then
+               C.Differing := C.Differing + 1;
+            end if;
+            C.Mean := Natural'Max (C.Mean, Mean);
+         end;
+      end if;
+      Test_Support.Check
+        (Mean <= Run.Mean_Limit, "the mean difference from the reference is too large, case",
+         Run.Id);
       Test_Support.Check (Bad = 0, "pixels differ from the reference decoder's, case", Run.Id);
    end Compare_With_Expected;
 
@@ -962,7 +1009,7 @@ procedure Test_Image is
          IMS.Chaos_Pal := [others => Canary];
       end if;
       for I in 1 .. Run.Num_Quirks loop
-         St := D.Set_Quirk (A_Key => Run.Quirks (I), A_Value => 1);
+         St := D.Set_Quirk (A_Key => Run.Quirks (I), A_Value => Run.Values (I));
          Begin_Line ("q");
          Put_Status (St);
          KV ("key", Wuffs.U64 (Run.Quirks (I)));
@@ -1058,10 +1105,36 @@ procedure Test_Image is
             when 'x' =>
                Run.Chaos := True;
                Seed := Wuffs.U32 (Number (Line (I + 1 .. J - 1), 10));
-            when 'q' =>
+            when 't' =>
+               Run.Tolerance := Natural (Number (Line (I + 1 .. J - 1), 10));
+            when 'a' =>
+               Run.Mean_Limit := Natural (Number (Line (I + 1 .. J - 1), 10));
+            when 'k' =>
+               --  The category: an existing one, or a new one.
+               declare
+                  Name : String renames Line (I + 1 .. J - 1);
+               begin
+                  for K in 1 .. Num_Categories loop
+                     if Categories (K).Name (1 .. Categories (K).Name_Last) = Name then
+                        Run.Category := K;
+                     end if;
+                  end loop;
+                  if Run.Category = 0 and then Num_Categories < Max_Categories
+                    and then Name'Length <= 40
+                  then
+                     Num_Categories := Num_Categories + 1;
+                     Categories (Num_Categories).Name (1 .. Name'Length) := Name;
+                     Categories (Num_Categories).Name_Last := Name'Length;
+                     Run.Category := Num_Categories;
+                  end if;
+               end;
+            when 'q' | 'Q' =>
                if Run.Num_Quirks < Max_Quirks then
                   Run.Num_Quirks := Run.Num_Quirks + 1;
                   Run.Quirks (Run.Num_Quirks) := Wuffs.U32 (Number (Line (I + 1 .. J - 1), 10));
+                  if Line (I) = 'Q' then
+                     Run.Values (Run.Num_Quirks) := 16#8000_0000_0000_0000#;
+                  end if;
                end if;
             when others => null;
          end case;
@@ -1115,6 +1188,9 @@ procedure Test_Image is
       elsif Line (F1 .. L1) = "handsum" then
          Wuffs.Std.Handsum.Initialize (IMS.Handsum_Decoder);
          Run_Decoder (IMS.Handsum_Decoder, Line (F6 .. L6));
+      elsif Line (F1 .. L1) = "jpeg" then
+         Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
+         Run_Decoder (IMS.Jpeg_Decoder, Line (F6 .. L6));
       else
          Test_Support.Check (False, "unknown format ", -1, Line (F1 .. L1));
       end if;
@@ -1129,6 +1205,21 @@ begin
       if Last > 0 then
          Do_Case (Line (1 .. Last));
       end if;
+   end loop;
+   for C of Categories (1 .. Num_Categories) loop
+      Ada.Text_IO.Put ("test_image: compared with the reference with a tolerance: ");
+      Ada.Text_IO.Put (C.Name (1 .. C.Name_Last));
+      Ada.Text_IO.Put (": runs");
+      Ada.Text_IO.Put (C.Runs'Image);
+      Ada.Text_IO.Put (", with a difference");
+      Ada.Text_IO.Put (C.Differing'Image);
+      Ada.Text_IO.Put (", largest channel difference");
+      Ada.Text_IO.Put (C.Largest'Image);
+      Ada.Text_IO.Put (", largest mean difference (hundredths)");
+      Ada.Text_IO.Put (C.Mean'Image);
+      Ada.Text_IO.Put (" (tolerance");
+      Ada.Text_IO.Put (C.Tolerance'Image);
+      Ada.Text_IO.Put_Line (")");
    end loop;
    Ada.Text_IO.Put ("test_image: cases:");
    Ada.Text_IO.Put (Cases'Image);

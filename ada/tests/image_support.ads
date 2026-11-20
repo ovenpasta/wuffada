@@ -14,6 +14,7 @@ with Wuffs.Std.Qoi;
 with Wuffs.Std.Etc2;
 with Wuffs.Std.Thumbhash;
 with Wuffs.Std.Handsum;
+with Wuffs.Std.Jpeg;
 
 package Image_Support is
 
@@ -45,6 +46,21 @@ package Image_Support is
    Chaos_Pal : Wuffs.Bytes (0 .. 4095);
    Expected : Wuffs.Bytes (0 .. File_Last);
 
+   --  The comparisons of test_image.adb with a tolerance, by category: how
+   --  many, and the largest per-channel and mean differences seen.
+   Max_Categories : constant := 16;
+   type Category_Stats is record
+      Name      : String (1 .. 40) := [others => ' '];
+      Name_Last : Natural := 0;
+      Tolerance : Natural := 0;
+      Runs      : Natural := 0;
+      Largest   : Natural := 0;
+      Differing : Natural := 0;  --  Runs with any difference at all.
+      Mean      : Natural := 0;  --  The largest mean difference of a run, in hundredths.
+   end record;
+   type Category_Table is array (1 .. Max_Categories) of Category_Stats;
+   Categories : Category_Table;
+
    --  For test_hostile.adb.
    Arena : Wuffs.Bytes (100 .. 8291);
 
@@ -59,5 +75,6 @@ package Image_Support is
    Etc2_Decoder : Wuffs.Std.Etc2.Decoder;
    Thumbhash_Decoder : Wuffs.Std.Thumbhash.Decoder;
    Handsum_Decoder : Wuffs.Std.Handsum.Decoder;
+   Jpeg_Decoder : Wuffs.Std.Jpeg.Decoder;
 
 end Image_Support;

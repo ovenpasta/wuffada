@@ -1,4 +1,5 @@
 with System.Storage_Elements;
+with Wuffs.Base.Pixel_Swizzler_YCCK;
 
 package body Wuffs.Runtime is
 
@@ -173,6 +174,168 @@ package body Wuffs.Runtime is
       Wuffs.Base.Pixel_Swizzler.Swizzle_Interleaved_Transparent_Black
         (S => S, Dst => Dst, Dst_Palette => Dst_Palette, Num_Pixels => Num_Pixels, N => N);
    end Swizzle_Interleaved_Transparent_Black;
+
+   procedure Swizzle_YCCK
+     (PB                : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      Pixels            : in out Wuffs.Bytes;
+      Palette           : Wuffs.Bytes;
+      Dst_Palette       : Wuffs.Bytes;
+      X_Min_Incl        : Wuffs.U32;
+      X_Max_Excl        : Wuffs.U32;
+      Y_Min_Incl        : Wuffs.U32;
+      Y_Max_Excl        : Wuffs.U32;
+      Src0              : Wuffs.Bytes;
+      Src1              : Wuffs.Bytes;
+      Src2              : Wuffs.Bytes;
+      Src3              : Wuffs.Bytes;
+      Width0            : Wuffs.U32;
+      Width1            : Wuffs.U32;
+      Width2            : Wuffs.U32;
+      Width3            : Wuffs.U32;
+      Height0           : Wuffs.U32;
+      Height1           : Wuffs.U32;
+      Height2           : Wuffs.U32;
+      Height3           : Wuffs.U32;
+      Stride0           : Wuffs.U32;
+      Stride1           : Wuffs.U32;
+      Stride2           : Wuffs.U32;
+      Stride3           : Wuffs.U32;
+      H0                : Wuffs.U8;
+      H1                : Wuffs.U8;
+      H2                : Wuffs.U8;
+      H3                : Wuffs.U8;
+      V0                : Wuffs.U8;
+      V1                : Wuffs.U8;
+      V2                : Wuffs.U8;
+      V3                : Wuffs.U8;
+      YCC_Model         : Wuffs.U8;
+      YCC_Upsampling    : Wuffs.U8;
+      Scratch_Buffer_2K : in out Wuffs.Bytes;
+      Result            : out Wuffs.Status)
+   is
+      --  True if the written array W shares an element with any array
+      --  that is only read.
+      function Touches_A_Source (W : Wuffs.Bytes) return Boolean is
+        (Share_An_Element (W, Palette)
+         or else Share_An_Element (W, Dst_Palette)
+         or else Share_An_Element (W, Src0)
+         or else Share_An_Element (W, Src1)
+         or else Share_An_Element (W, Src2)
+         or else Share_An_Element (W, Src3));
+   begin
+      if not Valid_Pixel_Buffer (PB => PB, Pixels => Pixels, Palette => Palette)
+        or else Touches_A_Source (Pixels)
+        or else Touches_A_Source (Scratch_Buffer_2K)
+        or else Share_An_Element (Pixels, Scratch_Buffer_2K)
+      then
+         Result := Wuffs.Base.Error_Bad_Argument;
+         return;
+      end if;
+      Wuffs.Base.Pixel_Swizzler_YCCK.Swizzle_YCCK
+        (PB                => PB,
+         Pixels            => Pixels,
+         Palette           => Palette,
+         Dst_Palette       => Dst_Palette,
+         X_Min_Incl        => X_Min_Incl,
+         X_Max_Excl        => X_Max_Excl,
+         Y_Min_Incl        => Y_Min_Incl,
+         Y_Max_Excl        => Y_Max_Excl,
+         Src0              => Src0,
+         Src1              => Src1,
+         Src2              => Src2,
+         Src3              => Src3,
+         Planes            =>
+           [0 => (Width => Width0, Height => Height0, Stride => Stride0, H => H0, V => V0),
+            1 => (Width => Width1, Height => Height1, Stride => Stride1, H => H1, V => V1),
+            2 => (Width => Width2, Height => Height2, Stride => Stride2, H => H2, V => V2),
+            3 => (Width => Width3, Height => Height3, Stride => Stride3, H => H3, V => V3)],
+         YCC_Model         => YCC_Model,
+         YCC_Upsampling    => YCC_Upsampling,
+         Scratch_Buffer_2K => Scratch_Buffer_2K,
+         Result            => Result);
+   end Swizzle_YCCK;
+
+   procedure Bulk_Load_Host_Endian_U8 (Dst : in out Wuffs.Bytes; Src : Wuffs.Bytes) is
+   begin
+      if not Share_An_Element (Dst, Src) then
+         Wuffs.Base.Slices.Bulk_Load_Host_Endian_U8 (Dst => Dst, Src => Src);
+      else
+         declare
+            U     : constant Union := Union_Of (Dst, Src);
+            Whole : Wuffs.Bytes (0 .. U.Length - 1)
+            with Import, Address => U.Start;
+         begin
+            Wuffs.Base.Slices.Bulk_Load_Host_Endian_U8_Within
+              (Data       => Whole,
+               Dst_First  => U.A_Offset,
+               Dst_Length => Dst'Length,
+               Src_First  => U.B_Offset,
+               Src_Length => Src'Length);
+         end;
+      end if;
+   end Bulk_Load_Host_Endian_U8;
+
+   procedure Bulk_Save_Host_Endian_U8 (Dst : in out Wuffs.Bytes; Src : Wuffs.Bytes) is
+   begin
+      if not Share_An_Element (Dst, Src) then
+         Wuffs.Base.Slices.Bulk_Save_Host_Endian_U8 (Dst => Dst, Src => Src);
+      else
+         declare
+            U     : constant Union := Union_Of (Dst, Src);
+            Whole : Wuffs.Bytes (0 .. U.Length - 1)
+            with Import, Address => U.Start;
+         begin
+            Wuffs.Base.Slices.Bulk_Save_Host_Endian_U8_Within
+              (Data       => Whole,
+               Dst_First  => U.A_Offset,
+               Dst_Length => Dst'Length,
+               Src_First  => U.B_Offset,
+               Src_Length => Src'Length);
+         end;
+      end if;
+   end Bulk_Save_Host_Endian_U8;
+
+   procedure Bulk_Load_Host_Endian_U16 (Dst : in out Wuffs.U16_Array; Src : Wuffs.Bytes) is
+   begin
+      if not Shares_Storage (A => Src, Address => Dst'Address, Size_In_Bits => Dst'Size) then
+         Wuffs.Base.Slices.Bulk_Load_Host_Endian_U16 (Dst => Dst, Src => Src);
+      end if;
+   end Bulk_Load_Host_Endian_U16;
+
+   procedure Bulk_Save_Host_Endian_U16 (Dst : in out Wuffs.Bytes; Src : Wuffs.U16_Array) is
+   begin
+      if not Shares_Storage (A => Dst, Address => Src'Address, Size_In_Bits => Src'Size) then
+         Wuffs.Base.Slices.Bulk_Save_Host_Endian_U16 (Dst => Dst, Src => Src);
+      end if;
+   end Bulk_Save_Host_Endian_U16;
+
+   procedure Bulk_Load_Host_Endian_U32 (Dst : in out Wuffs.U32_Array; Src : Wuffs.Bytes) is
+   begin
+      if not Shares_Storage (A => Src, Address => Dst'Address, Size_In_Bits => Dst'Size) then
+         Wuffs.Base.Slices.Bulk_Load_Host_Endian_U32 (Dst => Dst, Src => Src);
+      end if;
+   end Bulk_Load_Host_Endian_U32;
+
+   procedure Bulk_Save_Host_Endian_U32 (Dst : in out Wuffs.Bytes; Src : Wuffs.U32_Array) is
+   begin
+      if not Shares_Storage (A => Dst, Address => Src'Address, Size_In_Bits => Src'Size) then
+         Wuffs.Base.Slices.Bulk_Save_Host_Endian_U32 (Dst => Dst, Src => Src);
+      end if;
+   end Bulk_Save_Host_Endian_U32;
+
+   procedure Bulk_Load_Host_Endian_U64 (Dst : in out Wuffs.U64_Array; Src : Wuffs.Bytes) is
+   begin
+      if not Shares_Storage (A => Src, Address => Dst'Address, Size_In_Bits => Dst'Size) then
+         Wuffs.Base.Slices.Bulk_Load_Host_Endian_U64 (Dst => Dst, Src => Src);
+      end if;
+   end Bulk_Load_Host_Endian_U64;
+
+   procedure Bulk_Save_Host_Endian_U64 (Dst : in out Wuffs.Bytes; Src : Wuffs.U64_Array) is
+   begin
+      if not Shares_Storage (A => Dst, Address => Src'Address, Size_In_Bits => Src'Size) then
+         Wuffs.Base.Slices.Bulk_Save_Host_Endian_U64 (Dst => Dst, Src => Src);
+      end if;
+   end Bulk_Save_Host_Endian_U64;
 
    procedure Reader_Limited_Copy_U32_To_Slice
      (Data  : Wuffs.Bytes;

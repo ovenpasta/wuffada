@@ -284,8 +284,9 @@ func (g *gen) analyzeStructs() error {
 				return fmt.Errorf("%s: field %s: %v", what, o.Name().Str(g.tm), err)
 			}
 			switch typ.kind {
-			case kNum, kBool, kArray, kSwizzler:
-				// No-op.
+			case kNum, kBool, kStatus, kArray, kSwizzler:
+				// No-op. (A status field is a plain Wuffs.Status value,
+				// Wuffs.Ok_Status initially, as C's NULL status.)
 			case kStruct:
 				if !typ.st.classy {
 					return errNotYet("%s: field %s of a non-classy struct type", what, o.Name().Str(g.tm))
@@ -636,7 +637,7 @@ func (g *gen) findChoices() error {
 			}
 			args := []interface{}{"Self", self}
 			for i, p := range d.params {
-				if f.params[i].typ != p.typ || f.params[i].mode != p.mode {
+				if !sameAdaType(f.params[i].typ, p.typ) || f.params[i].decl != p.decl || f.params[i].mode != p.mode {
 					return nil, fmt.Errorf("func %s: an alternative has another signature", fi.ast.QQID().Str(g.tm))
 				}
 				actual := expr(eVar{p})

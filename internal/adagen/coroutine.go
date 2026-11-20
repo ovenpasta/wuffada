@@ -205,7 +205,8 @@ func (l *lowerer) assembleCoroutine(head []stmt, body []stmt) []stmt {
 			}
 			// C does not save a variable whose type has pointers (a slice
 			// or a table) either.
-			if !l.resumables[id] || v.typ.kind == kROSliceU8 || v.typ.kind == kSliceU8 || v.typ.kind == kTable {
+			if !l.resumables[id] || v.typ.kind == kROSliceU8 || v.typ.kind == kSliceU8 || v.typ.kind == kTable ||
+				v.typ.kind == kRowPtr {
 				continue
 			}
 			name := l.stateName("S", mangle(id.Str(l.g.tm)))

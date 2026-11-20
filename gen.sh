@@ -108,6 +108,18 @@ gen "$tmp/gen" xz \
     wuffs/std/xz/decode_filter.wuffs \
     wuffs/std/xz/decode_quirks.wuffs \
     wuffs/std/xz/decode_xz.wuffs
+gen "$tmp/gen" jpeg \
+    wuffs/std/jpeg/common_consts.wuffs \
+    wuffs/std/jpeg/decode_idct_default.wuffs \
+    wuffs/std/jpeg/decode_idct_x86_avx2.wuffs \
+    wuffs/std/jpeg/decode_jpeg.wuffs \
+    wuffs/std/jpeg/decode_load_smooth.wuffs \
+    wuffs/std/jpeg/decode_mcu_default.wuffs \
+    wuffs/std/jpeg/decode_mcu_progressive_ac_high_bits.wuffs \
+    wuffs/std/jpeg/decode_mcu_progressive_ac_low_bit.wuffs \
+    wuffs/std/jpeg/decode_mcu_progressive_dc_high_bits.wuffs \
+    wuffs/std/jpeg/decode_mcu_progressive_dc_low_bit.wuffs \
+    wuffs/std/jpeg/decode_quirks.wuffs
 
 # A test-only package that exercises what the standard packages above do not
 # (see the comment in the .wuffs file). Its driver is ada/tests/test_m1.adb.

@@ -46,6 +46,9 @@ func (l *lowerer) call(n *a.Expr) (val, error) {
 		}
 		return l.ioMethod(n, rv.io, name, args)
 
+	case recvTyp.IsEitherSliceType() && isBulkMethod(name):
+		return l.bulkMethod(n, recv, name, args)
+
 	case recvTyp.IsEitherSliceType():
 		return l.sliceMethod(n, recv, name, args)
 
@@ -785,25 +788,6 @@ func (l *lowerer) sliceMethod(n *a.Expr, recv *a.Expr, name string, args []*a.No
 		l.pre = append(l.pre, sCall{callNamed(fn, "Data", b.e, "Pos", bytesFirst(b), "V", vs[0].e)})
 		return val{}, nil
 	}
-	if name == "bulk_memset" {
-		vs, err := l.argValues(n, args, 1)
-		if err != nil {
-			return val{}, err
-		}
-		if err := l.numArg(n, vs[0], 8); err != nil {
-			return val{}, err
-		}
-		rv, err := l.expr(recv)
-		if err != nil {
-			return val{}, err
-		}
-		b, err := l.toBytes(rv, true)
-		if err != nil {
-			return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
-		}
-		l.pre = append(l.pre, sCall{callNamed(slicesPkg+".Bulk_Memset_U8", "Dst", b.e, "Byte_Value", vs[0].e)})
-		return val{}, nil
-	}
 	return val{}, errNotYet("slice method %q", name)
 }
 
@@ -1475,6 +1459,9 @@ func (l *lowerer) swizzlerMethod(n *a.Expr, recv *a.Expr, name string, args []*a
 		return l.procResult("Wuffs.Runtime.Swizzle_Interleaved_Transparent_Black", typU64, "N",
 			"S", rv.e, "Dst", dst.e, "Dst_Palette", dstPalette.e, "Num_Pixels", vs[2].e), nil
 
+	case "swizzle_ycck":
+		return l.swizzleYCCK(n, args, view)
+
 	case "limited_swizzle_u32_interleaved_from_reader":
 		vs, err := l.argValues(n, args, 4)
 		if err != nil {
@@ -1507,4 +1494,87 @@ func (io *ioArg) markWritten() {
 	if io.arg != nil {
 		io.arg.v.writes++
 	}
+}
+
+// swizzleYCCK lowers swizzler.swizzle_ycck!(dst: pb, dst_palette: p,
+// x_min_incl: etc, ..., scratch_buffer_2k: s): a call of the shell's
+// Swizzle_YCCK, which checks the aliasing of its arrays (the pixels and the
+// scratch buffer are written, everything else is read) and then calls the
+// proved Wuffs.Base.Pixel_Swizzler_YCCK.Swizzle_YCCK. The swizzler itself
+// is not an operand: C only checks that its pointer is not NULL.
+//
+// The Wuffs arguments, in order: dst, dst_palette, x_min_incl, x_max_excl,
+// y_min_incl, y_max_excl, src0 .. src3, width0 .. width3, height0 ..
+// height3, stride0 .. stride3, h0 .. h3, v0 .. v3, ycc_model,
+// ycc_upsampling, scratch_buffer_2k.
+func (l *lowerer) swizzleYCCK(n *a.Expr, args []*a.Node, view func(val, bool) (val, error)) (val, error) {
+	vs, err := l.argValues(n, args, 33)
+	if err != nil {
+		return val{}, err
+	}
+	for i, o := range args {
+		// The Wuffs compiler has checked the names; check the order that
+		// the indexes below rely on.
+		want := []string{"dst", "dst_palette", "x_min_incl", "x_max_excl", "y_min_incl", "y_max_excl",
+			"src0", "src1", "src2", "src3", "width0", "width1", "width2", "width3",
+			"height0", "height1", "height2", "height3", "stride0", "stride1", "stride2", "stride3",
+			"h0", "h1", "h2", "h3", "v0", "v1", "v2", "v3", "ycc_model", "ycc_upsampling",
+			"scratch_buffer_2k"}[i]
+		if got := o.AsArg().Name().Str(l.g.tm); got != want {
+			return val{}, fmt.Errorf("%q: argument %d is %q, not %q", n.Str(l.g.tm), i, got, want)
+		}
+	}
+	pb := vs[0]
+	if pb.parg == nil || pb.typ.kind != kPixBuf {
+		return val{}, errNotYet("%q: a pixel buffer other than a pixel buffer argument", n.Str(l.g.tm))
+	}
+	pb.parg.pixels.writes++
+	named := []interface{}{
+		"PB", expr(eVar{pb.parg.v}),
+		"Pixels", expr(eOut{eVar{pb.parg.pixels}}),
+		"Palette", expr(eVar{pb.parg.palette}),
+	}
+	dstPalette, err := view(vs[1], false)
+	if err != nil {
+		return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
+	}
+	named = append(named, "Dst_Palette", dstPalette.e)
+	for i, name := range []string{"X_Min_Incl", "X_Max_Excl", "Y_Min_Incl", "Y_Max_Excl"} {
+		if err := l.numArg(n, vs[2+i], 32); err != nil {
+			return val{}, err
+		}
+		named = append(named, name, vs[2+i].e)
+	}
+	for i := 0; i < 4; i++ {
+		src, err := view(vs[6+i], false)
+		if err != nil {
+			return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
+		}
+		named = append(named, fmt.Sprintf("Src%d", i), src.e)
+	}
+	for j, prefix := range []string{"Width", "Height", "Stride", "H", "V"} {
+		bits := 32
+		if j >= 3 {
+			bits = 8
+		}
+		for i := 0; i < 4; i++ {
+			v := vs[10+4*j+i]
+			if err := l.numArg(n, v, bits); err != nil {
+				return val{}, err
+			}
+			named = append(named, fmt.Sprintf("%s%d", prefix, i), v.e)
+		}
+	}
+	for i, name := range []string{"YCC_Model", "YCC_Upsampling"} {
+		if err := l.numArg(n, vs[30+i], 8); err != nil {
+			return val{}, err
+		}
+		named = append(named, name, vs[30+i].e)
+	}
+	scratch, err := view(vs[32], true)
+	if err != nil {
+		return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
+	}
+	named = append(named, "Scratch_Buffer_2K", scratch.e)
+	return l.procResult("Wuffs.Runtime.Swizzle_YCCK", typStatus, "Result", named...), nil
 }

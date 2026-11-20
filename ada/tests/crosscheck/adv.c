@@ -19,7 +19,7 @@
 
 #define LEN 48
 #define OUT_CAP 4096
-#define NUM_FUNCS 28
+#define NUM_FUNCS 30
 #define NUM_SEEDS 64
 #define MAX_CALLS 3000
 
@@ -48,6 +48,7 @@ static const fn g_fns[NUM_FUNCS] = {
     wuffs_advtest__thing__x7, wuffs_advtest__thing__x8,
     wuffs_advtest__thing__x9, wuffs_advtest__thing__x10,
     wuffs_advtest__thing__x11, wuffs_advtest__thing__y1,
+    wuffs_advtest__thing__z1, wuffs_advtest__thing__z2,
 };
 
 // The numbering of statuses that test_adv.adb uses too.

@@ -13,7 +13,8 @@
 # takes two to five minutes).
 #
 # Each mutant is built with its profile ("checked" for most) and tested with
-# the generator's reject tests, test_runtime, test_m1, test_hostile,
+# the generator's reject tests, test_runtime, test_m1, test_adv (compared
+# with upstream's C), test_hostile,
 # test_entry, test_hashers2, test_decode (compared with upstream's C),
 # test_image over the chaos manifest, and test_image over the image corpus,
 # compared with upstream's C. MUTATION_PROFILE=release (or checked) overrides
@@ -49,6 +50,7 @@ else
 fi
 ada/tests/crosscheck/run_image.sh < "$scratch/manifest" > "$scratch/c.trace"
 ada/tests/crosscheck/run.sh > "$scratch/m1.c.trace"
+ada/tests/crosscheck/run_adv.sh > "$scratch/adv.c.trace"
 mkdir "$scratch/dcorpus"
 go run ./ada/tests/corpus -data wuffs/test/data -out "$scratch/dcorpus" 2> /dev/null > "$scratch/decode.manifest"
 ada/tests/crosscheck/run_decode.sh < "$scratch/decode.manifest" > "$scratch/decode.c.trace"
@@ -72,11 +74,14 @@ check() {
     profile="${MUTATION_PROFILE:-$2}"
     log="$scratch/$name.log"
     if ! (cd ada && alr exec -- gprbuild -P wuffs_gen.gpr -XWUFFS_PROFILE="$profile" test_runtime.adb \
-        test_m1.adb test_hostile.adb test_entry.adb test_image.adb test_hashers2.adb test_decode.adb) >> "$log" 2>&1; then
+        test_m1.adb test_adv.adb test_hostile.adb test_entry.adb test_image.adb test_hashers2.adb \
+        test_decode.adb) >> "$log" 2>&1; then
         echo "$name: killed by the Ada build (an error or a warning)"; return
     fi
     killers=""
-    if ! go test ./internal/adagen -run 'TestRejects|TestCheckCalls|TestEntryChecks' >> "$log" 2>&1; then
+    if ! go test ./internal/adagen \
+        -run 'TestRejects|TestCheckCalls|TestEntryChecks|TestBulk|TestRowPointer|TestSwizzleYCCK|TestStatusField|TestChoosyRefined' \
+        >> "$log" 2>&1; then
         killers="$killers go-test"
     fi
     if ! (ulimit -s 256 && timeout 600 ada/bin/test_runtime) >> "$log" 2>&1; then
@@ -85,6 +90,10 @@ check() {
     if ! (ulimit -s 256 && timeout 600 ada/bin/test_m1) > "$scratch/m1.out" 2>> "$log" ||
         ! grep '^= ' "$scratch/m1.out" | cmp -s - "$scratch/m1.c.trace"; then
         killers="$killers test_m1"
+    fi
+    if ! (ulimit -s 256 && timeout 600 ada/bin/test_adv) > "$scratch/adv.out" 2>> "$log" ||
+        ! grep '^= ' "$scratch/adv.out" | cmp -s - "$scratch/adv.c.trace"; then
+        killers="$killers test_adv"
     fi
     if ! (ulimit -s 256 && timeout 600 ada/bin/test_hostile) >> "$log" 2>&1; then
         killers="$killers test_hostile"

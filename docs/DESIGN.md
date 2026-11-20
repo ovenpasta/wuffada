@@ -167,8 +167,8 @@ Not in scope yet. `choose` statements resolve to the scalar default.
    thumbhash, handsum; hashers and decompressors sha256, xxhash32/64, crc64,
    bzip2, lzma, lzip, xz; YCCK swizzle proved, about 0.9-1.1x of upstream's
    scalar C.
-4. JPEG, then the remaining decoders (webp, ...) and formats. SIMD after
-   JPEG works on the scalar paths.
+4. Done: JPEG (baseline and progressive, scalar paths).
+5. Next: SIMD; vp8/webp; json/cbor (token I/O); the known follow-ups below.
 
 ## Known follow-ups
 
@@ -186,10 +186,18 @@ From the review of generator milestone 4a; none affects generated `std` code.
   1-byte destination and lzma's real minimum is 274 bytes.
 * The new decompressors are not in the AddressSanitizer stage or the
   hostile-caller tests (no short or zero work buffer).
-* Still rejected at generation time, needed for jpeg: struct fields of type
-  status, bulk load/save on u16 arrays, tables from pixel-buffer planes,
-  `swizzle_ycck`. Also open: writer `io_limit`, private and non-classy
-  structs, local arrays over 1 KiB, non-u8 slices, token I/O.
+* Still rejected at generation time: writer `io_limit`, private and
+  non-classy structs, local arrays over 1 KiB, slice types other than u8,
+  tables from non-destination memory, token I/O. vp8/webp need
+  `make_pixel_blend` / `demake_pixel_blend` and nullable pixel buffers;
+  json/cbor need token I/O.
+* JPEG: the reference is upstream's *scalar* C build. Upstream's AVX2 IDCT
+  saturates in 16-bit lanes where its scalar IDCT wraps, so the two upstream
+  builds give different pixels for out-of-range coefficients in corrupt
+  files; on valid files they and the Ada agree byte for byte.
+* JPEG: the comparison with Go's `image/jpeg` is a gross-error check only.
+  On the default (triangle-filter) upsampling path its tolerance does not
+  catch subtle errors; that path rests on the byte-exact C comparison.
 
 ## Open decisions (owner: project lead)
 
