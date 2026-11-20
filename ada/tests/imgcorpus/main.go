@@ -795,6 +795,7 @@ func main() {
 		".bmp": "bmp", ".gif": "gif", ".png": "png", ".pbm": "netpbm", ".pgm": "netpbm", ".ppm": "netpbm",
 		".pnm": "netpbm", ".pam": "netpbm",
 		".wbmp": "wbmp", ".nie": "nie", ".tga": "targa",
+		".qoi": "qoi", ".pkm": "etc2", ".th": "thumbhash", ".handsum": "handsum",
 	}
 	paths := []string(nil)
 	filepath.WalkDir(*dataDir, func(path string, d fs.DirEntry, err error) error {

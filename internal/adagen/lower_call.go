@@ -69,6 +69,26 @@ func (l *lowerer) call(n *a.Expr) (val, error) {
 	case recvTyp.Decorator() == 0 && recvTyp.QID() == t.QID{t.IDBase, t.IDUtility}:
 		return l.utilityMethod(n, name, args)
 
+	case recvTyp.Decorator() == 0 && recvTyp.QID() == t.QID{t.IDBase, t.IDBitvec256}:
+		if name != "get_u64" {
+			break
+		}
+		rv, err := l.expr(recv)
+		if err != nil {
+			return val{}, err
+		}
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], 32); err != nil {
+			return val{}, err
+		}
+		if rv.typ != typBitvec256 {
+			break
+		}
+		return val{e: callNamed(intsPkg+".Get_U64", "B", rv.e, "I", vs[0].e), typ: typU64}, nil
+
 	case recvTyp.Decorator() == 0 && recvTyp.QID() == t.QID{t.IDBase, t.IDPixelFormat}:
 		return l.pixelFormatMethod(n, recv, name, args)
 
@@ -198,6 +218,16 @@ func (l *lowerer) ioMethod(n *a.Expr, io *ioArg, name string, args []*a.Node) (v
 			break
 		}
 		return val{e: call(ioPkg+".Can_Undo_Byte", c), typ: typBool}, nil
+	case "peek_undo_byte":
+		if len(args) != 0 {
+			break
+		}
+		// The Wuffs compiler has proved can_undo_byte().
+		cursor := "R"
+		if io.writer {
+			cursor = "W"
+		}
+		return val{e: callNamed(ioPkg+".Peek_Undo_Byte", "Data", data, cursor, c), typ: typU8}, nil
 	case "undo_byte":
 		if len(args) != 0 {
 			break
@@ -509,7 +539,10 @@ func (l *lowerer) writerMethod(n *a.Expr, io *ioArg, name string, args []*a.Node
 	case "limited_copy_u32_from_history",
 		"limited_copy_u32_from_history_fast",
 		"limited_copy_u32_from_history_8_byte_chunks_fast",
-		"limited_copy_u32_from_history_8_byte_chunks_distance_1_fast":
+		"limited_copy_u32_from_history_8_byte_chunks_distance_1_fast",
+		"limited_copy_u32_from_history_fast_return_cusp",
+		"limited_copy_u32_from_history_8_byte_chunks_fast_return_cusp",
+		"limited_copy_u32_from_history_8_byte_chunks_distance_1_fast_return_cusp":
 		vs, err := l.argValues(n, args, 2)
 		if err != nil {
 			return val{}, err
@@ -520,7 +553,13 @@ func (l *lowerer) writerMethod(n *a.Expr, io *ioArg, name string, args []*a.Node
 			}
 		}
 		// The LZ77 copies stay within the writer's own array.
-		return l.procResult(ioPkg+"."+mangle(name), typU32, "N",
+		out := "N"
+		if strings.HasSuffix(name, "_return_cusp") {
+			// The same copy; the result is the last two bytes before the
+			// new write position.
+			out = "Cusp"
+		}
+		return l.procResult(ioPkg+"."+mangle(name), typU32, out,
 			"Data", data, "W", c, "Up_To", vs[0].e, "Distance", vs[1].e), nil
 	}
 
@@ -746,6 +785,25 @@ func (l *lowerer) sliceMethod(n *a.Expr, recv *a.Expr, name string, args []*a.No
 		l.pre = append(l.pre, sCall{callNamed(fn, "Data", b.e, "Pos", bytesFirst(b), "V", vs[0].e)})
 		return val{}, nil
 	}
+	if name == "bulk_memset" {
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], 8); err != nil {
+			return val{}, err
+		}
+		rv, err := l.expr(recv)
+		if err != nil {
+			return val{}, err
+		}
+		b, err := l.toBytes(rv, true)
+		if err != nil {
+			return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
+		}
+		l.pre = append(l.pre, sCall{callNamed(slicesPkg+".Bulk_Memset_U8", "Dst", b.e, "Byte_Value", vs[0].e)})
+		return val{}, nil
+	}
 	return val{}, errNotYet("slice method %q", name)
 }
 
@@ -805,6 +863,72 @@ func (l *lowerer) utilityMethod(n *a.Expr, name string, args []*a.Node) (val, er
 				"Min_Incl_X", vs[0].e, "Min_Incl_Y", vs[1].e, "Max_Excl_X", vs[2].e, "Max_Excl_Y", vs[3].e),
 			typ: typRectIEU32,
 		}, nil
+
+	case "sign_extend_convert_u8_u32", "sign_extend_convert_u8_u64", "sign_extend_convert_u16_u32",
+		"sign_extend_convert_u16_u64", "sign_extend_convert_u32_u64":
+		m := regexp.MustCompile(`^sign_extend_convert_u(\d+)_u(\d+)$`).FindStringSubmatch(name)
+		from, _ := strconv.Atoi(m[1])
+		to, _ := strconv.Atoi(m[2])
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], from); err != nil {
+			return val{}, err
+		}
+		l.g.useType[to] = true
+		return val{e: call(intsPkg+".Sign_Extend_Convert_U"+m[1]+"_U"+m[2], vs[0].e), typ: numType(to)}, nil
+
+	case "sign_extend_rshift_u16", "sign_extend_rshift_u32", "sign_extend_rshift_u64":
+		bits, _ := strconv.Atoi(name[len("sign_extend_rshift_u"):])
+		shiftBits := 32
+		if bits == 16 {
+			shiftBits = 16
+		}
+		vs, err := l.argValues(n, args, 2)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], bits); err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[1], shiftBits); err != nil {
+			return val{}, err
+		}
+		// (The Wuffs compiler has proved that N is below the width.)
+		return val{
+			e:   callNamed(fmt.Sprintf("%s.Sign_Extend_Rshift_U%d", intsPkg, bits), "A", vs[0].e, "N", vs[1].e),
+			typ: numType(bits),
+		}, nil
+
+	case "make_bitvec256":
+		vs, err := l.argValues(n, args, 4)
+		if err != nil {
+			return val{}, err
+		}
+		for _, v := range vs {
+			if err := l.numArg(n, v, 64); err != nil {
+				return val{}, err
+			}
+		}
+		return val{
+			e: callNamed(intsPkg+".Make_Bitvec256",
+				"E00", vs[0].e, "E01", vs[1].e, "E02", vs[2].e, "E03", vs[3].e),
+			typ: typBitvec256,
+		}, nil
+
+	case "i64_divide":
+		vs, err := l.argValues(n, args, 2)
+		if err != nil {
+			return val{}, err
+		}
+		for _, v := range vs {
+			if err := l.numArg(n, v, 64); err != nil {
+				return val{}, err
+			}
+		}
+		// (The Wuffs compiler has proved that B is not zero.)
+		return val{e: callNamed(intsPkg+".I64_Divide", "A", vs[0].e, "B", vs[1].e), typ: typU64}, nil
 
 	case "make_range_ii_u64":
 		vs, err := l.argValues(n, args, 2)
@@ -935,11 +1059,28 @@ func (l *lowerer) userCall(n *a.Expr, recv *a.Expr, method t.ID, args []*a.Node)
 				return val{}, errNotYet("argument %q: an I/O value other than an I/O argument", arg.Str(l.g.tm))
 			}
 			names = append(names, want.v.name, want.meta.name)
-			values = append(values, v.io.data, eVar{v.io.meta})
 			v.io.meta.writes++
 			if v.io.writer {
 				v.io.markWritten()
 			}
+			if saved := v.io.forgotten; saved != nil {
+				// Inside io_forget_history: the callee gets the array from
+				// the forgotten base on, and the meta is saved and reloaded
+				// relative to that base (wuffs-base-io.ads, "Protocols").
+				if v.io.cursor == nil {
+					return val{}, fmt.Errorf("internal error: io_forget_history without a cursor")
+				}
+				cursor, meta := expr(eVar{v.io.cursor}), expr(eVar{v.io.meta})
+				first := bin("+", eAttr{v.io.data, "First"}, call(ioPkg+".Forgotten_Base", eVar{saved}))
+				last := bin("-", bin("+", eAttr{v.io.data, "First"}, eSel{cursor, "Io2"}), raw("1"))
+				values = append(values, eSlice{v.io.data, first, last}, meta)
+				l.pre = append(l.pre, sCall{callNamed(ioPkg+".Save_Forgotten",
+					"M", expr(eOut{meta}), "W", cursor, "Saved", expr(eVar{saved}))})
+				l.post = append(l.post, sCall{callNamed(ioPkg+".Reload_Forgotten",
+					"W", expr(eOut{cursor}), "M", meta, "Saved", expr(eVar{saved}))})
+				continue
+			}
+			values = append(values, v.io.data, eVar{v.io.meta})
 			// The callee builds its own cursor from the meta, and leaves
 			// its position there. C: writeSaveExprDerivedVars and
 			// writeLoadExprDerivedVars.

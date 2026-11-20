@@ -47,6 +47,10 @@ package body Wuffs.Std.M1test is
    --  Wuffs: const G_I1_POS
    W_G_I1_POS : constant Wuffs.U32 := 5;
 
+   --  Wuffs: const FLAGS
+   FLAGS : constant G_Array_6_Of_Boolean :=
+     [True, False, False, True, True, False];
+
    function Message_Length (S : Wuffs.Status) return Natural is
    begin
       if S = Error_Widget_Error then
@@ -624,10 +628,11 @@ package body Wuffs.Std.M1test is
       V_T := V_T * 3 + Wuffs.U64 (V_R.Length);
       V_S := (Base => A_X'Unrestricted_Access, First => A_X'First, Length => A_X'Length);
       if Wuffs.U64 (V_S.Length) >= 4 then
-         Wuffs.Base.Endian.Poke_U32LE
-           (Data => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
-            Pos => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S))'First,
-            V => 16#1234_5678#);
+         Wuffs.Base.Endian.Poke_U32LE (Data => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
+                                       Pos => V_S.Base
+                                                (V_S.First
+                                                 .. Wuffs.Runtime.Last (V_S))'First,
+                                       V => 16#1234_5678#);
       end if;
       if Wuffs.U64 (V_S.Length) >= 4 then
          V_T :=
@@ -726,5 +731,19 @@ package body Wuffs.Std.M1test is
       V_R := Mix (Self, A_V);
       return V_R;
    end Call_Mix;
+
+   function Fill (Self : in out Widget; A_V : Wuffs.U8; A_N : Wuffs.U32) return Wuffs.U64 is
+      V_R : Wuffs.U64 := 0;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return 0;
+      end if;
+      Wuffs.Base.Slices.Bulk_Memset_U8 (Dst => Self.F_Buf (3 .. 20), Byte_Value => A_V);
+      V_R := Sum_Buf (Self);
+      if FLAGS (Wuffs.Index (A_N and 3)) then
+         V_R := V_R + 1000000;
+      end if;
+      return V_R;
+   end Fill;
 
 end Wuffs.Std.M1test;

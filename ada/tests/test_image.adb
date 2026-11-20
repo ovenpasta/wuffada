@@ -53,6 +53,10 @@ with Wuffs.Std.Nie;
 with Wuffs.Std.Png;
 with Wuffs.Std.Targa;
 with Wuffs.Std.Wbmp;
+with Wuffs.Std.Qoi;
+with Wuffs.Std.Etc2;
+with Wuffs.Std.Thumbhash;
+with Wuffs.Std.Handsum;
 
 procedure Test_Image is
 
@@ -1099,6 +1103,18 @@ procedure Test_Image is
       elsif Line (F1 .. L1) = "targa" then
          Wuffs.Std.Targa.Initialize (IMS.Targa_Decoder);
          Run_Decoder (IMS.Targa_Decoder, Line (F6 .. L6));
+      elsif Line (F1 .. L1) = "qoi" then
+         Wuffs.Std.Qoi.Initialize (IMS.Qoi_Decoder);
+         Run_Decoder (IMS.Qoi_Decoder, Line (F6 .. L6));
+      elsif Line (F1 .. L1) = "etc2" then
+         Wuffs.Std.Etc2.Initialize (IMS.Etc2_Decoder);
+         Run_Decoder (IMS.Etc2_Decoder, Line (F6 .. L6));
+      elsif Line (F1 .. L1) = "thumbhash" then
+         Wuffs.Std.Thumbhash.Initialize (IMS.Thumbhash_Decoder);
+         Run_Decoder (IMS.Thumbhash_Decoder, Line (F6 .. L6));
+      elsif Line (F1 .. L1) = "handsum" then
+         Wuffs.Std.Handsum.Initialize (IMS.Handsum_Decoder);
+         Run_Decoder (IMS.Handsum_Decoder, Line (F6 .. L6));
       else
          Test_Support.Check (False, "unknown format ", -1, Line (F1 .. L1));
       end if;

@@ -94,6 +94,7 @@ var (
 	typRectIEU32  = &adaType{kind: kOpaque, name: rangesPkg + ".Rect_IE_U32",
 		zero: rangesPkg + ".Empty_Rect_IE_U32"}
 	typReaderLimit = &adaType{kind: kOpaque, name: ioPkg + ".Reader_Limit_State"}
+	typForgetState = &adaType{kind: kOpaque, name: ioPkg + ".Forget_State"}
 	typTable       = &adaType{kind: kTable, name: buffersPkg + ".Table"}
 	typSwizzler    = &adaType{kind: kSwizzler, name: swizzlerPkg + ".Swizzler"}
 	typPixBuf      = &adaType{kind: kPixBuf, name: buffersPkg + ".Pixel_Buffer"}
@@ -104,6 +105,8 @@ var (
 	typNptrMoreInfo    = &adaType{kind: kNptr, name: "Wuffs.Runtime.More_Information"}
 	typNptrFrameOpts   = &adaType{kind: kNptr, name: "Wuffs.Runtime.Decode_Frame_Options"}
 
+	typBitvec256 = &adaType{kind: kOpaque, name: intsPkg + ".Bitvec256",
+		zero: "[others => 0]"}
 	typOptionalU63 = &adaType{kind: kOpaque, name: intsPkg + ".Optional_U63",
 		zero: intsPkg + ".Make_Optional_U63 (Has_Value => False, Value => 0)"}
 	typRangeIIU64 = &adaType{kind: kOpaque, name: rangesPkg + ".Range_II_U64",
@@ -210,6 +213,8 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 				return typUtility, nil
 			case t.IDOptionalU63:
 				return typOptionalU63, nil
+			case t.IDBitvec256:
+				return typBitvec256, nil
 			case t.IDRangeIIU64:
 				return typRangeIIU64, nil
 			case t.IDIOReader:

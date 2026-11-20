@@ -478,6 +478,46 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    is abstract;
 
    ---------------------------------------------------------------------------
+   --  Wuffs `base.hasher_u64`.
+   ---------------------------------------------------------------------------
+
+   type Hasher_U64 is limited interface;
+
+   function Checksum_U64 (Self : Hasher_U64) return Wuffs.U64 is abstract;
+
+   function Get_Quirk (Self : Hasher_U64; A_Key : Wuffs.U32) return Wuffs.U64 is abstract;
+
+   function Set_Quirk
+     (Self : in out Hasher_U64; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
+   is abstract;
+
+   procedure Update (Self : in out Hasher_U64; A_X : Wuffs.Bytes) is abstract;
+
+   function Update_U64 (Self : in out Hasher_U64; A_X : Wuffs.Bytes) return Wuffs.U64
+   is abstract;
+
+   ---------------------------------------------------------------------------
+   --  Wuffs `base.hasher_bitvec256`.
+   ---------------------------------------------------------------------------
+
+   type Hasher_Bitvec256 is limited interface;
+
+   function Checksum_Bitvec256 (Self : Hasher_Bitvec256) return Wuffs.Base.Ints.Bitvec256
+   is abstract;
+
+   function Get_Quirk (Self : Hasher_Bitvec256; A_Key : Wuffs.U32) return Wuffs.U64 is abstract;
+
+   function Set_Quirk
+     (Self : in out Hasher_Bitvec256; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
+   is abstract;
+
+   procedure Update (Self : in out Hasher_Bitvec256; A_X : Wuffs.Bytes) is abstract;
+
+   function Update_Bitvec256
+     (Self : in out Hasher_Bitvec256; A_X : Wuffs.Bytes) return Wuffs.Base.Ints.Bitvec256
+   is abstract;
+
+   ---------------------------------------------------------------------------
    --  Wuffs `base.io_transformer`.
    ---------------------------------------------------------------------------
 

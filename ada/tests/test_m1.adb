@@ -251,5 +251,12 @@ begin
    M.Initialize (W);
    V ("mix after initialize", 0, Wuffs.U64 (M.Call_Mix (W, 7)), 8);
 
+   --  bulk_memset, and a constant array of Booleans.  (The expected values
+   --  are upstream C's: see ada/tests/crosscheck/m1test.c.)
+   for I in 0 .. 5 loop
+      Test_Support.Trace
+        ("fill", I, M.Fill (W, A_V => Wuffs.U8 (16#5A# + 3 * I), A_N => Wuffs.U32 (I)));
+   end loop;
+
    Test_Support.Finish ("test_m1");
 end Test_M1;

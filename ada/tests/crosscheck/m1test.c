@@ -198,5 +198,10 @@ int main(void) {
   wuffs_m1test__widget__choose_mix(&w, 2);
   initialize();
   v("mix after initialize", 0, wuffs_m1test__widget__call_mix(&w, 7));
+
+  for (i = 0; i < 6; i++) {
+    v("fill", i,
+      wuffs_m1test__widget__fill(&w, (uint8_t)(0x5A + 3 * i), (uint32_t)i));
+  }
   return 0;
 }

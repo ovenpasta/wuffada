@@ -34,6 +34,10 @@
 #define WUFFS_CONFIG__MODULE__PNG
 #define WUFFS_CONFIG__MODULE__TARGA
 #define WUFFS_CONFIG__MODULE__WBMP
+#define WUFFS_CONFIG__MODULE__QOI
+#define WUFFS_CONFIG__MODULE__ETC2
+#define WUFFS_CONFIG__MODULE__THUMBHASH
+#define WUFFS_CONFIG__MODULE__HANDSUM
 #define WUFFS_CONFIG__MODULE__ZLIB
 #include "wuffs-unsupported-snapshot.c"
 
@@ -58,6 +62,10 @@ static wuffs_png__decoder g_png;
 static wuffs_wbmp__decoder g_wbmp;
 static wuffs_nie__decoder g_nie;
 static wuffs_targa__decoder g_targa;
+static wuffs_qoi__decoder g_qoi;
+static wuffs_etc2__decoder g_etc2;
+static wuffs_thumbhash__decoder g_thumbhash;
+static wuffs_handsum__decoder g_handsum;
 
 // ---- The status table.
 
@@ -533,6 +541,22 @@ static void initialize(const char* format) {
     st = wuffs_targa__decoder__initialize(&g_targa, sizeof g_targa, WUFFS_VERSION,
                                        0);
     g_dec = wuffs_targa__decoder__upcast_as__wuffs_base__image_decoder(&g_targa);
+  } else if (!strcmp(format, "qoi")) {
+    st = wuffs_qoi__decoder__initialize(&g_qoi, sizeof g_qoi, WUFFS_VERSION,
+                                       0);
+    g_dec = wuffs_qoi__decoder__upcast_as__wuffs_base__image_decoder(&g_qoi);
+  } else if (!strcmp(format, "etc2")) {
+    st = wuffs_etc2__decoder__initialize(&g_etc2, sizeof g_etc2, WUFFS_VERSION,
+                                       0);
+    g_dec = wuffs_etc2__decoder__upcast_as__wuffs_base__image_decoder(&g_etc2);
+  } else if (!strcmp(format, "thumbhash")) {
+    st = wuffs_thumbhash__decoder__initialize(&g_thumbhash, sizeof g_thumbhash, WUFFS_VERSION,
+                                       0);
+    g_dec = wuffs_thumbhash__decoder__upcast_as__wuffs_base__image_decoder(&g_thumbhash);
+  } else if (!strcmp(format, "handsum")) {
+    st = wuffs_handsum__decoder__initialize(&g_handsum, sizeof g_handsum, WUFFS_VERSION,
+                                       0);
+    g_dec = wuffs_handsum__decoder__upcast_as__wuffs_base__image_decoder(&g_handsum);
   } else {
     fprintf(stderr, "image: unknown format %s\n", format);
     exit(1);

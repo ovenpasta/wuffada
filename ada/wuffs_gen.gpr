@@ -38,7 +38,7 @@ project Wuffs_Gen is
    for Exec_Dir use Exec;
    for Create_Missing_Dirs use "True";
    for Main use
-     ("test_hashers.adb", "test_m1.adb", "test_runtime.adb", "test_decode.adb", "test_adv.adb", "test_image.adb", "test_hostile.adb", "test_entry.adb");
+     ("test_hashers.adb", "test_m1.adb", "test_runtime.adb", "test_decode.adb", "test_adv.adb", "test_image.adb", "test_hostile.adb", "test_entry.adb", "test_hashers2.adb", "bench_main.adb");
    package Compiler is
       for Default_Switches ("Ada") use Wuffs_Common.Switches;
    end Compiler;

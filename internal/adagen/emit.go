@@ -156,6 +156,11 @@ func wrap(e expr, col int, tail int) []string {
 	case eOut:
 		return wrap(e.x, col, tail)
 
+	case eAttr:
+		sub := wrap(e.x, col, tail+len(e.attr)+1)
+		sub[len(sub)-1] += "'" + e.attr
+		return sub
+
 	case eBin:
 		lines := wrapOperand(e.args[0], e, col, 0)
 		for i, o := range e.args[1:] {
@@ -183,7 +188,8 @@ func wrap(e expr, col int, tail int) []string {
 			lines := []string(nil)
 			argCol := col + len(fn) + 2
 			if ownLines {
-				lines = append(lines, fn)
+				// (The name may itself be a long chain of indexings.)
+				lines = append(lines, wrap(e.fn, col, 0)...)
 				argCol = col + 3
 				lines = append(lines, spaces(col+2)+"(")
 			} else {

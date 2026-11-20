@@ -3275,11 +3275,12 @@ package body Wuffs.Std.Gif is
                pragma Assert (V_O <= V_O + 8);
                pragma Warnings ("c");
                G_T1 :=
-                 Wuffs.Runtime.Subslice_J
-                   ((Base => Self.F_Lzw_Suffixes (Wuffs.Index (V_C))'Unrestricted_Access,
-                     First => Self.F_Lzw_Suffixes (Wuffs.Index (V_C))'First,
-                     Length => Self.F_Lzw_Suffixes (Wuffs.Index (V_C))'Length),
-                    8);
+                 Wuffs.Runtime.Subslice_J ((Base => Self.F_Lzw_Suffixes
+                                                      (Wuffs.Index (V_C))'Unrestricted_Access,
+                                            First => Self.F_Lzw_Suffixes (Wuffs.Index (V_C))'First,
+                                            Length => Self.F_Lzw_Suffixes
+                                                        (Wuffs.Index (V_C))'Length),
+                                           8);
                Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_Lzw_Output
                                                        (Wuffs.Index (V_O)
                                                         .. Wuffs.Index (V_O + 8) - 1),

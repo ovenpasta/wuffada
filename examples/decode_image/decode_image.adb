@@ -3,7 +3,8 @@
 
 --  decode_image INPUT OUTPUT
 --
---  Decodes the image file INPUT (PNG, GIF, BMP or Netpbm: the format is
+--  Decodes the image file INPUT (PNG, GIF, BMP, Netpbm, NIE, QOI, ETC2/PKM or
+--  WBMP: the format is
 --  recognised from the file's first bytes, not from its name) with the
 --  decoders that wuffs-ada generated from Wuffs' standard library, and
 --  writes it to OUTPUT: as a PPM file (P6) if the image is opaque, else as a
@@ -25,9 +26,13 @@ with Wuffs.Base.Ranges;
 with Wuffs.Runtime;
 with Wuffs.Std.Bmp;
 with Wuffs.Std.Deflate;
+with Wuffs.Std.Etc2;
 with Wuffs.Std.Gif;
 with Wuffs.Std.Netpbm;
+with Wuffs.Std.Nie;
 with Wuffs.Std.Png;
+with Wuffs.Std.Qoi;
+with Wuffs.Std.Wbmp;
 with Wuffs.Std.Zlib;
 
 procedure Decode_Image is
@@ -48,7 +53,7 @@ procedure Decode_Image is
    RGB            : constant := 16#A000_0888#;
    RGBA_Nonpremul : constant := 16#A100_8888#;
 
-   type Format is (Unknown, Netpbm, Bmp, Gif, Png);
+   type Format is (Unknown, Netpbm, Bmp, Gif, Png, Nie, Qoi, Etc2, Wbmp);
 
    subtype Decoder is Wuffs.Runtime.Image_Decoder'Class;
 
@@ -101,6 +106,18 @@ procedure Decode_Image is
       --  pass on.
       if Length = 0 then
          Wuffs.Std.Zlib.Get_Message (S, Text, Length);
+      end if;
+      if Length = 0 then
+         Wuffs.Std.Nie.Get_Message (S, Text, Length);
+      end if;
+      if Length = 0 then
+         Wuffs.Std.Qoi.Get_Message (S, Text, Length);
+      end if;
+      if Length = 0 then
+         Wuffs.Std.Etc2.Get_Message (S, Text, Length);
+      end if;
+      if Length = 0 then
+         Wuffs.Std.Wbmp.Get_Message (S, Text, Length);
       end if;
       if Length = 0 then
          Wuffs.Std.Deflate.Get_Message (S, Text, Length);
@@ -166,6 +183,22 @@ procedure Decode_Image is
         and then S (2) in Character'Pos ('1') .. Character'Pos ('7')
       then
          return Netpbm;
+      elsif Length >= 4 and then S (1) = 16#6E# and then S (2) = 16#C3# and then S (3) = 16#AF#
+        and then S (4) = Character'Pos ('E')
+      then
+         --  "nïE", in UTF-8.
+         return Nie;
+      elsif Length >= 4 and then S (1) = Character'Pos ('q') and then S (2) = Character'Pos ('o')
+        and then S (3) = Character'Pos ('i') and then S (4) = Character'Pos ('f')
+      then
+         return Qoi;
+      elsif Length >= 4 and then S (1) = Character'Pos ('P') and then S (2) = Character'Pos ('K')
+        and then S (3) = Character'Pos ('M') and then S (4) = Character'Pos (' ')
+      then
+         return Etc2;
+      elsif Length >= 2 and then S (1) = 0 and then S (2) = 0 then
+         --  A WBMP file has no signature: type 0 and a zero header byte.
+         return Wbmp;
       end if;
       return Unknown;
    end Sniff;
@@ -367,8 +400,20 @@ begin
       when Png =>
          Wuffs.Std.Png.Initialize (Buffers.Png_Decoder);
          Convert (Buffers.Png_Decoder, Length, Output_Name (1 .. Output_Last));
+      when Nie =>
+         Wuffs.Std.Nie.Initialize (Buffers.Nie_Decoder);
+         Convert (Buffers.Nie_Decoder, Length, Output_Name (1 .. Output_Last));
+      when Qoi =>
+         Wuffs.Std.Qoi.Initialize (Buffers.Qoi_Decoder);
+         Convert (Buffers.Qoi_Decoder, Length, Output_Name (1 .. Output_Last));
+      when Etc2 =>
+         Wuffs.Std.Etc2.Initialize (Buffers.Etc2_Decoder);
+         Convert (Buffers.Etc2_Decoder, Length, Output_Name (1 .. Output_Last));
+      when Wbmp =>
+         Wuffs.Std.Wbmp.Initialize (Buffers.Wbmp_Decoder);
+         Convert (Buffers.Wbmp_Decoder, Length, Output_Name (1 .. Output_Last));
       when Unknown =>
-         Fail ("the input is not a PNG, GIF, BMP or Netpbm file");
+         Fail ("the input is not a PNG, GIF, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP file");
    end case;
 exception
    when Failed =>

@@ -20,6 +20,18 @@ png 10
 wbmp 11
 nie 12
 targa 13
+qoi 14
+xxhash32 15
+xxhash64 16
+crc64 17
+bzip2 18
+lzma 19
+lzip 20
+thumbhash 21
+etc2 22
+handsum 23
+sha256 24
+xz 25
 
 # Test-only packages count down from 65535.
 m1test 65535

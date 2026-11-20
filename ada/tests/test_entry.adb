@@ -45,6 +45,7 @@ procedure Test_Entry is
 
    use type Wuffs.U8;
    use type Wuffs.U32;
+   use type Wuffs.U64;
    use type Wuffs.Index;
    use type Wuffs.Status;
    use type Wuffs.Status_Category;
@@ -138,6 +139,10 @@ procedure Test_Entry is
    procedure Check_Resume (Dec : in out Decoder; K : Decoder_Kind; Size : Long_Long_Integer);
 
    procedure Check_Null_Pointers (Dec : in out Decoder; K : Decoder_Kind);
+
+   --  Suspends tell_me_more (of the GIF decoder, in the middle of an ICC
+   --  profile) and resumes it with other arguments.
+   procedure Check_Tell_Me_More;
 
    procedure Initialize (K : Kind) is
    begin
@@ -878,6 +883,116 @@ procedure Test_Entry is
       Initialize (K);
    end Check_Null_Pointers;
 
+   procedure Check_Tell_Me_More is
+      --  A GIF header (1 by 1, no colour table) and the start of an
+      --  application extension, "ICCRGBG1012", with a 3 byte sub-block.
+      File : constant Wuffs.Bytes :=
+        [16#47#, 16#49#, 16#46#, 16#38#, 16#39#, 16#61#, 1, 0, 1, 0, 0, 0, 0,
+         16#21#, 16#FF#, 16#0B#,
+         16#49#, 16#43#, 16#43#, 16#52#, 16#47#, 16#42#, 16#47#, 16#31#, 16#30#, 16#31#, 16#32#,
+         3, 16#61#, 16#62#, 16#63#, 0, 16#3B#];
+      Header : constant Wuffs.Index := 27;  --  Up to and including "ICCRGBG1012".
+
+      Dec    : Wuffs.Std.Gif.Decoder renames IMS.Gif_Decoder;
+      Object : Wuffs.Bytes (0 .. IMS.Gif_Decoder'Size / 8 - 1)
+      with Import, Address => IMS.Gif_Decoder'Address;
+
+      IC     : PF.Image_Config;
+      MI     : Wuffs.Runtime.More_Information;
+      SM, DM : IO.Buffer_Meta;
+      St     : Wuffs.Status;
+
+      procedure Suspend;
+
+      --  Leaves tell_me_more suspended: it has asked for the profile's data.
+      procedure Suspend is
+      begin
+         Arena := [others => Fill];
+         Arena (S .. S + File'Length - 1) := File;
+         Initialize (Gif);
+         Dec.Set_Report_Metadata (A_Fourcc => 16#4943_4350#, A_Report => True);
+         SM := (Wi => Header, Ri => 0, Pos => 0, Closed => False);
+         St :=
+           Dec.Decode_Image_Config
+             (A_Dst      => IC,
+              A_Dst_Null => False,
+              A_Src      => Arena (S .. S + Header - 1),
+              A_Src_Meta => SM);
+         Check (St = Wuffs.Base.Note_Metadata_Reported, "the GIF's metadata was not reported");
+         DM := IO.Empty_Meta;
+         St :=
+           Dec.Tell_Me_More
+             (A_Dst        => Arena (D .. D + 255),
+              A_Dst_Meta   => DM,
+              A_Minfo      => MI,
+              A_Minfo_Null => False,
+              A_Src        => Arena (S .. S + Header - 1),
+              A_Src_Meta   => SM);
+         Check (St = Wuffs.Base.Suspension_Short_Read, "tell_me_more did not suspend");
+         Arena (S .. S + File'Length - 1) := [others => Fill];
+         Arena (Copy .. Copy + 1023) := Object (0 .. 1023);
+         SM := (Wi => File'Length, Ri => SM.Ri, Pos => 0, Closed => True);
+      end Suspend;
+
+      function Tell (Dst : in out Wuffs.Bytes; Src : Wuffs.Bytes) return Wuffs.Status
+      is (Dec.Tell_Me_More
+            (A_Dst        => Dst,
+             A_Dst_Meta   => DM,
+             A_Minfo      => MI,
+             A_Minfo_Null => False,
+             A_Src        => Src,
+             A_Src_Meta   => SM));
+
+      Src : Wuffs.Bytes renames Arena (S .. S + File'Length - 1);
+   begin
+      --  The control: resumed with the rest of the file, it goes on and
+      --  says where the profile's bytes are.
+      Suspend;
+      Arena (S .. S + File'Length - 1) := File;
+      St := Tell (Arena (D .. D + 255), Src);
+      Check
+        (St = Wuffs.Base.Suspension_Even_More_Information and then MI.Flavor = 3
+         and then MI.W = 16#4943_4350# and then MI.Y = 28 and then MI.Z = 31,
+         "tell_me_more, resumed");
+
+      Suspend;
+      Rejected (Gif, Tell (Object (Object'Last - 255 .. Object'Last), Src), Object,
+                "tell_me_more resumed: dst in the object");
+      Check
+        (Dec.Set_Quirk (A_Key => 1, A_Value => 1) = Disabled,
+         "tell_me_more resumed: dst in the object: not disabled");
+      Suspend;
+      Rejected (Gif, Tell (Arena (D .. D + 255), Object (12 .. 44)), Object,
+                "tell_me_more resumed: src in the object");
+      Suspend;
+      SM := Too_Long;
+      Rejected (Gif, Tell (Arena (D .. D + 255), Src), Object,
+                "tell_me_more resumed: a src meta that is too long");
+      Suspend;
+      DM := Too_Long;
+      Rejected (Gif, Tell (Arena (D .. D + 255), Src), Object,
+                "tell_me_more resumed: a dst meta that is too long");
+      if not Checks_Enabled then
+         Suspend;
+         Rejected
+           (Gif,
+            Dec.Tell_Me_More
+              (A_Dst        => Arena (D .. D + 255),
+               A_Dst_Meta   => DM,
+               A_Minfo      => MI,
+               A_Minfo_Null => Bad_Boolean,
+               A_Src        => Src,
+               A_Src_Meta   => SM),
+            Object, "tell_me_more resumed: an invalid Boolean");
+      end if;
+      --  Another destination and source, both valid: not an argument error.
+      Suspend;
+      Arena (S + 100 .. S + 100 + File'Length - 1) := File;
+      St := Tell (Arena (D + 300 .. D + 303), Arena (S + 100 .. S + 100 + File'Length - 1));
+      Check (St /= Bad_Argument, "tell_me_more resumed with other arrays");
+      Initialize (Gif);
+   end Check_Tell_Me_More;
+
    Cfg : PF.Pixel_Config;
    St  : Wuffs.Status;
 
@@ -949,6 +1064,8 @@ begin
    Check_Null_Pointers (IMS.Netpbm_Decoder, Netpbm);
    Check_Null_Pointers (IMS.Bmp_Decoder, Bmp);
    Check_Null_Pointers (IMS.Gif_Decoder, Gif);
+
+   Check_Tell_Me_More;
 
    Test_Support.Finish ("test_entry");
 end Test_Entry;

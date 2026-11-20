@@ -31,9 +31,13 @@ with Wuffs.Base.Ints;
 with Wuffs.Base.IO;
 with Wuffs.Base.Ranges;
 with Wuffs.Runtime;
+with Wuffs.Std.Bzip2;
 with Wuffs.Std.Deflate;
 with Wuffs.Std.Gzip;
+with Wuffs.Std.Lzip;
+with Wuffs.Std.Lzma;
 with Wuffs.Std.Lzw;
+with Wuffs.Std.Xz;
 with Wuffs.Std.Zlib;
 
 procedure Test_Decode is
@@ -49,7 +53,7 @@ procedure Test_Decode is
    package DS renames Decode_Support;
    package IO renames Wuffs.Base.IO;
 
-   type Format is (Lzw, Deflate, Zlib, Gzip);
+   type Format is (Lzw, Deflate, Zlib, Gzip, Bzip2, Lzma, Lzip, Xz);
 
    type Schedule is record
       Src_Chunk : Wuffs.Index;  --  0 means everything at once.
@@ -61,13 +65,21 @@ procedure Test_Decode is
    Full_Schedules : constant Schedule_List :=
      [(0, 0), (1, 0), (2, 0), (3, 0), (7, 0), (31, 0), (4095, 0), (4097, 0),
       (0, 1), (0, 2), (0, 3), (0, 7), (0, 300), (0, 4097),
-      (1, 1), (3, 5), (5, 3), (300, 266), (1000, 1)];
+      (1, 1), (3, 5), (5, 3), (300, 266), (1000, 1), (7, 2_000_000)];
 
    --  For inputs of more than Reduced_Above bytes.
    Reduced_Schedules : constant Schedule_List :=
-     [(0, 0), (4097, 0), (0, 4097), (1000, 300), (1, 0), (0, 1)];
+     [(0, 0), (4097, 0), (0, 4097), (1000, 300), (1, 0), (0, 1), (4097, 2_000_000)];
 
    Reduced_Above : constant := 60_000;
+   Keep_History  : constant := 1_000_000;
+
+   --  For bzip2, lzma, lzip and xz, which make no progress with a
+   --  destination of a few bytes (std/lzma wants room for a whole match).  For
+   --  a long input: the first and the last three.
+   Roomy_Schedules : constant Schedule_List :=
+     [(0, 0), (1, 0), (2, 0), (3, 0), (7, 0), (31, 2_000_000), (4095, 0), (4097, 0),
+      (0, 4097), (1, 4097), (300, 4099), (1000, 65_536), (1000, 2_000_000)];
 
    --  The I/O buffers that the decoders see do not start at index 0 of
    --  their arrays (and not at the same index either).
@@ -175,8 +187,28 @@ procedure Test_Decode is
             Wuffs.Std.Zlib.Initialize (DS.Zlib_Decoder);
          when Gzip =>
             Wuffs.Std.Gzip.Initialize (DS.Gzip_Decoder);
+         when Bzip2 =>
+            Wuffs.Std.Bzip2.Initialize (DS.Bzip2_Decoder);
+         when Lzma =>
+            Wuffs.Std.Lzma.Initialize (DS.Lzma_Decoder);
+         when Lzip =>
+            Wuffs.Std.Lzip.Initialize (DS.Lzip_Decoder);
+         when Xz =>
+            Wuffs.Std.Xz.Initialize (DS.Xz_Decoder);
       end case;
    end Initialize;
+
+   --  What the decoder says is the longest work buffer that it can use.
+   function Wanted_Workbuf (F : Format) return Wuffs.U64
+   is (case F is
+         when Lzw => DS.Lzw_Decoder.Workbuf_Len.Max_Incl,
+         when Deflate => DS.Deflate_Decoder.Workbuf_Len.Max_Incl,
+         when Zlib => DS.Zlib_Decoder.Workbuf_Len.Max_Incl,
+         when Gzip => DS.Gzip_Decoder.Workbuf_Len.Max_Incl,
+         when Bzip2 => DS.Bzip2_Decoder.Workbuf_Len.Max_Incl,
+         when Lzma => DS.Lzma_Decoder.Workbuf_Len.Max_Incl,
+         when Lzip => DS.Lzip_Decoder.Workbuf_Len.Max_Incl,
+         when Xz => DS.Xz_Decoder.Workbuf_Len.Max_Incl);
 
    --  One call of transform_io, through the io_transformer interface.
    function Call
@@ -186,13 +218,27 @@ procedure Test_Decode is
       Src      : Wuffs.Bytes;
       Src_Meta : in out IO.Buffer_Meta) return Wuffs.Status
    is
-      function Transform (T : in out Wuffs.Runtime.IO_Transformer'Class) return Wuffs.Status
-      is (T.Transform_Io
-            (A_Dst      => Dst,
-             A_Dst_Meta => Dst_Meta,
-             A_Src      => Src,
-             A_Src_Meta => Src_Meta,
-             A_Workbuf  => DS.Workbuf));
+      function Transform (T : in out Wuffs.Runtime.IO_Transformer'Class) return Wuffs.Status;
+
+      function Transform (T : in out Wuffs.Runtime.IO_Transformer'Class) return Wuffs.Status is
+         Wanted : constant Wuffs.U64 := T.Workbuf_Len.Max_Incl;
+         --  (std/xz says how much it needs only after it has read a block
+         --  header, in the middle of a call, and then fails if it does not
+         --  have it: it gets everything.)
+         N      : constant Wuffs.Index :=
+           (if F = Xz then DS.Work_Capacity
+            elsif Wanted < 1 then 1
+            elsif Wanted > DS.Work_Capacity then DS.Work_Capacity
+            else Wuffs.Index (Wanted));
+      begin
+         return
+           T.Transform_Io
+             (A_Dst      => Dst,
+              A_Dst_Meta => Dst_Meta,
+              A_Src      => Src,
+              A_Src_Meta => Src_Meta,
+              A_Workbuf  => DS.Workbuf (1 .. N));
+      end Transform;
    begin
       case F is
          when Lzw =>
@@ -203,6 +249,14 @@ procedure Test_Decode is
             return Transform (DS.Zlib_Decoder);
          when Gzip =>
             return Transform (DS.Gzip_Decoder);
+         when Bzip2 =>
+            return Transform (DS.Bzip2_Decoder);
+         when Lzma =>
+            return Transform (DS.Lzma_Decoder);
+         when Lzip =>
+            return Transform (DS.Lzip_Decoder);
+         when Xz =>
+            return Transform (DS.Xz_Decoder);
       end case;
    end Call;
 
@@ -310,7 +364,12 @@ procedure Test_Decode is
             Out_Pos := Out_Pos + 1;
          end loop;
          Dst_Meta.Ri := Dst_Meta.Wi;
-         IO.Compact (DS.Dst_Work (Dst_First .. Dst_Last), Dst_Meta, N);
+         --  A destination of Keep_History bytes or more keeps what was
+         --  written (the decoder's history) until it is half full: the other
+         --  schedules start every call with an empty destination.
+         if not (S.Dst_Chunk >= Keep_History and then Dst_Meta.Wi <= Dst_Cap / 2) then
+            IO.Compact (DS.Dst_Work (Dst_First .. Dst_Last), Dst_Meta, N);
+         end if;
 
          if V.Dictionary /= 0
            and then not Added
@@ -340,6 +399,10 @@ procedure Test_Decode is
             Dst_Meta := IO.Empty_Meta;
          else
             exit when Status.Category /= Wuffs.Suspension;
+            --  It wants a longer work buffer than there is (a corrupt LZMA
+            --  header can ask for 4 GiB): that is the end of this run.
+            exit when Status = Wuffs.Base.Suspension_Short_Workbuf
+              and then Wanted_Workbuf (F) > DS.Work_Capacity;
          end if;
 
          --  A decoder that does not come to an end is a failure, here and
@@ -433,6 +496,14 @@ procedure Test_Decode is
             V.Dictionary := 2;
          elsif Kind = "gzip" then
             F := Gzip;
+         elsif Kind = "bzip2" then
+            F := Bzip2;
+         elsif Kind = "lzma" then
+            F := Lzma;
+         elsif Kind = "lzip" then
+            F := Lzip;
+         elsif Kind = "xz" then
+            F := Xz;
          elsif Kind = "gzipmulti" then
             F := Gzip;
             V.Multi_Member := True;
@@ -463,7 +534,15 @@ procedure Test_Decode is
          end loop;
 
          Cases := Cases + 1;
-         if In_Length > Reduced_Above then
+         if F >= Bzip2 then
+            for I in Roomy_Schedules'Range loop
+               if In_Length <= Reduced_Above or else I = 1 or else I > 10 then
+                  Run
+                    (F, V, In_Name (Slash + 1 .. In_Name'Last), In_Length, Has_Exp, Exp_Length,
+                     Roomy_Schedules (I));
+               end if;
+            end loop;
+         elsif In_Length > Reduced_Above then
             for S of Reduced_Schedules loop
                Run (F, V, In_Name (Slash + 1 .. In_Name'Last), In_Length, Has_Exp, Exp_Length, S);
             end loop;
@@ -514,7 +593,7 @@ procedure Test_Decode is
       Bad_Meta : IO.Buffer_Meta := (Wi => 5, Ri => 0, Pos => 0, Closed => False);
       Status   : Wuffs.Status;
    begin
-      for F in Format loop
+      for F in Format range Lzw .. Gzip loop
          --  DS.*_Decoder have not been initialized yet (this runs first).
          Status := Call (F, Dst, Dst_Meta, Src, Src_Meta);
          Test_Support.Check

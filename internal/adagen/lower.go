@@ -36,6 +36,10 @@ type ioArg struct {
 	data expr
 	meta *variable
 
+	// forgotten is the saved state of the io_forget_history block that the
+	// statements being lowered are in, if any.
+	forgotten *variable
+
 	// cursor is the function's Wuffs.Base.IO.Reader or Writer for the
 	// buffer (C: the iop, io0, io1 and io2 "derived variables"), or nil if
 	// the function only passes the buffer on.
@@ -1530,6 +1534,44 @@ func (l *lowerer) ioManip(n *a.IOManip) ([]stmt, error) {
 		out = append(out, body...)
 		return append(out, sCall{callNamed(ioPkg+".End_Limit",
 			"M", expr(eOut{meta}), "R", expr(eOut{cursor}), "Saved", expr(saved))}), nil
+
+	case t.IDIOForgetHistory:
+		// io_forget_history (io: w) { body }, for a writer: inside the
+		// body its history is empty, and a callee gets the buffer from the
+		// old write position on (see userCall).
+		wv, err := l.expr(n.IO())
+		if err != nil {
+			return nil, err
+		}
+		io := wv.io
+		if io == nil || io.cursor == nil || !io.writer {
+			return nil, errNotYet("io_forget_history of %q", n.IO().Str(l.g.tm))
+		}
+		if io.forgotten != nil {
+			return nil, errNotYet("io_forget_history inside io_forget_history")
+		}
+		if err := l.noExits(n.Body(), keyword); err != nil {
+			return nil, err
+		}
+		// (Not a temporary: see io_bind. The body has no suspension point.)
+		l.nBinds++
+		saved := l.newLocal(fmt.Sprintf("%sForgotten_%d", prefixGen, l.nBinds), typForgetState, nil)
+		meta, cursor := expr(eVar{io.meta}), expr(eVar{io.cursor})
+		io.meta.writes++
+		out := l.flush(sCall{callNamed(ioPkg+".Begin_Forget_History",
+			"M", expr(eOut{meta}), "W", expr(eOut{cursor}), "Saved", expr(eOut{eVar{saved}}))})
+		io.forgotten = saved
+		body, err := l.block(n.Body())
+		io.forgotten = nil
+		if err != nil {
+			return nil, err
+		}
+		if anyResume(body) {
+			return nil, errNotYet("a suspension inside an %s block", keyword)
+		}
+		out = append(out, body...)
+		return append(out, sCall{callNamed(ioPkg+".End_Forget_History",
+			"M", expr(eOut{meta}), "W", expr(eOut{cursor}), "Saved", expr(eVar{saved}))}), nil
 	}
 	return nil, errNotYet("%s blocks", keyword)
 }

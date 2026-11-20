@@ -24,6 +24,10 @@ with Wuffs.Std.Bmp.Probe;
 with Wuffs.Std.Gif.Probe;
 with Wuffs.Std.Netpbm.Probe;
 with Wuffs.Std.Png.Probe;
+with Wuffs.Std.Wbmp.Probe;
+with Wuffs.Std.Nie.Probe;
+with Wuffs.Std.Targa.Probe;
+with Wuffs.Std.Qoi.Probe;
 
 procedure Test_Hostile is
 
@@ -46,7 +50,10 @@ procedure Test_Hostile is
    BGR  : constant := 16#8000_0888#;
    RGB  : constant := 16#A000_0888#;
 
-   type Kind is (Netpbm, Bmp, Gif, Png);
+   type Kind is (Netpbm, Bmp, Gif, Png, Wbmp, Nie, Targa, Qoi);
+
+   --  The decoders whose status messages Check_Messages looks at.
+   subtype Message_Kind is Kind range Netpbm .. Png;
 
    subtype Decoder is Wuffs.Runtime.Image_Decoder'Class;
 
@@ -100,6 +107,10 @@ procedure Test_Hostile is
          when Bmp => Wuffs.Std.Bmp.Initialize (IMS.Bmp_Decoder);
          when Gif => Wuffs.Std.Gif.Initialize (IMS.Gif_Decoder);
          when Png => Wuffs.Std.Png.Initialize (IMS.Png_Decoder);
+         when Wbmp => Wuffs.Std.Wbmp.Initialize (IMS.Wbmp_Decoder);
+         when Nie => Wuffs.Std.Nie.Initialize (IMS.Nie_Decoder);
+         when Targa => Wuffs.Std.Targa.Initialize (IMS.Targa_Decoder);
+         when Qoi => Wuffs.Std.Qoi.Initialize (IMS.Qoi_Decoder);
       end case;
    end Initialize;
 
@@ -108,7 +119,11 @@ procedure Test_Hostile is
          when Netpbm => Wuffs.Std.Netpbm.Probe.Swizzler_Is_Default (IMS.Netpbm_Decoder),
          when Bmp => Wuffs.Std.Bmp.Probe.Swizzler_Is_Default (IMS.Bmp_Decoder),
          when Gif => Wuffs.Std.Gif.Probe.Swizzler_Is_Default (IMS.Gif_Decoder),
-         when Png => Wuffs.Std.Png.Probe.Swizzler_Is_Default (IMS.Png_Decoder));
+         when Png => Wuffs.Std.Png.Probe.Swizzler_Is_Default (IMS.Png_Decoder),
+         when Wbmp => Wuffs.Std.Wbmp.Probe.Swizzler_Is_Default (IMS.Wbmp_Decoder),
+         when Nie => Wuffs.Std.Nie.Probe.Swizzler_Is_Default (IMS.Nie_Decoder),
+         when Targa => Wuffs.Std.Targa.Probe.Swizzler_Is_Default (IMS.Targa_Decoder),
+         when Qoi => Wuffs.Std.Qoi.Probe.Swizzler_Is_Default (IMS.Qoi_Decoder));
 
    procedure Put_Size (Name : String; Bits : Long_Long_Integer) is
    begin
@@ -677,12 +692,12 @@ procedure Test_Hostile is
       Short  : String (5 .. 9);
       Length : Natural;
 
-      procedure Expect (S : Wuffs.Status; K : Kind; Text : String);
+      procedure Expect (S : Wuffs.Status; K : Message_Kind; Text : String);
 
-      procedure Expect (S : Wuffs.Status; K : Kind; Text : String) is
+      procedure Expect (S : Wuffs.Status; K : Message_Kind; Text : String) is
          L : Natural;
       begin
-         for Other in Kind loop
+         for Other in Message_Kind loop
             case Other is
                when Netpbm =>
                   L := Wuffs.Std.Netpbm.Message_Length (S);
@@ -814,13 +829,21 @@ begin
               when Netpbm => IMS.Netpbm_Decoder'Address,
               when Bmp => IMS.Bmp_Decoder'Address,
               when Gif => IMS.Gif_Decoder'Address,
-              when Png => IMS.Png_Decoder'Address);
+              when Png => IMS.Png_Decoder'Address,
+              when Wbmp => IMS.Wbmp_Decoder'Address,
+              when Nie => IMS.Nie_Decoder'Address,
+              when Targa => IMS.Targa_Decoder'Address,
+              when Qoi => IMS.Qoi_Decoder'Address);
          Size    : constant Long_Long_Integer :=
            (case K is
               when Netpbm => IMS.Netpbm_Decoder'Size,
               when Bmp => IMS.Bmp_Decoder'Size,
               when Gif => IMS.Gif_Decoder'Size,
-              when Png => IMS.Png_Decoder'Size);
+              when Png => IMS.Png_Decoder'Size,
+              when Wbmp => IMS.Wbmp_Decoder'Size,
+              when Nie => IMS.Nie_Decoder'Size,
+              when Targa => IMS.Targa_Decoder'Size,
+              when Qoi => IMS.Qoi_Decoder'Size);
          --  The object without its tag.
          Raw     : Wuffs.Bytes (0 .. Wuffs.Index (Size / 8) - 1)
          with Import, Address => Address;
@@ -836,14 +859,26 @@ begin
    Check_Overlaps (IMS.Bmp_Decoder, Bmp, IMS.Bmp_Decoder'Size);
    Check_Overlaps (IMS.Gif_Decoder, Gif, IMS.Gif_Decoder'Size);
    Check_Overlaps (IMS.Png_Decoder, Png, IMS.Png_Decoder'Size);
+   Check_Overlaps (IMS.Wbmp_Decoder, Wbmp, IMS.Wbmp_Decoder'Size);
+   Check_Overlaps (IMS.Nie_Decoder, Nie, IMS.Nie_Decoder'Size);
+   Check_Overlaps (IMS.Targa_Decoder, Targa, IMS.Targa_Decoder'Size);
+   Check_Overlaps (IMS.Qoi_Decoder, Qoi, IMS.Qoi_Decoder'Size);
    Check_Descriptors (IMS.Netpbm_Decoder, Netpbm);
    Check_Descriptors (IMS.Bmp_Decoder, Bmp);
    Check_Descriptors (IMS.Gif_Decoder, Gif);
    Check_Descriptors (IMS.Png_Decoder, Png);
+   Check_Descriptors (IMS.Wbmp_Decoder, Wbmp);
+   Check_Descriptors (IMS.Nie_Decoder, Nie);
+   Check_Descriptors (IMS.Targa_Decoder, Targa);
+   Check_Descriptors (IMS.Qoi_Decoder, Qoi);
    Check_Metas (IMS.Netpbm_Decoder, Netpbm);
    Check_Metas (IMS.Bmp_Decoder, Bmp);
    Check_Metas (IMS.Gif_Decoder, Gif);
    Check_Metas (IMS.Png_Decoder, Png);
+   Check_Metas (IMS.Wbmp_Decoder, Wbmp);
+   Check_Metas (IMS.Nie_Decoder, Nie);
+   Check_Metas (IMS.Targa_Decoder, Targa);
+   Check_Metas (IMS.Qoi_Decoder, Qoi);
    Check_Messages;
    Check_Tiny_Image;
 
@@ -851,5 +886,12 @@ begin
    Put_Size ("Wuffs.Std.Bmp.Decoder", IMS.Bmp_Decoder'Size);
    Put_Size ("Wuffs.Std.Gif.Decoder", IMS.Gif_Decoder'Size);
    Put_Size ("Wuffs.Std.Png.Decoder", IMS.Png_Decoder'Size);
+   Put_Size ("Wuffs.Std.Wbmp.Decoder", IMS.Wbmp_Decoder'Size);
+   Put_Size ("Wuffs.Std.Nie.Decoder", IMS.Nie_Decoder'Size);
+   Put_Size ("Wuffs.Std.Targa.Decoder", IMS.Targa_Decoder'Size);
+   Put_Size ("Wuffs.Std.Qoi.Decoder", IMS.Qoi_Decoder'Size);
+   Put_Size ("Wuffs.Std.Etc2.Decoder", IMS.Etc2_Decoder'Size);
+   Put_Size ("Wuffs.Std.Thumbhash.Decoder", IMS.Thumbhash_Decoder'Size);
+   Put_Size ("Wuffs.Std.Handsum.Decoder", IMS.Handsum_Decoder'Size);
    Test_Support.Finish ("test_hostile");
 end Test_Hostile;

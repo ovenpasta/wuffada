@@ -365,6 +365,12 @@ func (g *gen) constAggregate(v *a.Expr, typ *adaType, col int) []string {
 	line := spaces(col) + "["
 	for i, o := range elems {
 		s := numLiteral(o.AsExpr().ConstValue(), hexDigits)
+		if typ.elem.kind == kBool {
+			s = "False"
+			if o.AsExpr().ConstValue().Sign() != 0 {
+				s = "True"
+			}
+		}
 		if i != len(elems)-1 {
 			s += ","
 		} else {

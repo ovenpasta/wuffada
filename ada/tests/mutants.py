@@ -3,14 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 """The mutants of ada/tests/mutation.sh: deliberate faults, one at a time.
 
-usage: mutants.py list              print "NAME WHERE PROFILE" for each mutant
+usage: mutants.py list              print "NAME WHERE PROFILE EQUIVALENT" for each mutant
        mutants.py apply NAME        apply it to the tree in the current directory
+       mutants.py why NAME          print why a known-equivalent mutant is one
 
 WHERE is "src" (a fault in the generator or in the runtime shell: apply it,
 then run ./gen.sh) or "gen" (a fault in the generated Ada: run ./gen.sh, then
 apply it). PROFILE is the build profile that the mutant is tested with.
 Mutants 01 to 25 are the implementer's of milestone 3, R01 to R20 came from
-the independent review of it, and N01 to N08 cover the review's fixes.
+the independent review of it, N01 to N08 cover the review's fixes, and M01 to
+M12 are for milestone 4a (run those in both profiles: MUTATION_PROFILE).
 """
 
 import glob
@@ -273,13 +275,82 @@ MUTANTS = {
         "               Up_To      => Up_To,\n               Dst_Offset => U.B_Offset,",
         "               R_Base     => U.B_Offset,\n               R          => R,\n"
         "               Up_To      => Up_To,\n               Dst_Offset => U.A_Offset,")),
+
+    # Milestone 4a.
+    "M01-bulk-memset-ignores-value": ("src", "checked", lambda: rep(
+        G + "lower_call.go", '"Dst", b.e, "Byte_Value", vs[0].e)})',
+        '"Dst", b.e, "Byte_Value", expr(raw("0")))})')),
+    "M02-sign-extend-rshift-shifts-by-zero": ("src", "checked", lambda: rep(
+        G + "lower_call.go",
+        'fmt.Sprintf("%s.Sign_Extend_Rshift_U%d", intsPkg, bits), "A", vs[0].e, "N", vs[1].e),',
+        'fmt.Sprintf("%s.Sign_Extend_Rshift_U%d", intsPkg, bits), "A", vs[0].e, "N", expr(raw("0"))),')),
+    "M03-sign-extend-convert-zero-extends": ("src", "checked", lambda: rep(
+        G + "lower_call.go",
+        'return val{e: call(intsPkg+".Sign_Extend_Convert_U"+m[1]+"_U"+m[2], vs[0].e), typ: numType(to)}, nil',
+        'return val{e: call("Wuffs.U"+m[2], vs[0].e), typ: numType(to)}, nil')),
+    "M04-i64-divide-swaps-operands": ("src", "checked", lambda: rep(
+        G + "lower_call.go", 'callNamed(intsPkg+".I64_Divide", "A", vs[0].e, "B", vs[1].e)',
+        'callNamed(intsPkg+".I64_Divide", "A", vs[1].e, "B", vs[0].e)')),
+    "M05-forget-history-no-end": ("src", "checked", lambda: rep(
+        G + "lower.go",
+        'return append(out, sCall{callNamed(ioPkg+".End_Forget_History",\n'
+        '\t\t\t"M", expr(eOut{meta}), "W", expr(eOut{cursor}), "Saved", expr(eVar{saved}))}), nil',
+        "return out, nil")),
+    "M06-forget-history-callee-gets-whole-array": ("src", "checked", lambda: rep(
+        G + "lower_call.go",
+        'first := bin("+", eAttr{v.io.data, "First"}, call(ioPkg+".Forgotten_Base", eVar{saved}))',
+        'first := expr(eAttr{v.io.data, "First"})')),
+    "M07-forget-history-no-reload": ("src", "checked", lambda: rep(
+        G + "lower_call.go",
+        'l.post = append(l.post, sCall{callNamed(ioPkg+".Reload_Forgotten",',
+        '_ = append(l.post, sCall{callNamed(ioPkg+".Reload_Forgotten",')),
+    "M08-bitvec256-get-u64-ignores-index": ("src", "checked", lambda: rep(
+        G + "lower_call.go", 'callNamed(intsPkg+".Get_U64", "B", rv.e, "I", vs[0].e)',
+        'callNamed(intsPkg+".Get_U64", "B", rv.e, "I", expr(raw("0")))')),
+    "M09-make-bitvec256-reverses-elements": ("src", "checked", lambda: rep(
+        G + "lower_call.go", '"E00", vs[0].e, "E01", vs[1].e, "E02", vs[2].e, "E03", vs[3].e),',
+        '"E00", vs[3].e, "E01", vs[2].e, "E02", vs[1].e, "E03", vs[0].e),')),
+    "M10-boolean-constant-arrays-inverted": ("src", "checked", lambda: rep(
+        G + "decls.go", 's = "False"\n\t\t\tif o.AsExpr().ConstValue().Sign() != 0 {',
+        's = "False"\n\t\t\tif o.AsExpr().ConstValue().Sign() == 0 {')),
+    "M11-return-cusp-copies-through-the-plain-copy": ("src", "checked", lambda: rep(
+        G + "lower_call.go", 'return l.procResult(ioPkg+"."+mangle(name), typU32, out,',
+        'return l.procResult(ioPkg+"."+mangle(strings.TrimSuffix(name, "_return_cusp")), typU32, '
+        'strings.Replace(out, "Cusp", "N", 1),')),
+    "M12-writer-peek-undo-byte-reads-the-reader-way": ("src", "checked", lambda: rep(
+        G + "lower_call.go", 'return val{e: callNamed(ioPkg+".Peek_Undo_Byte", "Data", data, cursor, c), typ: typU8}, nil',
+        'return val{e: call("Wuffs.U8", raw("0"+cursor[:0])), typ: typU8}, nil')),
+}
+
+
+# Mutants that survive every test because they change nothing that can be
+# observed. They were investigated in milestone 3: do not investigate again.
+EQUIVALENT = {
+    "R04-gif-interlace-start":
+        "INTERLACE_START[4] is never read: std/gif reads INTERLACE_START[this.interlace] only "
+        "right after 'this.interlace -= 1' (decode_gif.wuffs, two places), and interlace starts "
+        "at 4, so the indexes read are 3, 2, 1 and 0.",
+    "R16-gif-dirty-rect-y":
+        "After 'while replicate_y0 < replicate_y1 { ...; replicate_y0 += 1 }' replicate_y0 equals "
+        "replicate_y1 whenever the loop ran, and when it did not run replicate_y0 (dst_y + 1) is "
+        "already no greater than the dirty_max_excl_y that the line before the block set, so "
+        "max(dirty_max_excl_y, replicate_y0) = max(dirty_max_excl_y, replicate_y1). test_image "
+        "hashes the dirty rect at every call, suspended ones included.",
+    "R15-reader-copy-to-slice-always-disjoint":
+        "Wuffs.Base.IO.Limited_Copy_U32_To_Slice, as compiled, gives memmove results when its "
+        "two arrays overlap (test_runtime checks all 16 layouts through the shell, with the "
+        "reader at two positions and three limits), so the disjoint and the _Within form cannot "
+        "be told apart from outside. The shell still must dispatch: the disjoint form's proof "
+        "assumes no overlap. A wrong _Within call is caught (mutant N08).",
 }
 
 
 def main():
     if len(sys.argv) == 2 and sys.argv[1] == "list":
         for name, (where, profile, _) in MUTANTS.items():
-            print(name, where, profile)
+            print(name, where, profile, "equivalent" if name in EQUIVALENT else "-")
+    elif len(sys.argv) == 3 and sys.argv[1] == "why" and sys.argv[2] in EQUIVALENT:
+        print(EQUIVALENT[sys.argv[2]])
     elif len(sys.argv) == 3 and sys.argv[1] == "apply" and sys.argv[2] in MUTANTS:
         MUTANTS[sys.argv[2]][2]()
     else:

@@ -21,6 +21,12 @@
 #define WUFFS_IMPLEMENTATION
 #define WUFFS_CONFIG__MODULES
 #define WUFFS_CONFIG__MODULE__BASE
+#define WUFFS_CONFIG__MODULE__BZIP2
+#define WUFFS_CONFIG__MODULE__LZIP
+#define WUFFS_CONFIG__MODULE__LZMA
+#define WUFFS_CONFIG__MODULE__CRC64
+#define WUFFS_CONFIG__MODULE__SHA256
+#define WUFFS_CONFIG__MODULE__XZ
 #define WUFFS_CONFIG__MODULE__ADLER32
 #define WUFFS_CONFIG__MODULE__CRC32
 #define WUFFS_CONFIG__MODULE__DEFLATE
@@ -31,6 +37,7 @@
 
 #define CAPACITY (4 * 1024 * 1024)
 #define REDUCED_ABOVE 60000
+#define KEEP_HISTORY 1000000
 #define SRC_FIRST 5
 #define DST_FIRST 1000
 #define MAX_OUTPUT (8 * 1024 * 1024)
@@ -39,7 +46,10 @@
 static uint8_t g_input[CAPACITY];
 static uint8_t g_src_work[CAPACITY];
 static uint8_t g_dst_work[CAPACITY];
-static uint8_t g_workbuf[1];
+// The work buffer of a call is as long as the decoder says it wants, within
+// these bounds (lzma wants its dictionary size and a little more).
+#define WORK_CAPACITY (40 * 1024 * 1024)
+static uint8_t g_workbuf[WORK_CAPACITY];
 static uint8_t g_dictionary[DICTIONARY_LENGTH];
 
 // What a manifest line asks for besides the decoder: see the format variants
@@ -54,6 +64,10 @@ static wuffs_lzw__decoder g_lzw;
 static wuffs_deflate__decoder g_deflate;
 static wuffs_zlib__decoder g_zlib;
 static wuffs_gzip__decoder g_gzip;
+static wuffs_bzip2__decoder g_bzip2;
+static wuffs_lzma__decoder g_lzma;
+static wuffs_lzip__decoder g_lzip;
+static wuffs_xz__decoder g_xz;
 
 // ---- The status table.
 
@@ -115,7 +129,42 @@ static void lookup_status(wuffs_base__status s,
 
 // ---- The decoders.
 
-enum { FORMAT_LZW, FORMAT_DEFLATE, FORMAT_ZLIB, FORMAT_GZIP };
+enum {
+  FORMAT_LZW,
+  FORMAT_DEFLATE,
+  FORMAT_ZLIB,
+  FORMAT_GZIP,
+  FORMAT_BZIP2,
+  FORMAT_LZMA,
+  FORMAT_LZIP,
+  FORMAT_XZ
+};
+
+static wuffs_base__io_transformer* transformer(int format) {
+  switch (format) {
+    case FORMAT_LZW:
+      return wuffs_lzw__decoder__upcast_as__wuffs_base__io_transformer(&g_lzw);
+    case FORMAT_DEFLATE:
+      return wuffs_deflate__decoder__upcast_as__wuffs_base__io_transformer(
+          &g_deflate);
+    case FORMAT_ZLIB:
+      return wuffs_zlib__decoder__upcast_as__wuffs_base__io_transformer(
+          &g_zlib);
+    case FORMAT_GZIP:
+      return wuffs_gzip__decoder__upcast_as__wuffs_base__io_transformer(
+          &g_gzip);
+    case FORMAT_BZIP2:
+      return wuffs_bzip2__decoder__upcast_as__wuffs_base__io_transformer(
+          &g_bzip2);
+    case FORMAT_LZMA:
+      return wuffs_lzma__decoder__upcast_as__wuffs_base__io_transformer(
+          &g_lzma);
+    case FORMAT_LZIP:
+      return wuffs_lzip__decoder__upcast_as__wuffs_base__io_transformer(
+          &g_lzip);
+  }
+  return wuffs_xz__decoder__upcast_as__wuffs_base__io_transformer(&g_xz);
+}
 
 static void initialize(int format, variant v) {
   wuffs_base__status s = wuffs_base__make_status(NULL);
@@ -141,6 +190,21 @@ static void initialize(int format, variant v) {
       s = wuffs_gzip__decoder__initialize(&g_gzip, sizeof g_gzip,
                                           WUFFS_VERSION, 0);
       break;
+    case FORMAT_BZIP2:
+      s = wuffs_bzip2__decoder__initialize(&g_bzip2, sizeof g_bzip2,
+                                           WUFFS_VERSION, 0);
+      break;
+    case FORMAT_LZMA:
+      s = wuffs_lzma__decoder__initialize(&g_lzma, sizeof g_lzma,
+                                          WUFFS_VERSION, 0);
+      break;
+    case FORMAT_LZIP:
+      s = wuffs_lzip__decoder__initialize(&g_lzip, sizeof g_lzip,
+                                          WUFFS_VERSION, 0);
+      break;
+    case FORMAT_XZ:
+      s = wuffs_xz__decoder__initialize(&g_xz, sizeof g_xz, WUFFS_VERSION, 0);
+      break;
   }
   if (s.repr) {
     fprintf(stderr, "decode: initialize: %s\n", s.repr);
@@ -151,17 +215,20 @@ static void initialize(int format, variant v) {
 static wuffs_base__status call(int format,
                                wuffs_base__io_buffer* dst,
                                wuffs_base__io_buffer* src) {
-  wuffs_base__slice_u8 workbuf = wuffs_base__make_slice_u8(g_workbuf, 1);
-  switch (format) {
-    case FORMAT_LZW:
-      return wuffs_lzw__decoder__transform_io(&g_lzw, dst, src, workbuf);
-    case FORMAT_DEFLATE:
-      return wuffs_deflate__decoder__transform_io(&g_deflate, dst, src,
-                                                  workbuf);
-    case FORMAT_ZLIB:
-      return wuffs_zlib__decoder__transform_io(&g_zlib, dst, src, workbuf);
+  wuffs_base__io_transformer* t = transformer(format);
+  uint64_t n = wuffs_base__io_transformer__workbuf_len(t).max_incl;
+  if (n < 1) {
+    n = 1;
+  } else if (n > WORK_CAPACITY) {
+    n = WORK_CAPACITY;
   }
-  return wuffs_gzip__decoder__transform_io(&g_gzip, dst, src, workbuf);
+  if (format == FORMAT_XZ) {
+    // std/xz says how much it needs only after it has read a block header,
+    // in the middle of a call, and then fails if it does not have it.
+    n = WORK_CAPACITY;
+  }
+  return wuffs_base__io_transformer__transform_io(
+      t, dst, src, wuffs_base__make_slice_u8(g_workbuf, (size_t)n));
 }
 
 // ---- The schedules, as in test_decode.adb.
@@ -175,10 +242,11 @@ static const schedule g_full_schedules[] = {
     {0, 0},   {1, 0},    {2, 0},    {3, 0}, {7, 0}, {31, 0}, {4095, 0},
     {4097, 0}, {0, 1},   {0, 2},    {0, 3}, {0, 7}, {0, 300}, {0, 4097},
     {1, 1},   {3, 5},    {5, 3},    {300, 266}, {1000, 1},
+    {7, 2000000},
 };
 
 static const schedule g_reduced_schedules[] = {
-    {0, 0}, {4097, 0}, {0, 4097}, {1000, 300}, {1, 0}, {0, 1},
+    {0, 0}, {4097, 0}, {0, 4097}, {1000, 300}, {1, 0}, {0, 1}, {4097, 2000000},
 };
 
 // FNV-1a over the 8 bytes of x, least significant first.
@@ -249,7 +317,12 @@ static void run(int format,
       out_pos++;
     }
     dst.meta.ri = dst.meta.wi;
-    wuffs_base__io_buffer__compact(&dst);
+    // A destination of KEEP_HISTORY bytes or more keeps what was written
+    // (the decoder's history) until it is half full: the other schedules
+    // start every call with an empty destination.
+    if (!(s.dst_chunk >= KEEP_HISTORY && dst.meta.wi <= dst_cap / 2)) {
+      wuffs_base__io_buffer__compact(&dst);
+    }
 
     if (v.dictionary && !added &&
         status.repr == wuffs_zlib__note__dictionary_required) {
@@ -271,6 +344,12 @@ static void run(int format,
       initialize(format, v);
       dst.meta = wuffs_base__empty_io_buffer_meta();
     } else if (category != 2) {
+      break;
+    } else if (status.repr == wuffs_base__suspension__short_workbuf &&
+               wuffs_base__io_transformer__workbuf_len(transformer(format))
+                       .max_incl > WORK_CAPACITY) {
+      // It wants a longer work buffer than there is (a corrupt LZMA header
+      // can ask for 4 GiB): that is the end of this run.
       break;
     }
 
@@ -338,6 +417,14 @@ int main(int argc, char** argv) {
       v.dictionary = 2;
     } else if (!strcmp(kind, "gzip")) {
       format = FORMAT_GZIP;
+    } else if (!strcmp(kind, "bzip2")) {
+      format = FORMAT_BZIP2;
+    } else if (!strcmp(kind, "lzma")) {
+      format = FORMAT_LZMA;
+    } else if (!strcmp(kind, "lzip")) {
+      format = FORMAT_LZIP;
+    } else if (!strcmp(kind, "xz")) {
+      format = FORMAT_XZ;
     } else if (!strcmp(kind, "gzipmulti")) {
       format = FORMAT_GZIP;
       v.multi_member = 1;
@@ -349,7 +436,21 @@ int main(int argc, char** argv) {
     const char* slash = strrchr(in_name, '/');
     const char* name = slash ? slash + 1 : in_name;
 
-    if (in_length > REDUCED_ABOVE) {
+    if (format >= FORMAT_BZIP2) {
+      // These decoders make no progress with a destination of a few bytes
+      // (std/lzma wants room for a whole match).
+      static const schedule roomy[] = {
+          {0, 0},    {1, 0},    {2, 0},       {3, 0},        {7, 0},
+          {31, 2000000}, {4095, 0}, {4097, 0}, {0, 4097},  {1, 4097},
+          {300, 4099}, {1000, 65536}, {1000, 2000000},
+      };
+      size_t n = (in_length > REDUCED_ABOVE) ? 4 : sizeof roomy / sizeof roomy[0];
+      for (size_t i = 0; i < n; i++) {
+        // (For a long input: the first and the last three.)
+        size_t k = (in_length > REDUCED_ABOVE && i > 0) ? i + 9 : i;
+        run(format, v, name, in_length, roomy[k]);
+      }
+    } else if (in_length > REDUCED_ABOVE) {
       for (size_t i = 0;
            i < sizeof g_reduced_schedules / sizeof g_reduced_schedules[0];
            i++) {

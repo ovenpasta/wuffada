@@ -10,6 +10,10 @@ with Wuffs.Std.Nie;
 with Wuffs.Std.Png;
 with Wuffs.Std.Targa;
 with Wuffs.Std.Wbmp;
+with Wuffs.Std.Qoi;
+with Wuffs.Std.Etc2;
+with Wuffs.Std.Thumbhash;
+with Wuffs.Std.Handsum;
 
 package Image_Support is
 
@@ -51,5 +55,9 @@ package Image_Support is
    Wbmp_Decoder   : Wuffs.Std.Wbmp.Decoder;
    Nie_Decoder    : Wuffs.Std.Nie.Decoder;
    Targa_Decoder  : Wuffs.Std.Targa.Decoder;
+   Qoi_Decoder : Wuffs.Std.Qoi.Decoder;
+   Etc2_Decoder : Wuffs.Std.Etc2.Decoder;
+   Thumbhash_Decoder : Wuffs.Std.Thumbhash.Decoder;
+   Handsum_Decoder : Wuffs.Std.Handsum.Decoder;
 
 end Image_Support;

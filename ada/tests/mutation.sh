@@ -14,8 +14,10 @@
 #
 # Each mutant is built with its profile ("checked" for most) and tested with
 # the generator's reject tests, test_runtime, test_m1, test_hostile,
-# test_entry, test_image over the chaos manifest, and test_image over the
-# image corpus, compared with upstream's C.
+# test_entry, test_hashers2, test_decode (compared with upstream's C),
+# test_image over the chaos manifest, and test_image over the image corpus,
+# compared with upstream's C. MUTATION_PROFILE=release (or checked) overrides
+# the profile of every mutant.
 #
 # LIMITATION: by default the image corpus is REDUCED, to every run that has
 # reference pixels and every ninth of the others, so "SURVIVED" here does
@@ -47,6 +49,10 @@ else
 fi
 ada/tests/crosscheck/run_image.sh < "$scratch/manifest" > "$scratch/c.trace"
 ada/tests/crosscheck/run.sh > "$scratch/m1.c.trace"
+mkdir "$scratch/dcorpus"
+go run ./ada/tests/corpus -data wuffs/test/data -out "$scratch/dcorpus" 2> /dev/null > "$scratch/decode.manifest"
+ada/tests/crosscheck/run_decode.sh < "$scratch/decode.manifest" > "$scratch/decode.c.trace"
+find wuffs/test/data -maxdepth 1 -type f | LC_ALL=C sort | xargs go run ./ada/tests/hashexpect2 > "$scratch/manifest2"
 echo "$(wc -l < "$scratch/manifest" | tr -d ' ') image runs and $(wc -l < "$scratch/chaos.manifest" | tr -d ' ') chaos runs per mutant"
 
 save() {
@@ -62,10 +68,11 @@ restore() {
 # check NAME PROFILE: builds and tests the tree as it is; prints one line.
 check() {
     name="$1"
-    profile="$2"
+    # MUTATION_PROFILE, if set, replaces every mutant's own profile.
+    profile="${MUTATION_PROFILE:-$2}"
     log="$scratch/$name.log"
     if ! (cd ada && alr exec -- gprbuild -P wuffs_gen.gpr -XWUFFS_PROFILE="$profile" test_runtime.adb \
-        test_m1.adb test_hostile.adb test_entry.adb test_image.adb) >> "$log" 2>&1; then
+        test_m1.adb test_hostile.adb test_entry.adb test_image.adb test_hashers2.adb test_decode.adb) >> "$log" 2>&1; then
         echo "$name: killed by the Ada build (an error or a warning)"; return
     fi
     killers=""
@@ -85,6 +92,15 @@ check() {
     if ! (ulimit -s 256 && timeout 600 ada/bin/test_entry) >> "$log" 2>&1; then
         killers="$killers test_entry"
     fi
+    if ! (ulimit -s 256 && timeout 600 ada/bin/test_hashers2 < "$scratch/manifest2") >> "$log" 2>&1; then
+        killers="$killers test_hashers2"
+    fi
+    if ! (ulimit -s 256 && timeout 900 ada/bin/test_decode < "$scratch/decode.manifest") > "$scratch/decode.out" 2>> "$log"; then
+        killers="$killers test_decode(checks)"
+    fi
+    if ! grep '^= ' "$scratch/decode.out" | cmp -s - "$scratch/decode.c.trace"; then
+        killers="$killers test_decode(trace-vs-C)"
+    fi
     if ! (ulimit -s 256 && timeout 900 ada/bin/test_image < "$scratch/chaos.manifest") > "$scratch/chaos.out" 2>> "$log"; then
         killers="$killers test_image(chaos)"
     fi
@@ -98,7 +114,11 @@ check() {
         killers="$killers test_image(trace-vs-C)"
     fi
     if [ -z "$killers" ]; then
-        echo "$name: SURVIVED"
+        if python3 ada/tests/mutants.py why "$name" > /dev/null 2>&1; then
+            echo "$name: SURVIVED (a known equivalent mutant: see ada/tests/mutants.py)"
+        else
+            echo "$name: SURVIVED"
+        fi
     else
         echo "$name: killed by$killers"
     fi
@@ -109,7 +129,7 @@ if echo "00-unchanged" | grep -q -E "$only"; then
     check "00-unchanged" checked
 fi
 
-python3 ada/tests/mutants.py list | while read -r name where profile; do
+python3 ada/tests/mutants.py list | while read -r name where profile equivalent; do
     echo "$name" | grep -q -E "$only" || continue
     log="$scratch/$name.log"
     : > "$log"

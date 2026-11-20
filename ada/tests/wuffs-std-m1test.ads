@@ -88,6 +88,9 @@ package Wuffs.Std.M1test with Preelaborate is
    --  Wuffs: func widget.call_mix
    function Call_Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
 
+   --  Wuffs: func widget.fill
+   function Fill (Self : in out Widget; A_V : Wuffs.U8; A_N : Wuffs.U32) return Wuffs.U64;
+
 private
 
    subtype G_U32_Range_0_1000 is Wuffs.U32 range 0 .. 1000;
@@ -95,6 +98,8 @@ private
    type G_Array_2_Of_Array_3_Of_U16 is array (Wuffs.Index range 0 .. 1) of Wuffs.U16_Array (0 .. 2);
 
    type G_Array_4_Of_Boolean is array (Wuffs.Index range 0 .. 3) of Boolean;
+
+   type G_Array_6_Of_Boolean is array (Wuffs.Index range 0 .. 5) of Boolean;
 
    subtype G_U32_Range_0_7 is Wuffs.U32 range 0 .. 7;
 

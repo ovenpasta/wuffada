@@ -68,6 +68,12 @@ find wuffs/test/data -maxdepth 1 -type f | LC_ALL=C sort > "$tmp/files"
 xargs go run ./ada/tests/hashexpect < "$tmp/files" > "$tmp/manifest"
 nfiles="$(wc -l < "$tmp/manifest" | tr -d ' ')"
 [ "$nfiles" -ge 100 ] || die "only $nfiles test data files found"
+# xxhash32, xxhash64, crc64 and sha256: Go (crypto/sha256, hash/crc64 and an
+# xxHash written for this test) and upstream's C must agree first.
+xargs go run ./ada/tests/hashexpect2 < "$tmp/files" > "$tmp/manifest2"
+xargs ada/tests/crosscheck/run_hash2.sh < "$tmp/files" > "$tmp/manifest2.c"
+cmp "$tmp/manifest2" "$tmp/manifest2.c" || die "Go's and upstream C's xxhash32/xxhash64/crc64/sha256 differ"
+echo "xxhash32, xxhash64, crc64, sha256 of $nfiles files: Go and upstream's C agree"
 
 say "Cross-check: what upstream's C back-end computes for m1test"
 ada/tests/crosscheck/run.sh > "$tmp/m1.c.trace"
@@ -187,6 +193,11 @@ for profile in checked release; do
     cat "$tmp/hashers.out"
     grep -q "^test_hashers: files checked: $nfiles\$" "$tmp/hashers.out" ||
         die "test_hashers did not check all $nfiles files ($profile)"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_hashers2 < "$tmp/manifest2") > "$tmp/hashers.out" ||
+        { cat "$tmp/hashers.out"; die "test_hashers2 ($profile)"; }
+    cat "$tmp/hashers.out"
+    grep -q "^test_hashers2: files checked: $nfiles\$" "$tmp/hashers.out" ||
+        die "test_hashers2 did not check all $nfiles files ($profile)"
 
     (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_decode < "$tmp/decode.manifest") > "$tmp/decode.out" ||
         { grep -v '^= ' "$tmp/decode.out" | head -n 50; die "test_decode ($profile)"; }
@@ -247,7 +258,7 @@ for profile in checked release; do
             die "decode_image $f ($profile)"
         go run ./ada/tests/pnmcheck "wuffs/test/data/$f" "$tmp/example.pnm" || die "decode_image $f: wrong pixels ($profile)"
     done
-    for f in hippopotamus.bmp hippopotamus.ppm; do
+    for f in hippopotamus.bmp hippopotamus.ppm hippopotamus.nie hat.wbmp bricks-color.qoi; do
         (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "wuffs/test/data/$f" "$tmp/example.pnm") ||
             die "decode_image $f ($profile)"
         echo "decode_image: $f: $(wc -c < "$tmp/example.pnm" | tr -d ' ') bytes written"
@@ -266,7 +277,7 @@ for profile in checked release; do
     expect_failure "$tmp/truncated.png" "decode_frame: deflate: truncated input"
     expect_failure "$tmp/truncated.gif" "decode_image_config: gif: truncated input"
     expect_failure "$tmp/bad.bmp" "decode_image_config: bmp: bad header"
-    expect_failure go.mod "the input is not a PNG, GIF, BMP or Netpbm file"
+    expect_failure go.mod "the input is not a PNG, GIF, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP file"
     # A file name longer than the program accepts (and so nowhere near the
     # run-time library's own limits).
     if (examples/bin/decode_image wuffs/test/data/hippopotamus.bmp \

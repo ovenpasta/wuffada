@@ -73,6 +73,41 @@ gen "$tmp/gen" nie \
     wuffs/std/nie/decode_nie.wuffs
 gen "$tmp/gen" targa \
     wuffs/std/targa/decode_targa.wuffs
+gen "$tmp/gen" qoi \
+    wuffs/std/qoi/decode_qoi.wuffs
+gen "$tmp/gen" xxhash32 \
+    wuffs/std/xxhash32/common_xxhash32.wuffs
+gen "$tmp/gen" xxhash64 \
+    wuffs/std/xxhash64/common_xxhash64.wuffs
+gen "$tmp/gen" crc64 \
+    wuffs/std/crc64/common_crc64.wuffs \
+    wuffs/std/crc64/common_up_x86_sse42.wuffs
+gen "$tmp/gen" bzip2 \
+    wuffs/std/bzip2/decode_bzip2.wuffs \
+    wuffs/std/bzip2/decode_flush_fast.wuffs \
+    wuffs/std/bzip2/decode_flush_slow.wuffs \
+    wuffs/std/bzip2/decode_huffman_fast.wuffs \
+    wuffs/std/bzip2/decode_huffman_slow.wuffs
+gen "$tmp/gen" lzma \
+    wuffs/std/lzma/decode_bitstream_fast.wuffs \
+    wuffs/std/lzma/decode_bitstream_slow.wuffs \
+    wuffs/std/lzma/decode_lzma.wuffs \
+    wuffs/std/lzma/decode_quirks.wuffs
+gen "$tmp/gen" lzip \
+    wuffs/std/lzip/decode_lzip.wuffs
+gen "$tmp/gen" thumbhash \
+    wuffs/std/thumbhash/decode_quirks.wuffs \
+    wuffs/std/thumbhash/decode_thumbhash.wuffs
+gen "$tmp/gen" etc2 \
+    wuffs/std/etc2/decode_etc2.wuffs
+gen "$tmp/gen" handsum \
+    wuffs/std/handsum/decode_handsum.wuffs
+gen "$tmp/gen" sha256 \
+    wuffs/std/sha256/common_sha256.wuffs
+gen "$tmp/gen" xz \
+    wuffs/std/xz/decode_filter.wuffs \
+    wuffs/std/xz/decode_quirks.wuffs \
+    wuffs/std/xz/decode_xz.wuffs
 
 # A test-only package that exercises what the standard packages above do not
 # (see the comment in the .wuffs file). Its driver is ada/tests/test_m1.adb.

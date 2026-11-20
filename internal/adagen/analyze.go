@@ -143,9 +143,11 @@ type funcInfo struct {
 
 // supportedInterfaces maps a Wuffs base interface to its Ada equivalent.
 var supportedInterfaces = map[string]string{
-	"hasher_u32":     "Wuffs.Runtime.Hasher_U32",
-	"io_transformer": "Wuffs.Runtime.IO_Transformer",
-	"image_decoder":  "Wuffs.Runtime.Image_Decoder",
+	"hasher_u32":       "Wuffs.Runtime.Hasher_U32",
+	"hasher_u64":       "Wuffs.Runtime.Hasher_U64",
+	"hasher_bitvec256": "Wuffs.Runtime.Hasher_Bitvec256",
+	"io_transformer":   "Wuffs.Runtime.IO_Transformer",
+	"image_decoder":    "Wuffs.Runtime.Image_Decoder",
 }
 
 func (g *gen) analyze() error {

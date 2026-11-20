@@ -23,15 +23,18 @@ package main
 
 import (
 	"bytes"
+	"compress/bzip2"
 	"compress/flate"
 	"compress/gzip"
 	"compress/lzw"
 	"compress/zlib"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -51,6 +54,7 @@ func main() {
 	}
 	fixtures()
 	compressed()
+	tools()
 	mutations()
 }
 
@@ -107,6 +111,15 @@ var decoders = map[string]func(b []byte) ([]byte, error){
 		r.Multistream(false)
 		return io.ReadAll(r)
 	},
+	"bzip2": func(b []byte) ([]byte, error) {
+		return io.ReadAll(bzip2.NewReader(bytes.NewReader(b)))
+	},
+	// Go's library has no LZMA or lzip decoder: the expectation is the plain
+	// file that upstream keeps next to the fixture (see fixtures), or the
+	// data that the system's xz compressed (see tools).
+	"lzma": func(b []byte) ([]byte, error) { return nil, errors.New("no decoder") },
+	"lzip": func(b []byte) ([]byte, error) { return nil, errors.New("no decoder") },
+	"xz":   func(b []byte) ([]byte, error) { return nil, errors.New("no decoder") },
 	"lzw": func(b []byte) ([]byte, error) {
 		return io.ReadAll(lzw.NewReader(bytes.NewReader(b), lzw.LSB, 8))
 	},
@@ -146,6 +159,14 @@ func fixtures() {
 				fatal(fmt.Errorf("%s: Go's output differs from the .decompressed file", name))
 			}
 		}
+		// Upstream's plain file, for a fixture named after it.
+		if plain, err := os.ReadFile(filepath.Join(*dataDir, strings.TrimSuffix(name, filepath.Ext(name)))); err == nil &&
+			(format == "bzip2" || format == "lzma" || format == "lzip" || format == "xz") {
+			if expected != nil && !bytes.Equal(plain, expected) {
+				fatal(fmt.Errorf("%s: Go's output differs from the plain file", name))
+			}
+			expected = nonNil(plain)
+		}
 		desc := "fixture_" + strings.NewReplacer("/", "_", ".", "_").Replace(name)
 		emit(format, desc, input, expected)
 	}
@@ -154,6 +175,21 @@ func fixtures() {
 	}
 	for _, name := range []string{"DCI-P3-D65.icc.zlib", "midsummer.txt.zlib", "pi.txt.zlib", "romeo.txt.zlib"} {
 		add("zlib", name)
+	}
+	for _, name := range []string{
+		"256.bytes.bz2", "abraca.txt.bz2", "archive.tar.bz2", "midsummer.txt.bz2", "pi.txt.bz2", "romeo.txt.bz2",
+	} {
+		add("bzip2", name)
+	}
+	for _, name := range []string{"enwik5.lzma", "romeo.txt.lzma"} {
+		add("lzma", name)
+	}
+	add("lzip", "romeo.txt.lz")
+	for _, name := range []string{
+		"256.bytes.two-concatenated-streams.xz", "enwik5.block-size-32k.xz", "enwik5.lzma2-chunk-max-1-13.xz",
+		"enwik5.xz", "romeo.txt.delta1.xz", "romeo.txt.xz",
+	} {
+		add("xz", name)
 	}
 	for _, name := range []string{"romeo.txt.deflate", "romeo.txt.fixed-huff.deflate"} {
 		add("deflate", name)
@@ -367,6 +403,49 @@ func nonNil(b []byte) []byte {
 	return b
 }
 
+// tool runs a compressor of this system, if it has it, over b.
+func tool(b []byte, name string, args ...string) []byte {
+	path, err := exec.LookPath(name)
+	if err != nil {
+		return nil
+	}
+	cmd := exec.Command(path, args...)
+	cmd.Stdin = bytes.NewReader(b)
+	out, err := cmd.Output()
+	if err != nil {
+		fatal(fmt.Errorf("%s: %v", name, err))
+	}
+	return out
+}
+
+// tools adds what the system's bzip2 and xz (as an LZMA compressor) make of
+// the sources, where those programs are installed.
+func tools() {
+	n := 0
+	for _, s := range sources() {
+		for _, level := range []string{"-1", "-9"} {
+			if c := tool(s.data, "bzip2", "-c", level); c != nil {
+				emit("bzip2", s.name+"_tool"+level, c, nonNil(s.data))
+				n++
+			}
+		}
+		for i, check := range []string{"none", "crc32", "crc64", "sha256"} {
+			level := []string{"-0", "-6", "-3", "-1"}[i]
+			if c := tool(s.data, "xz", "--format=xz", "--check="+check, "-c", level); c != nil {
+				emit("xz", s.name+"_tool"+level+"_"+check, c, nonNil(s.data))
+				n++
+			}
+		}
+		for _, level := range []string{"-0", "-6"} {
+			if c := tool(s.data, "xz", "--format=lzma", "-c", level); c != nil {
+				emit("lzma", s.name+"_tool"+level, c, nonNil(s.data))
+				n++
+			}
+		}
+	}
+	fmt.Fprintf(os.Stderr, "corpus: %d inputs from the system's bzip2 and xz\n", n)
+}
+
 // mutations adds truncated and corrupted inputs. What the decoder must do
 // with them is whatever upstream's C does.
 func mutations() {
@@ -385,6 +464,12 @@ func mutations() {
 		{"gzip", "romeo_header", gzipCompress(romeo, 6, true)},
 		{"lzw", "romeo", lzwCompress(romeo)},
 		{"lzw", "midsummer", lzwCompress(midsummer)},
+		{"bzip2", "romeo_fixture", read("romeo.txt.bz2")},
+		{"bzip2", "256_fixture", read("256.bytes.bz2")},
+		{"lzma", "romeo_fixture", read("romeo.txt.lzma")},
+		{"lzip", "romeo_fixture", read("romeo.txt.lz")},
+		{"xz", "romeo_fixture", read("romeo.txt.xz")},
+		{"xz", "delta_fixture", read("romeo.txt.delta1.xz")},
 	}
 	for _, b := range bases {
 		n := len(b.data)

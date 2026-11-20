@@ -205,6 +205,89 @@ func TestCheckedIn(tt *testing.T) {
 		outDir: "ada/gen",
 		files:  []string{"wuffs/std/targa/decode_targa.wuffs"},
 	}, {
+		name:   "qoi",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/qoi/decode_qoi.wuffs",
+		},
+	}, {
+		name:   "xxhash32",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/xxhash32/common_xxhash32.wuffs",
+		},
+	}, {
+		name:   "xxhash64",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/xxhash64/common_xxhash64.wuffs",
+		},
+	}, {
+		name:   "crc64",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/crc64/common_crc64.wuffs",
+			"wuffs/std/crc64/common_up_x86_sse42.wuffs",
+		},
+	}, {
+		name:   "bzip2",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/bzip2/decode_bzip2.wuffs",
+			"wuffs/std/bzip2/decode_flush_fast.wuffs",
+			"wuffs/std/bzip2/decode_flush_slow.wuffs",
+			"wuffs/std/bzip2/decode_huffman_fast.wuffs",
+			"wuffs/std/bzip2/decode_huffman_slow.wuffs",
+		},
+	}, {
+		name:   "lzma",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/lzma/decode_bitstream_fast.wuffs",
+			"wuffs/std/lzma/decode_bitstream_slow.wuffs",
+			"wuffs/std/lzma/decode_lzma.wuffs",
+			"wuffs/std/lzma/decode_quirks.wuffs",
+		},
+	}, {
+		name:   "lzip",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/lzip/decode_lzip.wuffs",
+		},
+	}, {
+		name:   "thumbhash",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/thumbhash/decode_quirks.wuffs",
+			"wuffs/std/thumbhash/decode_thumbhash.wuffs",
+		},
+	}, {
+		name:   "etc2",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/etc2/decode_etc2.wuffs",
+		},
+	}, {
+		name:   "handsum",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/handsum/decode_handsum.wuffs",
+		},
+	}, {
+		name:   "sha256",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/sha256/common_sha256.wuffs",
+		},
+	}, {
+		name:   "xz",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/xz/decode_filter.wuffs",
+			"wuffs/std/xz/decode_quirks.wuffs",
+			"wuffs/std/xz/decode_xz.wuffs",
+		},
+	}, {
 		name:   "m1test",
 		outDir: "ada/tests",
 		files:  []string{"internal/adagen/testdata/m1test.wuffs"},
@@ -395,10 +478,11 @@ func TestRejects(tt *testing.T) {
 				io_forget_history (io: args.dst) {
 					if args.dst.length() > 0 {
 						args.dst.write_u8_fast!(a: 1)
+						return ok
 					}
 				}
 			}`,
-		want: "not yet supported: io_forget_history blocks",
+		want: "not yet supported: a return out of an io_forget_history block",
 	}, {
 		what: "an I/O variable outside of io_bind",
 		src: prelude + `
@@ -458,22 +542,19 @@ func TestRejects(tt *testing.T) {
 		want: "not yet supported: struct foo: private structs",
 	}, {
 		what: "interface without an Ada equivalent",
-		src: `pub struct foo? implements base.hasher_u64()
-			pub func foo.checksum_u64() base.u64 {
-				return 0
-			}
+		src: `pub struct foo? implements base.token_decoder(util : base.utility)
 			pub func foo.get_quirk(key: base.u32) base.u64 {
 				return 0
 			}
 			pub func foo.set_quirk!(key: base.u32, value: base.u64) base.status {
 				return ok
 			}
-			pub func foo.update!(x: roslice base.u8) {
+			pub func foo.workbuf_len() base.range_ii_u64 {
+				return this.util.make_range_ii_u64(min_incl: 0, max_incl: 0)
 			}
-			pub func foo.update_u64!(x: roslice base.u8) base.u64 {
-				return 0
+			pub func foo.decode_tokens?(dst: base.token_writer, src: base.io_reader, workbuf: slice base.u8) {
 			}`,
-		want: "not yet supported: struct foo: implements base.hasher_u64",
+		want: "not yet supported",
 	}, {
 		what: "statuses without a package id",
 		src:  "pub status \"#bad\"\n" + prelude,

@@ -8,6 +8,10 @@ with Wuffs.Std.Bmp;
 with Wuffs.Std.Gif;
 with Wuffs.Std.Netpbm;
 with Wuffs.Std.Png;
+with Wuffs.Std.Etc2;
+with Wuffs.Std.Nie;
+with Wuffs.Std.Qoi;
+with Wuffs.Std.Wbmp;
 
 package Decode_Image_Buffers is
 
@@ -32,5 +36,9 @@ package Decode_Image_Buffers is
    Bmp_Decoder    : Wuffs.Std.Bmp.Decoder;
    Gif_Decoder    : Wuffs.Std.Gif.Decoder;
    Png_Decoder    : Wuffs.Std.Png.Decoder;
+   Nie_Decoder : Wuffs.Std.Nie.Decoder;
+   Qoi_Decoder : Wuffs.Std.Qoi.Decoder;
+   Etc2_Decoder : Wuffs.Std.Etc2.Decoder;
+   Wbmp_Decoder : Wuffs.Std.Wbmp.Decoder;
 
 end Decode_Image_Buffers;

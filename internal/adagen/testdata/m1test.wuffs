@@ -439,3 +439,18 @@ pub func widget.call_mix!(v: base.u32) base.u32 {
     r = this.mix!(v: args.v)
     return r
 }
+
+// bulk_memset with a value other than zero, and a constant array of bools.
+
+pri const FLAGS : roarray[6] base.bool = [true, false, false, true, true, false]
+
+pub func widget.fill!(v: base.u8, n: base.u32) base.u64 {
+    var r : base.u64
+
+    this.buf[3 .. 21].bulk_memset!(byte_value: args.v)
+    r = this.sum_buf()
+    if FLAGS[args.n & 3] {
+        r ~mod+= 1_000_000
+    }
+    return r
+}

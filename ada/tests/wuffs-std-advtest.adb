@@ -2277,9 +2277,12 @@ package body Wuffs.Std.Advtest is
          Self.F_Buf (1) := 6;
          V_X :=
            V_X
-             + Wuffs.Base.Endian.Peek_U32LE
-                 (Data => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
-                  Pos => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S))'First);
+             + Wuffs.Base.Endian.Peek_U32LE (Data => V_S.Base
+                                                       (V_S.First
+                                                        .. Wuffs.Runtime.Last (V_S)),
+                                             Pos => V_S.Base
+                                                      (V_S.First
+                                                       .. Wuffs.Runtime.Last (V_S))'First);
          Self.F_Sum := Self.F_Sum + V_X;
       end if;
       Self.G_Scratch_17_U2 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
@@ -4960,16 +4963,20 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T6);
       V_C := G_T6;
       if Wuffs.U64 (A_Workbuf'Length) >= 8 then
-         Wuffs.Base.Endian.Poke_U32LE
-           (Data => A_Workbuf (A_Workbuf'First + 3 .. (A_Workbuf'First + 7) - 1),
-            Pos => A_Workbuf (A_Workbuf'First + 3 .. (A_Workbuf'First + 7) - 1)'First,
-            V => Wuffs.U32 (V_C) * 16#0101_0101#);
+         Wuffs.Base.Endian.Poke_U32LE (Data => A_Workbuf
+                                                 (A_Workbuf'First + 3
+                                                  .. (A_Workbuf'First + 7) - 1),
+                                       Pos => A_Workbuf
+                                                (A_Workbuf'First + 3
+                                                 .. (A_Workbuf'First + 7) - 1)'First,
+                                       V => Wuffs.U32 (V_C) * 16#0101_0101#);
          Self.F_Sum :=
            Self.F_Sum
-             + Wuffs.U32
-                 (Wuffs.Base.Endian.Peek_U16BE
-                    (Data => A_Workbuf (A_Workbuf'First + 1 .. (A_Workbuf'First + 3) - 1),
-                     Pos => A_Workbuf (A_Workbuf'First + 1 .. (A_Workbuf'First + 3) - 1)'First));
+             + Wuffs.U32 (Wuffs.Base.Endian.Peek_U16BE
+                            (Data => A_Workbuf (A_Workbuf'First + 1 .. (A_Workbuf'First + 3) - 1),
+                             Pos => A_Workbuf
+                                      (A_Workbuf'First + 1
+                                       .. (A_Workbuf'First + 3) - 1)'First));
          Wuffs.Runtime.Writer_Copy_From_Slice (Data => A_Dst,
                                                W => G_W_Dst,
                                                Src => A_Workbuf

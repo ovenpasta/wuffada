@@ -163,10 +163,33 @@ Not in scope yet. `choose` statements resolve to the scalar default.
    * Generator: use the proved base, coroutine lowering, I/O, `use`;
      lzw, deflate, zlib, gzip.
    * Base: pixel formats, pixel buffer, pixel swizzler, proved. Done.
-3. Image decoders netpbm, bmp, gif, png (+ wbmp, nie, targa); YCCK swizzle
-   proved, within 1.5x of upstream's scalar C.
+3. Done: image decoders netpbm, bmp, gif, png, wbmp, nie, targa, qoi, etc2,
+   thumbhash, handsum; hashers and decompressors sha256, xxhash32/64, crc64,
+   bzip2, lzma, lzip, xz; YCCK swizzle proved, about 0.9-1.1x of upstream's
+   scalar C.
 4. JPEG, then the remaining decoders (webp, ...) and formats. SIMD after
    JPEG works on the scalar paths.
+
+## Known follow-ups
+
+From the review of generator milestone 4a; none affects generated `std` code.
+
+* `io_forget_history`: a block, then `undo_byte`, then a second block with a
+  callee in the same call leaves the rebase point ahead of the cursor. Checked
+  raises from a base precondition, release diverges, upstream C is undefined.
+  No `std` package has this shape. The generator should reject or guard it.
+* `test.sh` has no xz input with a BCJ filter, so that path (the only heavy
+  user of `io_forget_history`) is untested there. Upstream C itself fails on
+  some BCJ files under chunked destinations; those need trace-only
+  expectations.
+* The "roomy" decode schedules are looser than needed: bzip2 works with a
+  1-byte destination and lzma's real minimum is 274 bytes.
+* The new decompressors are not in the AddressSanitizer stage or the
+  hostile-caller tests (no short or zero work buffer).
+* Still rejected at generation time, needed for jpeg: struct fields of type
+  status, bulk load/save on u16 arrays, tables from pixel-buffer planes,
+  `swizzle_ycck`. Also open: writer `io_limit`, private and non-classy
+  structs, local arrays over 1 KiB, non-u8 slices, token I/O.
 
 ## Open decisions (owner: project lead)
 
