@@ -8,7 +8,8 @@
 --  required in the "checked" and in the "release" profile: a bad-argument
 --  status and a disabled decoder, and never an exception or a write out of
 --  bounds.  Also here: the decoders' pixel swizzlers after Initialize, the
---  packages' status messages, and the sizes of the decoder objects.
+--  packages' status messages, and the sizes of the decoder objects.  The
+--  same for the token decoders: see token_hostile.adb.
 
 with Ada.Text_IO;
 with Image_Support;
@@ -16,6 +17,7 @@ with Interfaces;
 with System;
 with System.Storage_Elements;
 with Test_Support;
+with Token_Hostile;
 with Wuffs.Base.IO;
 with Wuffs.Base.Pixel_Buffers;
 with Wuffs.Base.Pixel_Formats;
@@ -1256,5 +1258,8 @@ begin
    Put_Size ("Wuffs.Std.Handsum.Decoder", IMS.Handsum_Decoder'Size);
    Put_Size ("Wuffs.Std.Vp8.Decoder", IMS.Vp8_Decoder'Size);
    Put_Size ("Wuffs.Std.Webp.Decoder", IMS.Webp_Decoder'Size);
+   --  The token decoders (json, cbor): see token_hostile.adb.
+   Token_Hostile;
+
    Test_Support.Finish ("test_hostile");
 end Test_Hostile;

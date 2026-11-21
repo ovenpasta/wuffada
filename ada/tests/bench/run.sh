@@ -3,7 +3,8 @@
 # generated Ada decoders, release profile, against upstream's C, for CRC-32
 # and Adler-32 of a 4 MiB buffer, gzip decompression of a few megabytes, and
 # decoding the largest PNGs, the largest GIF, the largest JPEGs and the
-# largest lossy and lossless WebPs of wuffs/test/data to BGRA_PREMUL.
+# largest lossy and lossless WebPs of wuffs/test/data to BGRA_PREMUL, and
+# tokenising the three largest JSON files there.
 #
 # usage: ada/tests/bench/run.sh
 #
@@ -38,6 +39,7 @@ cat wuffs/test/data/*.txt wuffs/test/data/*.bmp wuffs/test/data/*.json 2> /dev/n
     ls -S wuffs/test/data/*.jpeg | head -n 3 | sed 's/^/jpeg 10 /'
     ls -S wuffs/test/data/*.lossy.webp | head -n 1 | sed 's/^/webp 10 /'
     ls -S wuffs/test/data/*.lossless.webp | head -n 1 | sed 's/^/webp 10 /'
+    ls -S wuffs/test/data/*.json | head -n 3 | sed 's/^/json 50 /'
 } > "$tmp/list"
 
 (cd ada && alr exec -- gprbuild -q -P wuffs_gen.gpr -XWUFFS_PROFILE=release bench_main.adb)

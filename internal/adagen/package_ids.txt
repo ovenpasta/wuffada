@@ -35,7 +35,10 @@ xz 25
 jpeg 26
 vp8 27
 webp 28
+json 29
+cbor 30
 
 # Test-only packages count down from 65535.
 m1test 65535
 advtest 65534
+tokadv 65533

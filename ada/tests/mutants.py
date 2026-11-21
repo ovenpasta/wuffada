@@ -15,7 +15,11 @@ the independent review of it, N01 to N08 cover the review's fixes, M01 to
 M12 are for milestone 4a, J01 to J15 for the JPEG milestone, and W01 to W16
 for the vp8/webp milestone (run those in both profiles: MUTATION_PROFILE; and
 MUTATION_FORMATS='webp|vp8' restricts the image corpus to those formats, see
-mutation.sh).
+mutation.sh), T01 to T19 for the json/cbor (token I/O) milestone (run those in
+both profiles, with MUTATION_TOKENS=1: see mutation.sh); T18 is T01's
+fault in a form that the Ada build cannot see, and T19 is T09's (which,
+in the release profile, GNAT's -gnatwc reports as a condition that is
+always False).
 """
 
 import glob
@@ -33,6 +37,17 @@ def rep(path, old, new, count=1):
     if s.count(old) != count:
         sys.exit("mutants.py: %d occurrences of %r in %s" % (s.count(old), old, path))
     open(path, "w").write(s.replace(old, new))
+
+
+def nth_rep(path, old, new, k):
+    """Replaces the k-th (from 0) occurrence of old in path."""
+    s = open(path).read()
+    i = -1
+    for _ in range(k + 1):
+        i = s.find(old, i + 1)
+        if i < 0:
+            sys.exit("mutants.py: fewer than %d occurrences of %r in %s" % (k + 1, old, path))
+    open(path, "w").write(s[:i] + new + s[i + len(old):])
 
 
 def drop_end_limit(k):
@@ -421,6 +436,63 @@ MUTANTS = {
     "W16-webp-subtract-green-skips-blue": ("gen", "checked", lambda: rep(
         GEN + "webp.adb", "Wuffs.Runtime.Set (S => V_P, I => 0, V => Wuffs.Runtime.Get (V_P, 0) + V_G);",
         "null;")),
+    # ---- The json/cbor (token I/O) milestone.
+    "T01-gen-token-major-and-minor-swapped": ("src", "checked", lambda: rep(
+        G + "lower_call.go", 'adaNames := []string{"Value_Major", "Value_Minor", "Continued", "Length"}',
+        'adaNames := []string{"Value_Minor", "Value_Major", "Continued", "Length"}')),
+    "T02-gen-no-token-reload-after-callee": ("src", "checked", lambda: rep(
+        G + "lower_call.go", '\t\t\t\tl.post = append(l.post, sCall{call(tokensPkg+".Reload", cursor, meta)})\n', "")),
+    "T03-gen-no-token-save-before-callee": ("src", "checked", lambda: rep(
+        G + "lower_call.go", '\t\t\t\tl.pre = append(l.pre, sCall{call(tokensPkg+".Save", meta, cursor)})\n', "")),
+    "T04-gen-no-token-save-at-exit": ("src", "checked", lambda: rep(
+        G + "lower.go", "\tfor _, io := range l.ioList {\n\t\tif io.cursor != nil {\n\t\t\tio.meta.writes++",
+        "\tfor _, io := range l.ioList {\n\t\tif io.cursor != nil && !io.tokens {\n\t\t\tio.meta.writes++")),
+    "T05-json-a-continued-bit-cleared": ("gen", "checked", lambda: nth_rep(
+        GEN + "json.adb", "Continued => 1", "Continued => 0", 4)),
+    "T06-json-replace-invalid-unicode-quirk-index": ("gen", "checked", lambda: rep(
+        GEN + "json.adb", "F_Quirks (20)", "F_Quirks (19)", count=7)),
+    "T07-cbor-text-not-checked-for-utf8": ("gen", "checked", lambda: rep(
+        GEN + "cbor.adb",
+        "V_N64 := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => V_N64);",
+        "V_N64 := Wuffs.U64'Min (V_N64, Wuffs.Base.IO.Length (G_R_Src))\n"
+        "        + 0 * Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => V_N64);")),
+    "T08-json-depth-limit-1023": ("gen", "checked", lambda: rep(
+        GEN + "json.adb", "if V_Depth = 1024 then", "if V_Depth = 1023 then", count=2)),
+    "T09-cbor-additional-info-26-branch": ("gen", "checked", lambda: rep(
+        GEN + "cbor.adb", "elsif V_C_Minor = 16#1A# then", "elsif V_C_Minor = 16#1B# then")),
+    "T10-shell-tokens-source-overlap-missed": ("src", "checked", lambda: rep(
+        RT, "return Tokens (Tokens'First)'Address < First_Address (B) + SE.Storage_Offset (B'Length)",
+        "return Tokens (Tokens'First)'Address < First_Address (B) - SE.Storage_Offset (B'Length)")),
+    "T11-shell-token-write-index-one-beyond-accepted": ("src", "checked", lambda: rep(
+        RTS, "       and then M.Ri <= M.Wi\n       and then M.Wi <= Data'Length)\n   with Inline;\n\n"
+        "   --  True if the array of tokens",
+        "       and then M.Ri <= M.Wi\n       and then M.Wi - 1 <= Data'Length)\n   with Inline;\n\n"
+        "   --  True if the array of tokens")),
+    "T12-gen-no-token-overlap-check": ("src", "checked", lambda: rep(
+        G + "lower.go", '\t\t\t\tconds = append(conds, callNamed("Wuffs.Runtime.Tokens_Share_Storage",',
+        '\t\t\t\t_ = append(conds, callNamed("Wuffs.Runtime.Tokens_Share_Storage",')),
+    "T13-gen-token-array-in-self-unchecked": ("src", "checked", lambda: rep(
+        G + "lower.go", "if v.typ.kind == kBytes || v.typ.kind == kBytesVar || v.typ.kind == kTokenArray {",
+        "if v.typ.kind == kBytes || v.typ.kind == kBytesVar {")),
+    "T14-gen-peek-u64le-at-offset-plus-1": ("src", "checked", lambda: rep(
+        G + "lower_call.go", 'callNamed(ioPkg+".Peek_U64LE_At", "Data", data, "R", c, "Offset", vs[0].e)',
+        'callNamed(ioPkg+".Peek_U64LE_At", "Data", data, "R", c, "Offset", bin("+", vs[0].e, raw("1")))')),
+    "T15-gen-valid-utf8-length-up-to-plus-1": ("src", "checked", lambda: rep(
+        G + "lower_call.go", '"Data", data, "R", c, "Up_To", vs[0].e)',
+        '"Data", data, "R", c, "Up_To", bin("+", vs[0].e, raw("1")))')),
+    "T16-shell-token-storage-half-size": ("src", "checked", lambda: rep(
+        RT, "(Wuffs.U64_Array'Component_Size / System.Storage_Unit)",
+        "(Wuffs.U64_Array'Component_Size / 2 / System.Storage_Unit)")),
+    "T17-json-match7-true-misspelt": ("gen", "checked", lambda: rep(
+        GEN + "json.adb", "A => 16#65_7572_7404#", "A => 16#65_7572_7304#")),
+    "T19-cbor-additional-info-26-reads-big-endian-as-little": ("gen", "checked", lambda: rep(
+        GEN + "cbor.adb",
+        "V_String_Length := Wuffs.U64 (Wuffs.Base.IO.Peek_U32BE (A_Src, G_R_Src));",
+        "V_String_Length := Wuffs.U64 (Wuffs.Base.IO.Peek_U32LE (A_Src, G_R_Src));")),
+    "T18-gen-continued-argument-dropped": ("src", "checked", lambda: rep(
+        G + "lower_call.go", "\t\t\tnamed = append(named, adaNames[i], vs[i].e)\n",
+        "\t\t\tif adaNames[i] == \"Continued\" {\n\t\t\t\tnamed = append(named, adaNames[i], raw(\"0\"))\n"
+        "\t\t\t\tcontinue\n\t\t\t}\n\t\t\tnamed = append(named, adaNames[i], vs[i].e)\n")),
 }
 
 

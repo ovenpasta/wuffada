@@ -13,7 +13,8 @@
 # With WUFFS_ASAN=1 in the environment, it also builds the image tests a
 # third time, for the release profile with -fsanitize=address (in the
 # temporary directory), and runs them: the hostile-caller tests, the chaos
-# runs and the whole image corpus (compared with upstream's C again).
+# runs, the whole image corpus and the token decoders' corpus (compared with
+# upstream's C again).
 set -eu
 cd "$(dirname "$0")"
 
@@ -88,6 +89,11 @@ ada/tests/crosscheck/run_adv.sh > "$tmp/adv.c.trace"
 echo "$(wc -l < "$tmp/adv.c.trace" | tr -d ' ') runs traced from C"
 [ -s "$tmp/adv.c.trace" ] || die "empty C trace"
 
+say "Cross-check: what upstream's C back-end computes for tokadv"
+ada/tests/crosscheck/run_tokadv.sh > "$tmp/tokadv.c.trace"
+echo "$(wc -l < "$tmp/tokadv.c.trace" | tr -d ' ') runs traced from C"
+[ -s "$tmp/tokadv.c.trace" ] || die "empty C trace"
+
 if grep -l 'pragma Warnings' ada/gen/wuffs-std-adler32.ad[sb] ada/gen/wuffs-std-crc32.ad[sb]; then
     die "adler32 or crc32 suppresses warnings"
 fi
@@ -147,6 +153,23 @@ say "Cross-check: upstream's C image decoders over the corpus"
 ada/tests/crosscheck/run_image.sh < "$tmp/image.manifest" > "$tmp/image.c.trace"
 echo "$(wc -l < "$tmp/image.c.trace" | tr -d ' ') lines traced from C"
 [ -s "$tmp/image.c.trace" ] || die "empty C trace"
+
+say "Corpus for the token decoders (Go's encoding/json and tokcheck's own CBOR walker as the independent references)"
+mkdir "$tmp/tokcorpus"
+go run ./ada/tests/tokcorpus -data wuffs/test/data -out "$tmp/tokcorpus" > "$tmp/tokens.manifest" || die "tokcorpus failed"
+ntokcases="$(wc -l < "$tmp/tokens.manifest" | tr -d ' ')"
+ntokjson="$(grep -c '^json ' "$tmp/tokens.manifest" || true)"
+ntokcbor="$(grep -c '^cbor ' "$tmp/tokens.manifest" || true)"
+ntokrefs="$(grep -c -v ' -$' "$tmp/tokens.manifest" || true)"
+echo "$ntokcases test cases (json: $ntokjson, cbor: $ntokcbor), $ntokrefs of them with an independent reference"
+[ "$ntokjson" -ge 3500 ] || die "only $ntokjson json test cases"
+[ "$ntokcbor" -ge 2500 ] || die "only $ntokcbor cbor test cases"
+[ "$ntokrefs" -ge 4000 ] || die "only $ntokrefs token test cases with an independent reference"
+
+say "Cross-check: upstream's C token decoders over the corpus"
+ada/tests/crosscheck/run_tokens.sh < "$tmp/tokens.manifest" > "$tmp/tokens.c.trace"
+echo "$(wc -l < "$tmp/tokens.c.trace" | tr -d ' ') runs traced from C"
+[ -s "$tmp/tokens.c.trace" ] || die "empty C trace"
 
 # The tests run with a deliberately small main stack: the library must not
 # need more (docs/DESIGN.md, "Stack and heap").
@@ -211,6 +234,16 @@ for profile in checked release; do
     }
     echo "test_adv: trace ($(wc -l < "$tmp/adv.ada.trace" | tr -d ' ') lines) is identical to upstream's C"
 
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_tokadv) > "$tmp/tokadv.out" ||
+        { grep -v '^= ' "$tmp/tokadv.out" | head -n 50; die "test_tokadv ($profile)"; }
+    grep -v '^= ' "$tmp/tokadv.out"
+    grep '^= ' "$tmp/tokadv.out" > "$tmp/tokadv.ada.trace" || true
+    cmp "$tmp/tokadv.c.trace" "$tmp/tokadv.ada.trace" || {
+        diff "$tmp/tokadv.c.trace" "$tmp/tokadv.ada.trace" | head -n 20
+        die "test_tokadv's trace differs from upstream's C ($profile)"
+    }
+    echo "test_tokadv: trace ($(wc -l < "$tmp/tokadv.ada.trace" | tr -d ' ') lines) is identical to upstream's C"
+
     (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_hashers < "$tmp/manifest") > "$tmp/hashers.out" ||
         { cat "$tmp/hashers.out"; die "test_hashers ($profile)"; }
     cat "$tmp/hashers.out"
@@ -247,6 +280,31 @@ for profile in checked release; do
         die "test_decode's force32 trace differs from upstream's C ($profile)"
     }
     echo "test_decode, force32: trace ($(wc -l < "$tmp/decode32.ada.trace" | tr -d ' ') runs) is identical to upstream's C"
+    # The token decoders: the trace must be upstream C's, the tokens of the
+    # whole-input runs must agree with the independent references, and the
+    # chaos runs (other arguments at every call) must not raise.
+    mkdir "$tmp/tokdump"
+    (echo "dump $tmp/tokdump"; echo chaos; cat "$tmp/tokens.manifest") |
+        (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_tokens) > "$tmp/tokens.out" ||
+        { grep -v '^= ' "$tmp/tokens.out" | head -n 50; die "test_tokens ($profile)"; }
+    grep -v '^= ' "$tmp/tokens.out"
+    grep -q "^test_tokens: cases: $ntokcases," "$tmp/tokens.out" ||
+        die "test_tokens did not run all $ntokcases cases ($profile)"
+    grep '^= ' "$tmp/tokens.out" > "$tmp/tokens.ada.trace" || true
+    cmp "$tmp/tokens.c.trace" "$tmp/tokens.ada.trace" || {
+        diff "$tmp/tokens.c.trace" "$tmp/tokens.ada.trace" | head -n 20
+        die "test_tokens's trace differs from upstream's C ($profile)"
+    }
+    echo "test_tokens: trace ($(wc -l < "$tmp/tokens.ada.trace" | tr -d ' ') runs) is identical to upstream's C"
+    go run ./ada/tests/tokcheck "$tmp/tokdump" || die "tokcheck ($profile)"
+    rm -rf "$tmp/tokdump"
+    # The chaos runs are seeded: their results must not depend on the build.
+    grep '^test_tokens: chaos runs:' "$tmp/tokens.out" > "$tmp/chaos.tokens.$profile"
+    if [ -f "$tmp/chaos.tokens.checked" ]; then
+        cmp -s "$tmp/chaos.tokens.checked" "$tmp/chaos.tokens.$profile" ||
+            die "test_tokens: the chaos runs' results differ between the profiles"
+    fi
+
     (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_hostile) || die "test_hostile ($profile)"
     (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_entry) || die "test_entry ($profile)"
 
@@ -328,7 +386,7 @@ done
 if [ "${WUFFS_ASAN:-}" = 1 ]; then
     say "Ada: the image tests with AddressSanitizer (release profile)"
     (cd ada && alr exec -- gprbuild -q -P wuffs_gen.gpr -XWUFFS_PROFILE=release --relocate-build-tree="$tmp/asan" \
-        test_hostile.adb test_entry.adb test_image.adb -cargs -fsanitize=address -g -largs -fsanitize=address) \
+        test_hostile.adb test_entry.adb test_image.adb test_tokens.adb -cargs -fsanitize=address -g -largs -fsanitize=address) \
         > "$tmp/build.asan" 2>&1 || { cat "$tmp/build.asan"; die "the AddressSanitizer build failed"; }
     export ASAN_OPTIONS=detect_leaks=0
     timeout "$run_limit" "$tmp/asan/bin/test_hostile" || die "test_hostile (ASan)"
@@ -342,6 +400,15 @@ if [ "${WUFFS_ASAN:-}" = 1 ]; then
     grep '^= ' "$tmp/image.out" | cmp - "$tmp/image.c.trace" || die "test_image's trace differs from upstream's C (ASan)"
     [ ! -s "$tmp/asan.err" ] || { head -n 50 "$tmp/asan.err"; die "AddressSanitizer reported something"; }
     echo "AddressSanitizer: nothing reported; trace identical to upstream's C"
+    (echo chaos; cat "$tmp/tokens.manifest") |
+        timeout "$run_limit" "$tmp/asan/bin/test_tokens" > "$tmp/tokens.out" 2> "$tmp/asan.err" ||
+        { cat "$tmp/asan.err" | head -n 50; grep -v '^= ' "$tmp/tokens.out" | head -n 20; die "test_tokens (ASan)"; }
+    grep -v '^= ' "$tmp/tokens.out"
+    grep '^= ' "$tmp/tokens.out" | cmp - "$tmp/tokens.c.trace" || die "test_tokens's trace differs from upstream's C (ASan)"
+    grep '^test_tokens: chaos runs:' "$tmp/tokens.out" | cmp -s - "$tmp/chaos.tokens.checked" ||
+        die "test_tokens: the chaos runs' results differ from the checked profile's (ASan)"
+    [ ! -s "$tmp/asan.err" ] || { head -n 50 "$tmp/asan.err"; die "AddressSanitizer reported something (test_tokens)"; }
+    echo "AddressSanitizer, token decoders: nothing reported; trace identical to upstream's C"
 fi
 
 say "ALL PASS"

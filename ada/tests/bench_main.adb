@@ -5,7 +5,8 @@
 --  a test and not part of test.sh).  Standard input has one line per
 --  measurement, "KIND REPETITIONS PATH", with KIND one of crc32, adler32
 --  (hash the file), gzip (decompress it), png, gif (decode every frame to
---  BGRA_PREMUL).  For each it prints
+--  BGRA_PREMUL), json (tokenise the whole file in one call).  For each it
+--  prints
 --
 --    KIND PATH BYTES NANOSECONDS RESULT
 --
@@ -18,9 +19,11 @@ with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
 with Decode_Support;
 with Image_Support;
+with Token_Support;
 with Wuffs.Base.IO;
 with Wuffs.Base.Pixel_Buffers;
 with Wuffs.Base.Pixel_Formats;
+with Wuffs.Base.Tokens;
 with Wuffs.Runtime;
 with Wuffs.Std.Adler32;
 with Wuffs.Std.Crc32;
@@ -28,6 +31,7 @@ with Wuffs.Std.Gif;
 with Wuffs.Std.Gzip;
 with Wuffs.Std.Png;
 with Wuffs.Std.Jpeg;
+with Wuffs.Std.Json;
 with Wuffs.Std.Webp;
 
 procedure Bench_Main is
@@ -65,6 +69,8 @@ procedure Bench_Main is
    procedure Decode_Gzip;
 
    procedure Decode_Image (D : in out Wuffs.Runtime.Image_Decoder'Class);
+
+   procedure Decode_Json;
 
    procedure Measure (Line : String);
 
@@ -144,6 +150,25 @@ procedure Bench_Main is
       Failed := Failed or else St /= Wuffs.Ok_Status;
       Result := Wuffs.U64 (Dst_Meta.Wi);
    end Decode_Gzip;
+
+   --  Result is the number of tokens (in Token_Support.Tok_Work).
+   procedure Decode_Json is
+      Src_Meta : IO.Buffer_Meta := (Wi => Len, Ri => 0, Pos => 0, Closed => True);
+      Dst_Meta : Wuffs.Base.Tokens.Token_Buffer_Meta := Wuffs.Base.Tokens.Empty_Meta;
+      Work     : Wuffs.Bytes (1 .. 1) := [others => 0];
+      St       : Wuffs.Status;
+   begin
+      Wuffs.Std.Json.Initialize (Token_Support.Json_Decoder);
+      St :=
+        Token_Support.Json_Decoder.Decode_Tokens
+          (A_Dst      => Token_Support.Tok_Work,
+           A_Dst_Meta => Dst_Meta,
+           A_Src      => IMS.File (0 .. Len - 1),
+           A_Src_Meta => Src_Meta,
+           A_Workbuf  => Work);
+      Failed := Failed or else St /= Wuffs.Ok_Status;
+      Result := Wuffs.U64 (Dst_Meta.Wi);
+   end Decode_Json;
 
    procedure Decode_Image (D : in out Wuffs.Runtime.Image_Decoder'Class) is
       Src_Meta : IO.Buffer_Meta := (Wi => Len, Ri => 0, Pos => 0, Closed => True);
@@ -268,6 +293,8 @@ procedure Bench_Main is
             elsif Kind = "webp" then
                Wuffs.Std.Webp.Initialize (IMS.Webp_Decoder);
                Decode_Image (IMS.Webp_Decoder);
+            elsif Kind = "json" then
+               Decode_Json;
             end if;
             Elapsed := Ada.Real_Time.Clock - Start;
             if Elapsed < Best then
@@ -277,6 +304,14 @@ procedure Bench_Main is
          --  What was computed: the checksum, or the bytes produced.
          if Kind = "gzip" then
             Fnv (Check, IMS.Pix (IMS.Pix_First .. IMS.Pix_First + Wuffs.Index (Result) - 1));
+         elsif Kind = "json" then
+            --  The tokens' bytes (little-endian, as on the machine).
+            declare
+               Token_Bytes : Wuffs.Bytes (0 .. 8 * Wuffs.Index (Result) - 1)
+               with Import, Address => Token_Support.Tok_Work'Address;
+            begin
+               Fnv (Check, Token_Bytes);
+            end;
          elsif Kind = "png" or else Kind = "gif" or else Kind = "jpeg" or else Kind = "webp" then
             Fnv (Check, IMS.Pix (IMS.Pix_First .. IMS.Pix_First + Wuffs.Index (Result / 1000) - 1));
             Check := Check + Result mod 1000;

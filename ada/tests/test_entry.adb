@@ -19,6 +19,7 @@ with Image_Support;
 with Test_Support;
 with Tiny_Jpeg;
 with Tiny_Webp;
+with Token_Entry;
 with System;
 with Wuffs.Base.IO;
 with Wuffs.Base.Pixel_Buffers;
@@ -1253,6 +1254,9 @@ begin
    Check_Webp_Sub_Decoder;
 
    Check_Tell_Me_More;
+
+   --  The token decoders (json, cbor): see token_entry.adb.
+   Token_Entry;
 
    Test_Support.Finish ("test_entry");
 end Test_Entry;

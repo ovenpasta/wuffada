@@ -18,13 +18,13 @@ import (
 // calls into the proved base library (Wuffs.Base.*) or, where two arrays or
 // a slice handle are involved, into its shell (Wuffs.Runtime).
 
-// isIOMethodCall reports whether n calls a built-in method of an io_reader
-// or io_writer.
+// isIOMethodCall reports whether n calls a built-in method of an io_reader,
+// io_writer, token_reader or token_writer.
 func isIOMethodCall(n *a.Expr) bool {
 	if n.Operator() != a.ExprOperatorCall {
 		return false
 	}
-	return n.LHS().AsExpr().LHS().AsExpr().MType().IsIOType()
+	return n.LHS().AsExpr().LHS().AsExpr().MType().IsIOTokenType()
 }
 
 // call lowers a method call.
@@ -41,10 +41,20 @@ func (l *lowerer) call(n *a.Expr) (val, error) {
 		if err != nil {
 			return val{}, err
 		}
-		if rv.io == nil {
+		if rv.io == nil || rv.io.tokens {
 			return val{}, errNotYet("method call %q on something other than an I/O argument", n.Str(l.g.tm))
 		}
 		return l.ioMethod(n, rv.io, name, args)
+
+	case recvTyp.IsTokenType():
+		rv, err := l.expr(recv)
+		if err != nil {
+			return val{}, err
+		}
+		if rv.io == nil || !rv.io.tokens {
+			return val{}, errNotYet("method call %q on something other than a token_writer argument", n.Str(l.g.tm))
+		}
+		return l.tokenWriterMethod(n, rv.io, name, args)
 
 	case recvTyp.IsEitherSliceType() && isBulkMethod(name):
 		return l.bulkMethod(n, recv, name, args)
@@ -341,6 +351,39 @@ func (l *lowerer) readerMethod(n *a.Expr, io *ioArg, name string, args []*a.Node
 		}
 		return val{e: callNamed(ioPkg+".Peek_U8_At", "Data", data, "R", c, "Offset", vs[0].e), typ: typU8}, nil
 
+	case "peek_u64le_at":
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], 32); err != nil {
+			return val{}, err
+		}
+		// The Wuffs compiler has proved that length() >= offset + 8.
+		return val{e: callNamed(ioPkg+".Peek_U64LE_At", "Data", data, "R", c, "Offset", vs[0].e), typ: typU64}, nil
+
+	case "match7":
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], 64); err != nil {
+			return val{}, err
+		}
+		// (The Wuffs result type is u32[..= 2]: Match7's postcondition.)
+		return val{e: callNamed(ioPkg+".Match7", "Data", data, "R", c, "A", vs[0].e), typ: typU32}, nil
+
+	case "valid_utf_8_length":
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], 64); err != nil {
+			return val{}, err
+		}
+		return val{e: callNamed(utf8Pkg+".Valid_UTF_8_Length", "Data", data, "R", c, "Up_To", vs[0].e),
+			typ: typU64}, nil
+
 	case "skip_u32_fast":
 		vs, err := l.argValues(n, args, 2)
 		if err != nil {
@@ -599,6 +642,66 @@ func (l *lowerer) writerMethod(n *a.Expr, io *ioArg, name string, args []*a.Node
 		return val{}, nil
 	}
 	return val{}, errNotYet("io_writer method %q", name)
+}
+
+// tokenWriterMethod lowers a built-in method of a token_writer argument:
+// see the method table in ada/src/token/wuffs-base-tokens.ads.
+func (l *lowerer) tokenWriterMethod(n *a.Expr, io *ioArg, name string, args []*a.Node) (val, error) {
+	if io.cursor == nil {
+		return val{}, fmt.Errorf("internal error: no cursor for %q", n.Str(l.g.tm))
+	}
+	data, c := io.data, expr(eVar{io.cursor})
+	switch name {
+	case "length":
+		if len(args) != 0 {
+			break
+		}
+		return val{e: call(tokensPkg+".Length", c), typ: typU64}, nil
+
+	case "write_simple_token_fast", "write_extended_token_fast":
+		// C (writeBuiltinTokenWriter): *iop++ = make_token(the fields,
+		// shifted into place). The Wuffs compiler has proved that length()
+		// >= 1 and that each argument is within its parameter's refinement,
+		// which are the subtypes of Wuffs.Base.Tokens' parameters.
+		want := []string{"value_major", "value_minor", "continued", "length"}
+		bits := []int{32, 32, 32, 32}
+		adaNames := []string{"Value_Major", "Value_Minor", "Continued", "Length"}
+		proc := "Write_Simple_Token_Fast"
+		if name == "write_extended_token_fast" {
+			want = []string{"value_extension", "continued", "length"}
+			bits = []int{64, 32, 32}
+			adaNames = []string{"Value_Extension", "Continued", "Length"}
+			proc = "Write_Extended_Token_Fast"
+		}
+		vs, err := l.argValues(n, args, len(want))
+		if err != nil {
+			return val{}, err
+		}
+		named := []interface{}{"Data", data, "W", expr(eOut{c})}
+		for i, o := range args {
+			if got := o.AsArg().Name().Str(l.g.tm); got != want[i] {
+				return val{}, fmt.Errorf("%q: argument %d is %q, not %q", n.Str(l.g.tm), i, got, want[i])
+			}
+			if err := l.numArg(n, vs[i], bits[i]); err != nil {
+				return val{}, err
+			}
+			if want[i] == "value_extension" {
+				// Upstream's C back-end prints a constant below 2**32 as a
+				// 32-bit literal and complements and shifts it in 32 bits,
+				// so its token is not the one that the 64-bit arithmetic of
+				// Make_Extended_Token gives. No std package does this.
+				if cv := o.AsArg().Value().ConstValue(); cv != nil && cv.BitLen() <= 32 {
+					return val{}, errNotYet("%q: a constant value_extension below 2**32 "+
+						"(upstream's C computes it in 32 bits)", n.Str(l.g.tm))
+				}
+			}
+			named = append(named, adaNames[i], vs[i].e)
+		}
+		io.markWritten()
+		l.pre = append(l.pre, sCall{callNamed(tokensPkg+"."+proc, named...)})
+		return val{}, nil
+	}
+	return val{}, errNotYet("token_writer method %q", name)
 }
 
 // bytesFirst returns the Ada index of the first element of the array view b
@@ -954,6 +1057,14 @@ func (l *lowerer) utilityMethod(n *a.Expr, name string, args []*a.Node) (val, er
 		// (The Wuffs compiler has proved that B is not zero.)
 		return val{e: callNamed(intsPkg+".I64_Divide", "A", vs[0].e, "B", vs[1].e), typ: typU64}, nil
 
+	case "empty_range_ii_u64":
+		// C: wuffs_base__utility__empty_range_ii_u64, a macro for
+		// wuffs_base__empty_range_ii_u64: (0, 0).
+		if len(args) != 0 {
+			break
+		}
+		return val{e: raw(rangesPkg + ".Empty_Range_II_U64"), typ: typRangeIIU64}, nil
+
 	case "make_range_ii_u64":
 		vs, err := l.argValues(n, args, 2)
 		if err != nil {
@@ -1078,6 +1189,22 @@ func (l *lowerer) userCall(n *a.Expr, recv *a.Expr, method t.ID, args []*a.Node)
 		}
 		want := callee.args[i]
 		switch want.typ.kind {
+		case kTokenWriter:
+			// As an io_writer below (wuffs-base-tokens.ads, "Protocols").
+			if v.io == nil || !v.io.tokens || v.typ.kind != want.typ.kind {
+				return val{}, errNotYet("argument %q: a token_writer other than a token_writer argument",
+					arg.Str(l.g.tm))
+			}
+			names = append(names, want.v.name, want.meta.name)
+			v.io.meta.writes++
+			v.io.markWritten()
+			values = append(values, v.io.data, eVar{v.io.meta})
+			if v.io.cursor != nil {
+				cursor, meta := eVar{v.io.cursor}, eVar{v.io.meta}
+				l.pre = append(l.pre, sCall{call(tokensPkg+".Save", meta, cursor)})
+				l.post = append(l.post, sCall{call(tokensPkg+".Reload", cursor, meta)})
+			}
+			continue
 		case kIOReader, kIOWriter:
 			if v.io == nil || v.typ.kind != want.typ.kind {
 				return val{}, errNotYet("argument %q: an I/O value other than an I/O argument", arg.Str(l.g.tm))

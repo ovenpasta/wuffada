@@ -1,0 +1,17 @@
+--  Test drivers for the token part of the base library (ada/tests_token).
+--  Owner: base-library work.
+--
+--    alr exec -- gprbuild -P wuffs_token_tests.gpr [-XWUFFS_PROFILE=release]
+--    bin/token_tests        (exit status 0 only if every check passed)
+--    tests_token/oracle/regen.sh   (expected digests from upstream's C)
+with "wuffs_common.gpr";
+project Wuffs_Token_Tests is
+   for Source_Dirs use ("src/root", "src/base", "src/token", "tests_token");
+   for Object_Dir use "obj/token_tests/" & Wuffs_Common.Profile;
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("token_tests.adb");
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+end Wuffs_Token_Tests;

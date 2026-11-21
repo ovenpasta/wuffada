@@ -331,9 +331,25 @@ func TestCheckedIn(tt *testing.T) {
 			"wuffs/std/webp/decode_webp.wuffs",
 		},
 	}, {
+		name:   "json",
+		outDir: "ada/gen",
+		files: []string{
+			"wuffs/std/json/common_consts.wuffs",
+			"wuffs/std/json/decode_json.wuffs",
+			"wuffs/std/json/decode_quirks.wuffs",
+		},
+	}, {
+		name:   "cbor",
+		outDir: "ada/gen",
+		files:  []string{"wuffs/std/cbor/decode_cbor.wuffs"},
+	}, {
 		name:   "m1test",
 		outDir: "ada/tests",
 		files:  []string{"internal/adagen/testdata/m1test.wuffs"},
+	}, {
+		name:   "tokadv",
+		outDir: "ada/tests",
+		files:  []string{"internal/adagen/testdata/tokadv.wuffs"},
 	}, {
 		name:   "advtest",
 		outDir: "ada/tests",
@@ -588,21 +604,6 @@ func TestRejects(tt *testing.T) {
 		src:  "pri struct foo?(\n    x : base.u32,\n)\n",
 		want: "not yet supported: struct foo: private structs",
 	}, {
-		what: "interface without an Ada equivalent",
-		src: `pub struct foo? implements base.token_decoder(util : base.utility)
-			pub func foo.get_quirk(key: base.u32) base.u64 {
-				return 0
-			}
-			pub func foo.set_quirk!(key: base.u32, value: base.u64) base.status {
-				return ok
-			}
-			pub func foo.workbuf_len() base.range_ii_u64 {
-				return this.util.make_range_ii_u64(min_incl: 0, max_incl: 0)
-			}
-			pub func foo.decode_tokens?(dst: base.token_writer, src: base.io_reader, workbuf: slice base.u8) {
-			}`,
-		want: "not yet supported",
-	}, {
 		what: "statuses without a package id",
 		src:  "pub status \"#bad\"\n" + prelude,
 		want: "needs a package id",
@@ -635,6 +636,54 @@ func TestRejects(tt *testing.T) {
 				return this.x == 0
 			}`,
 		want: "public function returns \"base.bool\", which upstream's wuffs-c also rejects",
+	}, {
+		what: "a token_reader argument",
+		src: prelude + `
+			pub func foo.bar?(src: base.token_reader) {
+				this.x = 1
+			}`,
+		want: "not yet supported: type \"base.token_reader\"",
+	}, {
+		what: "two token_writer arguments",
+		src: prelude + `
+			pub func foo.bar?(a: base.token_writer, b: base.token_writer) {
+				if args.a.length() > 0 {
+					args.a.write_simple_token_fast!(value_major: 0, value_minor: 0, continued: 0, length: 0)
+				}
+				if args.b.length() > 0 {
+					args.b.write_simple_token_fast!(value_major: 0, value_minor: 0, continued: 0, length: 0)
+				}
+			}`,
+		want: "not yet supported: a function with two token_writer arguments",
+	}, {
+		what: "a token_writer and a pixel buffer",
+		src: prelude + `
+			pub func foo.bar!(a: base.token_writer, dst: ptr base.pixel_buffer) {
+				if args.a.length() > 0 {
+					args.a.write_simple_token_fast!(value_major: 0, value_minor: 0, continued: 0, length: 0)
+				}
+			}`,
+		want: "not yet supported: a function with a token_writer and a pixel buffer argument",
+	}, {
+		what: "a constant value_extension below 2**32",
+		src: prelude + `
+			pub func foo.bar!(a: base.token_writer) {
+				if args.a.length() > 0 {
+					args.a.write_extended_token_fast!(value_extension: 7, continued: 1, length: 0)
+				}
+			}`,
+		want: "a constant value_extension below 2**32",
+	}, {
+		what: "io_limit of a token_writer",
+		src: prelude + `
+			pub func foo.bar!(a: base.token_writer) {
+				io_limit (io: args.a, limit: 1 as base.u64) {
+					if args.a.length() > 0 {
+						args.a.write_simple_token_fast!(value_major: 0, value_minor: 0, continued: 0, length: 0)
+					}
+				}
+			}`,
+		want: "io_limit",
 	}, {
 		what: "local variables that differ only by case",
 		src: prelude + `
@@ -1666,5 +1715,92 @@ func TestEntryChecks(tt *testing.T) {
 	}
 	if !strings.Contains(string(out.Spec), "with Put_Image => G_Put_Image;") {
 		tt.Errorf("no Put_Image aspect:\n%s", out.Spec)
+	}
+}
+
+// Token I/O: a token_writer argument is a token array and its meta, with a
+// cursor that is built at entry, stored back at exit and around callees,
+// and whose methods are calls into Wuffs.Base.Tokens; the struct implements
+// Wuffs.Runtime.Token_Decoder; the reader methods that the token decoders
+// use are calls into Wuffs.Base.IO and Wuffs.Base.UTF8.
+func TestTokenWriter(tt *testing.T) {
+	got := mustGenerate(tt, `
+		pub struct foo? implements base.token_decoder(util : base.utility, x : base.u32)
+		pub func foo.get_quirk(key: base.u32) base.u64 {
+			return 0
+		}
+		pub func foo.set_quirk!(key: base.u32, value: base.u64) base.status {
+			return ok
+		}
+		pub func foo.workbuf_len() base.range_ii_u64 {
+			return this.util.empty_range_ii_u64()
+		}
+		pri func foo.put!(dst: base.token_writer, v: base.u32) {
+			if args.dst.length() > 0 {
+				args.dst.write_extended_token_fast!(value_extension: 0x3FFF_FFFF_FFFF, continued: 0, length: 3)
+			}
+		}
+		pub func foo.decode_tokens?(dst: base.token_writer, src: base.io_reader, workbuf: slice base.u8) {
+			var m : base.u32[..= 2]
+			var n : base.u64
+			var y : base.u64
+			while args.dst.length() <= 0,
+					post args.dst.length() > 0,
+			{
+				yield? base."$short write"
+			}
+			args.dst.write_simple_token_fast!(value_major: 0x0B_29FA, value_minor: 7, continued: 1, length: 0xFFFF)
+			this.put!(dst: args.dst, v: 1)
+			if args.src.length() >= 12 {
+				m = args.src.match7(a: 0x6162_02)
+				y = args.src.peek_u64le_at(offset: 4)
+				n = args.src.valid_utf_8_length(up_to: 12)
+				this.x = (m as base.u32) ~mod+ (((n ~mod+ y) & 0xFF) as base.u32)
+			}
+		}`)
+	wantContains(tt, got,
+		"type Foo is limited new Wuffs.Runtime.Token_Decoder with private;",
+		"A_Dst : in out Wuffs.U64_Array;",
+		"A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;",
+		"G_TW_Dst : Wuffs.Base.Tokens.Token_Writer;",
+		"G_TW_Dst := Wuffs.Base.Tokens.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);",
+		"Wuffs.Runtime.Shares_Storage (A => A_Dst,",
+		"not Wuffs.Runtime.Valid_Token_Buffer (A_Dst, A_Dst_Meta)",
+		"Wuffs.Runtime.Tokens_Share_Storage (Tokens => A_Dst, B => A_Src)",
+		"Wuffs.Runtime.Tokens_Share_Storage (Tokens => A_Dst, B => A_Workbuf)",
+		"Wuffs.Base.Tokens.Length (G_TW_Dst)",
+		"Value_Major => 16#0B_29FA#",
+		"Continued => 1",
+		"Length => 16#FFFF#",
+		"Value_Extension => 16#3FFF_FFFF_FFFF#",
+		"Wuffs.Base.Tokens.Save (A_Dst_Meta, G_TW_Dst);\n      Put (Self, A_Dst => A_Dst, A_Dst_Meta => A_Dst_Meta, A_V => 1);\n      Wuffs.Base.Tokens.Reload (G_TW_Dst, A_Dst_Meta);",
+		"Wuffs.Base.IO.Match7 (Data => A_Src, R => G_R_Src, A => 16#61_6202#)",
+		"Wuffs.Base.IO.Peek_U64LE_At (Data => A_Src, R => G_R_Src, Offset => 4)",
+		"Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => 12)",
+		"return Wuffs.Base.Ranges.Empty_Range_II_U64;",
+	)
+	if n := strings.Count(got, "Wuffs.Base.Tokens.Write_Simple_Token_Fast\n"); n != 1 {
+		tt.Errorf("%d calls of Write_Simple_Token_Fast, want 1", n)
+	}
+}
+
+func TestCheckCallsTokens(tt *testing.T) {
+	ok := []stmt{
+		sCall{call("Wuffs.Base.Tokens.Save", raw("M"), raw("W"))},
+		sCall{call("Wuffs.Base.Tokens.Reload", raw("W"), raw("M"))},
+		sIf{branches: []ifBranch{{call("Wuffs.Runtime.Valid_Token_Buffer", raw("D"), raw("M")), nil}}},
+	}
+	if err := checkCalls(ok); err != nil {
+		tt.Errorf("unexpected error: %v", err)
+	}
+	for _, bad := range []stmt{
+		sCall{call("Wuffs.Base.Tokens.Write_Simple_Token_Fast", raw("D"), raw("W"), raw("0"), raw("1"), raw("0"), raw("1"))},
+		sCall{call("Wuffs.Base.Tokens.Write_Extended_Token_Fast", raw("D"), raw("W"), raw("0"), raw("0"), raw("1"))},
+		sAssign{raw("X"), call("Wuffs.Runtime.Tokens_Share_Storage", raw("T"), raw("B"))},
+		sAssign{raw("X"), call("Wuffs.Base.UTF8.Valid_UTF_8_Length", raw("D"), raw("R"), raw("N"))},
+	} {
+		if err := checkCalls([]stmt{bad}); err == nil {
+			tt.Errorf("no error for a positional call: %#v", bad)
+		}
 	}
 }

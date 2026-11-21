@@ -45,7 +45,7 @@ func (g *gen) header() string {
 func (g *gen) withClauses(text string, specText string) string {
 	needs := func(s string, unit string) bool { return strings.Contains(s, unit+".") }
 	candidates := []string{"Ada.Strings.Text_Buffers", "Interfaces", "Wuffs.Runtime", targetPkg, basePkg, intsPkg, slicesPkg, endianPkg, ioPkg,
-		rangesPkg, formatsPkg, buffersPkg, swizzlerPkg}
+		rangesPkg, tokensPkg, utf8Pkg, formatsPkg, buffersPkg, swizzlerPkg}
 	for _, o := range g.usedPackages() {
 		candidates = append(candidates, o)
 	}

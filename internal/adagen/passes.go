@@ -149,12 +149,17 @@ var positionalCalls = func() map[string]bool {
 		// the reverse.
 		ioPkg + ".Save":   true,
 		ioPkg + ".Reload": true,
+		// (M : in out Token_Buffer_Meta; W : Token_Writer), and the reverse.
+		tokensPkg + ".Save":   true,
+		tokensPkg + ".Reload": true,
 		// (S : a slice handle; I : Wuffs.Index).
 		"Wuffs.Runtime.Get":        true,
 		"Wuffs.Runtime.Subslice_I": true,
 		"Wuffs.Runtime.Subslice_J": true,
 		// (Data : Wuffs.Bytes; M : Buffer_Meta).
 		"Wuffs.Runtime.Valid_Buffer": true,
+		// (Data : Wuffs.U64_Array; M : Token_Buffer_Meta).
+		"Wuffs.Runtime.Valid_Token_Buffer": true,
 	}
 	// (Data : Wuffs.Bytes; R : Reader).
 	for _, bits := range []string{"8", "16", "24", "32", "40", "48", "56", "64"} {

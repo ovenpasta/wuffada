@@ -1,0 +1,20 @@
+--  The SPARK-proved token part of the base library (ada/src/token): token
+--  buffers and cursors (Wuffs.Base.Tokens) and UTF-8 (Wuffs.Base.UTF8), for
+--  std/json and std/cbor.  It builds on, and re-proves together with, the
+--  frozen core (src/base).  Owner: base-library work.
+with "wuffs_common.gpr";
+project Wuffs_Token is
+   for Source_Dirs use ("src/root", "src/base", "src/token");
+   for Object_Dir use "obj/token/" & Wuffs_Common.Profile;
+   for Create_Missing_Dirs use "True";
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   end Compiler;
+   package Prove is
+      --  Level 2 (provers cvc5, z3, altergo), but with a step limit in place
+      --  of the level's 5 second prover timeout, so that a check is proved or
+      --  not regardless of how busy the machine is.  The same limit is in
+      --  wuffs_base.gpr, wuffs_pixel.gpr and wuffs_ycck.gpr.
+      for Proof_Switches ("Ada") use Wuffs_Common.Proof_Switches;
+   end Prove;
+end Wuffs_Token;

@@ -10,8 +10,8 @@ with "../ada/wuffs_common.gpr";
 project Decode_Image is
 
    for Source_Dirs use
-     ("../ada/src/root", "../ada/src/base", "../ada/src/pixel", "../ada/src/ycck", "../ada/src/runtime",
-      "../ada/src/runtime/target", "../ada/gen", "decode_image");
+     ("../ada/src/root", "../ada/src/base", "../ada/src/pixel", "../ada/src/ycck", "../ada/src/token",
+      "../ada/src/runtime", "../ada/src/runtime/target", "../ada/gen", "decode_image");
    for Object_Dir use "obj/" & Wuffs_Common.Profile;
    for Exec_Dir use "bin";
    for Create_Missing_Dirs use "True";

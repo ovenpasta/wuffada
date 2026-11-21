@@ -64,6 +64,32 @@ package body Wuffs.Runtime is
         and then Address < First_Address (A) + SE.Storage_Offset (A'Length);
    end Shares_Storage;
 
+   --  The number of storage elements of the array of tokens A.
+   function Storage_Length (A : Wuffs.U64_Array) return SE.Storage_Offset is
+     (SE.Storage_Offset (A'Length) * (Wuffs.U64_Array'Component_Size / System.Storage_Unit));
+
+   function Shares_Storage
+     (A : Wuffs.U64_Array; Address : System.Address; Size_In_Bits : Long_Long_Integer)
+      return Boolean
+   is
+      Size : constant SE.Storage_Offset := SE.Storage_Offset ((Size_In_Bits + 7) / 8);
+   begin
+      if A'Length = 0 or else Size <= 0 then
+         return False;
+      end if;
+      return A (A'First)'Address < Address + Size
+        and then Address < A (A'First)'Address + Storage_Length (A);
+   end Shares_Storage;
+
+   function Tokens_Share_Storage (Tokens : Wuffs.U64_Array; B : Wuffs.Bytes) return Boolean is
+   begin
+      if Tokens'Length = 0 or else B'Length = 0 then
+         return False;
+      end if;
+      return Tokens (Tokens'First)'Address < First_Address (B) + SE.Storage_Offset (B'Length)
+        and then First_Address (B) < Tokens (Tokens'First)'Address + Storage_Length (Tokens);
+   end Tokens_Share_Storage;
+
    function Valid_Pixel_Buffer
      (PB      : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
       Pixels  : Wuffs.Bytes;

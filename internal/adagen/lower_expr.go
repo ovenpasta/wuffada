@@ -32,7 +32,7 @@ type val struct {
 	// zeroBased means that arr'First is known to be 0 (a constrained array).
 	zeroBased bool
 
-	// io is the argument, for a kIOReader or kIOWriter value.
+	// io is the argument, for a kIOReader, kIOWriter or kTokenWriter value.
 	io *ioArg
 
 	// variable means that e names an Ada variable (something assignable).
@@ -441,7 +441,10 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 				}
 				if io := l.ios[n.Ident()]; io != nil {
 					typ := typIOReader
-					if io.writer {
+					switch {
+					case io.tokens:
+						typ = typTokenWriter
+					case io.writer:
 						typ = typIOWriter
 					}
 					return val{typ: typ, io: io}, nil

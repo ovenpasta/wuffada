@@ -52,6 +52,13 @@ const (
 	// the row's index (a Wuffs.Offset), -1 for nullptr. elem and length are
 	// the row's element type and length.
 	kRowPtr
+
+	// kTokenWriter is Wuffs "base.token_writer": an Ada array of tokens
+	// (Wuffs.U64_Array) plus a Wuffs.Base.Tokens.Token_Buffer_Meta, as
+	// kIOWriter is a byte array plus a Buffer_Meta.
+	kTokenWriter
+	kTokenArray // Wuffs.U64_Array: the array of a token buffer.
+	kTokenMeta  // Wuffs.Base.Tokens.Token_Buffer_Meta.
 )
 
 // adaType is the Ada type of a Wuffs type, variable or expression.
@@ -101,6 +108,11 @@ var (
 	typMeta      = &adaType{kind: kMeta, name: ioPkg + ".Buffer_Meta"}
 	typReader    = &adaType{kind: kCursor, name: ioPkg + ".Reader"}
 	typWriter    = &adaType{kind: kCursor, name: ioPkg + ".Writer"}
+
+	typTokenWriter = &adaType{kind: kTokenWriter, name: "base.token_writer"}
+	typTokenArray  = &adaType{kind: kTokenArray, name: "Wuffs.U64_Array"}
+	typTokenMeta   = &adaType{kind: kTokenMeta, name: tokensPkg + ".Token_Buffer_Meta"}
+	typTokenCursor = &adaType{kind: kCursor, name: tokensPkg + ".Token_Writer"}
 
 	typPixelFormat = &adaType{kind: kOpaque, name: formatsPkg + ".Pixel_Format",
 		zero: formatsPkg + ".Make_Pixel_Format (Repr => 0)"}
@@ -264,6 +276,12 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 				return typIOReader, nil
 			case t.IDIOWriter:
 				return typIOWriter, nil
+			case t.IDTokenWriter:
+				return typTokenWriter, nil
+			case t.IDTokenReader:
+				// Wuffs has no token_reader methods and no package of
+				// Wuffs' standard library takes one.
+				return nil, errNotYet("type %q", x.Str(g.tm))
 			case t.IDPixelFormat:
 				return typPixelFormat, nil
 			case t.IDPixelBlend:

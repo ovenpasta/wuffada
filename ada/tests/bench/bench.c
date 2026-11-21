@@ -21,6 +21,7 @@
 #define WUFFS_CONFIG__MODULE__GZIP
 #define WUFFS_CONFIG__MODULE__PNG
 #define WUFFS_CONFIG__MODULE__JPEG
+#define WUFFS_CONFIG__MODULE__JSON
 #define WUFFS_CONFIG__MODULE__VP8
 #define WUFFS_CONFIG__MODULE__WEBP
 #define WUFFS_CONFIG__MODULE__ZLIB
@@ -42,6 +43,9 @@ static wuffs_png__decoder g_png;
 static wuffs_jpeg__decoder g_jpeg;
 static wuffs_gif__decoder g_gif;
 static wuffs_webp__decoder g_webp;
+static wuffs_json__decoder g_json;
+#define CAP_TOK (4 * 1024 * 1024)
+static wuffs_base__token g_tok[CAP_TOK];
 
 static uint64_t fnv(uint64_t h, const uint8_t* p, size_t n) {
   for (size_t i = 0; i < n; i++) {
@@ -131,6 +135,20 @@ static void once(const char* kind) {
       g_failed = 1;
     }
     decode_image(wuffs_jpeg__decoder__upcast_as__wuffs_base__image_decoder(&g_jpeg));
+  } else if (!strcmp(kind, "json")) {
+    wuffs_base__io_buffer src = wuffs_base__ptr_u8__reader(g_file, g_len, true);
+    wuffs_base__token_buffer dst =
+        wuffs_base__slice_token__writer(wuffs_base__make_slice_token(g_tok, CAP_TOK));
+    uint8_t work[1] = {0};
+    if (wuffs_json__decoder__initialize(&g_json, sizeof g_json, WUFFS_VERSION, 0).repr) {
+      g_failed = 1;
+    }
+    wuffs_base__status st = wuffs_json__decoder__decode_tokens(
+        &g_json, &dst, &src, wuffs_base__make_slice_u8(work, 1));
+    if (st.repr) {
+      g_failed = 1;
+    }
+    g_result = dst.meta.wi;
   } else if (!strcmp(kind, "webp")) {
     if (wuffs_webp__decoder__initialize(&g_webp, sizeof g_webp, WUFFS_VERSION, 0).repr) {
       g_failed = 1;
@@ -167,6 +185,8 @@ int main(void) {
     uint64_t check = 0xCBF29CE484222325ull;
     if (!strcmp(kind, "gzip")) {
       check = fnv(check, g_pix, (size_t)g_result);
+    } else if (!strcmp(kind, "json")) {
+      check = fnv(check, (const uint8_t*)g_tok, (size_t)g_result * 8);
     } else if (!strcmp(kind, "png") || !strcmp(kind, "gif") || !strcmp(kind, "jpeg") ||
                !strcmp(kind, "webp")) {
       check = fnv(check, g_pix, (size_t)(g_result / 1000)) + g_result % 1000;

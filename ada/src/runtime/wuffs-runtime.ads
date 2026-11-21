@@ -62,6 +62,7 @@ with Wuffs.Base.Pixel_Formats;
 with Wuffs.Base.Pixel_Swizzler;
 with Wuffs.Base.Ranges;
 with Wuffs.Base.Slices;
+with Wuffs.Base.Tokens;
 
 package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
 
@@ -216,6 +217,61 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    with Inline;
 
    ---------------------------------------------------------------------------
+   --  Token buffers.
+   --
+   --  A token_writer argument of a Wuffs function is two Ada parameters, as
+   --  an io_writer is: the caller's array of tokens (a Wuffs.U64_Array; a
+   --  token is a U64, see wuffs-base-tokens.ads) and its
+   --  Wuffs.Base.Tokens.Token_Buffer_Meta.  Nothing is held across calls.
+   --
+   --  At every public entry (also when a suspended coroutine is resumed,
+   --  whose arguments may differ from the suspended call's), before
+   --  anything else reads or writes an argument, in every profile:
+   --
+   --    * the meta describes the array: Valid_Token_Buffer below;
+   --    * the token array shares no storage with the object that the
+   --      function is called on (Shares_Storage, the U64_Array form);
+   --    * the token array shares no storage with any byte array argument
+   --      (the source buffer, the work buffer, a slice):
+   --      Tokens_Share_Storage.
+   --
+   --  The last is stricter than C, which leaves overlapping buffers to the
+   --  caller.  Between two byte arrays an overlap is dealt with at each
+   --  two-array operation (the aliasing decision above), but an array of
+   --  tokens and an array of bytes are never parts of one Ada array, so
+   --  there is no same-array form to call, and the Ada compiler may assume
+   --  that objects of the two element types do not overlap (as it may for
+   --  the bulk loads and saves below).  No proved operation is given a
+   --  token array and a byte array in one call, so this is not needed for
+   --  the proofs; it makes the decoders' results well defined, the same in
+   --  both profiles and the same as C's for every caller that is accepted.
+   --
+   --  Whatever fails, the function returns Wuffs.Base.Error_Bad_Argument
+   --  and disables the object, as for the other arguments (see "Arguments"
+   --  below).
+   ---------------------------------------------------------------------------
+
+   --  The token counterpart of Valid_Buffer: every field of M has a value
+   --  of its subtype ('Valid), the indexes are ordered and they lie within
+   --  the array.  After it, the cursor that Wuffs.Base.Tokens.To_Writer
+   --  makes from M satisfies Wuffs.Base.Tokens.Valid for Data.
+   function Valid_Token_Buffer
+     (Data : Wuffs.U64_Array; M : Wuffs.Base.Tokens.Token_Buffer_Meta) return Boolean
+   is (M.Ri'Valid
+       and then M.Wi'Valid
+       and then M.Closed'Valid
+       and then M.Ri <= M.Wi
+       and then M.Wi <= Data'Length)
+   with Inline;
+
+   --  True if the array of tokens Tokens and the byte array B have a
+   --  storage element in common: both are non-empty and their address
+   --  ranges intersect, each range being [address of the first element,
+   --  that plus the array's length times its elements' size in storage
+   --  elements).  That is decided by address, whatever the element types.
+   function Tokens_Share_Storage (Tokens : Wuffs.U64_Array; B : Wuffs.Bytes) return Boolean;
+
+   ---------------------------------------------------------------------------
    --  Two-array operations.  See "The aliasing decision" above.
    ---------------------------------------------------------------------------
 
@@ -304,10 +360,15 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    --  literal nullptr as Null_Pixel_Buffer, True and two empty arrays of its
    --  own.
    --
-   --  Overlap between array arguments other than under (d) is NOT an error
-   --  at entry: a destination buffer, a source buffer and a work buffer may
-   --  share elements with each other (as upstream's C allows).  It is dealt
-   --  with at each operation that takes two arrays, in this package:
+   --  f. A token array (a token_writer argument) shares no storage with any
+   --     byte array argument, and its meta describes it: see "Token
+   --     buffers" above.
+   --
+   --  Overlap between array arguments other than under (d) and (f) is NOT
+   --  an error at entry: a destination buffer, a source buffer and a work
+   --  buffer may share elements with each other (as upstream's C allows).
+   --  It is dealt with at each operation that takes two arrays, in this
+   --  package:
    --
    --     Copy_From_Slice, Writer_Copy_From_Slice,
    --     Writer_Limited_Copy_U32_From_Slice,
@@ -361,6 +422,12 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    --  start at Address (a decoder object: Self'Address and Self'Size).
    function Shares_Storage
      (A : Wuffs.Bytes; Address : System.Address; Size_In_Bits : Long_Long_Integer)
+      return Boolean;
+
+   --  The same for an array of tokens (see "Token buffers" above): A's
+   --  storage is its Length * 8 storage elements from A'Address.
+   function Shares_Storage
+     (A : Wuffs.U64_Array; Address : System.Address; Size_In_Bits : Long_Long_Integer)
       return Boolean;
 
    --  The total validation of a caller's pixel buffer: every field of every
@@ -739,6 +806,37 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    is abstract;
 
    function Workbuf_Len (Self : Image_Decoder) return Wuffs.Base.Ranges.Range_II_U64
+   is abstract;
+
+   ---------------------------------------------------------------------------
+   --  Wuffs `base.token_decoder`.
+   ---------------------------------------------------------------------------
+
+   type Token_Decoder is limited interface;
+
+   --  A_Dst (A_Dst'First .. A_Dst'First + A_Dst_Meta.Wi - 1) holds the
+   --  tokens written so far and A_Src (A_Src'First + A_Src_Meta.Ri ..
+   --  A_Src'First + A_Src_Meta.Wi - 1) what is still to be read, as in C's
+   --  wuffs_base__token_buffer and wuffs_base__io_buffer.  Returns a
+   --  suspension ("short read", "short write") to be called again with
+   --  more input or more room.  See "Token buffers" above for what is
+   --  checked about the arguments.
+   function Decode_Tokens
+     (Self       : in out Token_Decoder;
+      A_Dst      : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src      : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf  : in out Wuffs.Bytes) return Wuffs.Status
+   is abstract;
+
+   function Get_Quirk (Self : Token_Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is abstract;
+
+   function Set_Quirk
+     (Self : in out Token_Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
+   is abstract;
+
+   function Workbuf_Len (Self : Token_Decoder) return Wuffs.Base.Ranges.Range_II_U64
    is abstract;
 
 private

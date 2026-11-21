@@ -24,10 +24,10 @@ read it before changing anything.
 |---|---|
 | `docs/DESIGN.md` | architecture, type mapping, milestones, open decisions |
 | `ada/src/root/wuffs.ads` | shared scalar/array/status types (architect-owned) |
-| `ada/src/base/`, `ada/src/pixel/`, `ada/src/ycck/` | `Wuffs.Base.*`, hand-written (pixel rows script-generated), SPARK, proved |
+| `ada/src/base/`, `ada/src/pixel/`, `ada/src/ycck/`, `ada/src/token/` | `Wuffs.Base.*`, hand-written (pixel rows script-generated), SPARK, proved |
 | `ada/src/runtime/` | `Wuffs.Runtime.*`, non-SPARK glue for generated code |
 | `ada/gen/` | generator output `Wuffs.Std.*` (checked in, never hand-edited) |
-| `ada/tests/`, `ada/tests_base/`, `ada/tests_pixel/`, `ada/tests_ycck/` | generator tests; proved-library tests + C oracles |
+| `ada/tests/`, `ada/tests_base/`, `ada/tests_pixel/`, `ada/tests_ycck/`, `ada/tests_token/` | generator tests; proved-library tests + C oracles |
 | `examples/` | `decode_image`: image file to PPM/PAM with the Ada library only |
 | `cmd/wuffs-ada/`, `internal/adagen/` | the generator (Go) |
 | `wuffs/` | upstream checkout, pinned at `a87f0bb`, git-ignored, read-only |

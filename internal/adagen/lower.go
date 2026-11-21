@@ -27,10 +27,17 @@ type loopInfo struct {
 	isIterate     bool
 }
 
-// ioArg is an io_reader or io_writer argument of the function being lowered.
+// ioArg is an io_reader, io_writer or token_writer argument of the function
+// being lowered.
 type ioArg struct {
 	arg    *argInfo // nil for a local variable bound by io_bind.
 	writer bool
+
+	// tokens means that it is a token_writer (writer is then true too): data
+	// is a Wuffs.U64_Array, meta a Wuffs.Base.Tokens.Token_Buffer_Meta and
+	// cursor a Wuffs.Base.Tokens.Token_Writer, and the protocols are those of
+	// wuffs-base-tokens.ads (the same as for byte buffers).
+	tokens bool
 
 	// data is the buffer's array and meta is its Buffer_Meta.
 	data expr
@@ -145,7 +152,7 @@ func (g *gen) lowerFunc(fi *funcInfo) error {
 		data, meta := io.data, eVar{io.meta}
 		if io.writer {
 			head = append(head, sAssign{eVar{io.cursor},
-				callNamed(ioPkg+".To_Writer", "M", meta, "Data_Length", eAttr{data, "Length"})})
+				callNamed(io.pkg()+".To_Writer", "M", meta, "Data_Length", eAttr{data, "Length"})})
 		} else {
 			head = append(head, sAssign{eVar{io.cursor}, call(ioPkg+".To_Reader", meta)})
 		}
@@ -188,10 +195,18 @@ func (l *lowerer) saveCursors() []stmt {
 	for _, io := range l.ioList {
 		if io.cursor != nil {
 			io.meta.writes++
-			ret = append(ret, sCall{call(ioPkg+".Save", eVar{io.meta}, eVar{io.cursor})})
+			ret = append(ret, sCall{call(io.pkg()+".Save", eVar{io.meta}, eVar{io.cursor})})
 		}
 	}
 	return ret
+}
+
+// pkg returns the proved package of the buffer's cursor and meta.
+func (io *ioArg) pkg() string {
+	if io.tokens {
+		return tokensPkg
+	}
+	return ioPkg
 }
 
 func (l *lowerer) newLocal(name string, typ *adaType, init expr) *variable {
@@ -238,18 +253,22 @@ func (l *lowerer) declareArgs() error {
 	for _, arg := range l.fi.args {
 		id := arg.id
 		switch arg.typ.kind {
-		case kIOReader, kIOWriter:
+		case kIOReader, kIOWriter, kTokenWriter:
 			if assigned[id] {
 				return errNotYet("assigning to args.%s", id.Str(l.g.tm))
 			}
-			io := &ioArg{arg: arg, writer: arg.typ.kind == kIOWriter, data: eVar{arg.v}, meta: arg.meta}
+			io := &ioArg{arg: arg, writer: arg.typ.kind != kIOReader, tokens: arg.typ.kind == kTokenWriter,
+				data: eVar{arg.v}, meta: arg.meta}
 			need, err := l.needCursor(id)
 			if err != nil {
 				return err
 			}
 			if need {
 				typ, prefix := typReader, "R_"
-				if io.writer {
+				switch {
+				case io.tokens:
+					typ, prefix = typTokenCursor, "TW_"
+				case io.writer:
 					typ, prefix = typWriter, "W_"
 				}
 				io.cursor = l.newLocal(prefixGen+prefix+mangle(id.Str(l.g.tm)), typ, nil)
@@ -615,14 +634,39 @@ func (l *lowerer) prologue() ([]stmt, error) {
 			continue
 		}
 		for _, v := range arg.vars() {
-			if v.typ.kind == kBytes || v.typ.kind == kBytesVar {
+			if v.typ.kind == kBytes || v.typ.kind == kBytesVar || v.typ.kind == kTokenArray {
 				conds = append(conds, sharesSelf(v))
 			}
 		}
 	}
 	for _, io := range l.ioList {
-		conds = append(conds, eUn{"not",
-			call("Wuffs.Runtime.Valid_Buffer", io.data, eVar{io.meta})})
+		fn := "Wuffs.Runtime.Valid_Buffer"
+		if io.tokens {
+			fn = "Wuffs.Runtime.Valid_Token_Buffer"
+		}
+		conds = append(conds, eUn{"not", call(fn, io.data, eVar{io.meta})})
+	}
+	// A token array must share no storage with any byte array argument (a
+	// source buffer, a work buffer, a slice): an array of tokens and an
+	// array of bytes are never parts of one Ada array, so nothing could
+	// make sense of an overlap (see "Token buffers" in wuffs-runtime.ads).
+	for _, arg := range l.fi.args {
+		if arg.typ.kind != kTokenWriter {
+			continue
+		}
+		for _, other := range l.fi.args {
+			switch other.typ.kind {
+			case kBytes, kBytesVar, kIOReader, kIOWriter:
+				conds = append(conds, callNamed("Wuffs.Runtime.Tokens_Share_Storage",
+					"Tokens", expr(eVar{arg.v}), "B", expr(eVar{other.v})))
+			case kTokenWriter:
+				if other != arg {
+					return nil, errNotYet("a function with two token_writer arguments")
+				}
+			case kPixBuf, kNptrPixBuf:
+				return nil, errNotYet("a function with a token_writer and a pixel buffer argument")
+			}
+		}
 	}
 	// A pixel buffer must be valid for its two arrays, and those two arrays
 	// (which pixel operations write) must be apart from each other and from
@@ -1663,7 +1707,7 @@ func (l *lowerer) ioManip(n *a.IOManip) ([]stmt, error) {
 			return nil, err
 		}
 		io := rv.io
-		if io == nil || io.cursor == nil {
+		if io == nil || io.cursor == nil || io.tokens {
 			return nil, errNotYet("io_limit of %q", n.IO().Str(l.g.tm))
 		}
 		if io.writer {
@@ -1707,7 +1751,7 @@ func (l *lowerer) ioManip(n *a.IOManip) ([]stmt, error) {
 			return nil, err
 		}
 		io := wv.io
-		if io == nil || io.cursor == nil || !io.writer {
+		if io == nil || io.cursor == nil || !io.writer || io.tokens {
 			return nil, errNotYet("io_forget_history of %q", n.IO().Str(l.g.tm))
 		}
 		if io.forgotten != nil {

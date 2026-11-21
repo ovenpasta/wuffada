@@ -140,6 +140,13 @@ gen "$tmp/gen" webp \
     wuffs/std/webp/decode_vp8l.wuffs \
     wuffs/std/webp/decode_webp.wuffs
 
+gen "$tmp/gen" json \
+    wuffs/std/json/common_consts.wuffs \
+    wuffs/std/json/decode_json.wuffs \
+    wuffs/std/json/decode_quirks.wuffs
+gen "$tmp/gen" cbor \
+    wuffs/std/cbor/decode_cbor.wuffs
+
 # A test-only package that exercises what the standard packages above do not
 # (see the comment in the .wuffs file). Its driver is ada/tests/test_m1.adb.
 gen "$tmp/tests" m1test internal/adagen/testdata/m1test.wuffs
@@ -147,6 +154,10 @@ gen "$tmp/tests" m1test internal/adagen/testdata/m1test.wuffs
 # A test-only package of adversarial coroutines. Its driver is
 # ada/tests/test_adv.adb.
 gen "$tmp/tests" advtest internal/adagen/testdata/advtest.wuffs
+
+# A test-only package of adversarial token-writer coroutines. Its driver is
+# ada/tests/test_tokadv.adb.
+gen "$tmp/tests" tokadv internal/adagen/testdata/tokadv.wuffs
 
 # Success: replace the checked-in output.
 # (ada/tests also holds hand-written children of generated packages, the

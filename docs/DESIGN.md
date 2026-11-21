@@ -26,6 +26,7 @@ Upstream is pinned at `google/wuffs@a87f0bb` (2026-11-18). A checkout lives in
 | `ada/src/base/` | `Wuffs.Base.*` core, hand-written | **yes, proved** |
 | `ada/src/pixel/` | `Wuffs.Base.Pixel*`: pixel formats, buffers, swizzler, hand-written (`ada/wuffs_pixel.gpr`) | **yes, proved** |
 | `ada/src/ycck/` | `Wuffs.Base.Pixel_Swizzler_YCCK`, `Color_YCC`, `Pixel_Buffers.Rows`: YCbCr/YCCK conversion and chroma upsampling for JPEG/VP8, hand-written (`ada/wuffs_ycck.gpr`) | **yes, proved** |
+| `ada/src/token/` | `Wuffs.Base.Tokens`, `Wuffs.Base.UTF8`: token values, token-buffer cursors and UTF-8 for the json/cbor token decoders, hand-written (`ada/wuffs_token.gpr`) | **yes, proved** |
 | `ada/src/runtime/` | `Wuffs.Runtime.*`, glue the generated code needs that SPARK cannot express (slice handles, interfaces) | no |
 | `ada/gen/` | generator output, `Wuffs.Std.<pkg>` (checked in) | no |
 | `ada/tests/` | test drivers | no |
@@ -49,6 +50,7 @@ Two GNAT projects so the halves build independently: `ada/wuffs_base.gpr`
 | `slice T` as a re-assignable value in generated code | `Wuffs.Runtime` slice handle (GNAT fat pointer); every index still bounds-checked |
 | `struct` | `limited record`; never copied, never returned by value |
 | `implements base.X` | Ada limited interface in `Wuffs.Runtime` |
+| `base.token_writer` | a `Wuffs.U64_Array` of tokens plus a `Token_Buffer_Meta`, with a cursor like a byte writer's |
 | `nptr base.image_config` etc., `nptr base.pixel_buffer` | the object (for a pixel buffer: descriptor, pixels and palette arrays) plus a `_Null : Boolean`; nothing is read or written when it is True, and everything is validated at entry when it is False |
 | `status` | `Wuffs.Status` (root package): a small value record (category + code), no pointers; base status constants live in `Wuffs.Base` |
 | `~mod+ ~mod- ~mod*` | native modular operators |
@@ -96,6 +98,9 @@ between source and destination palette). The runtime shell checks this by
 address range before calling the proved code and returns a bad-argument status
 if a caller's buffers violate it, in every profile. No decoder in upstream's
 `std` creates such an overlap itself.
+
+A token array must share no storage with any byte-array argument; the shell
+rejects that at entry by address range (stricter than C).
 
 `Swizzle_YCCK` writes two arrays, the pixels and the 2 KiB scratch buffer;
 each must be disjoint from every other array argument and from each other.
@@ -170,7 +175,8 @@ Not in scope yet. `choose` statements resolve to the scalar default.
    scalar C.
 4. Done: JPEG (baseline and progressive) and WebP (lossy VP8 and lossless
    VP8L), scalar paths.
-5. Next: json/cbor (token I/O); SIMD; the known follow-ups below.
+5. Done: json and cbor. Every package of upstream's std is now generated.
+6. Next: SIMD; the known follow-ups below.
 
 ## Known follow-ups
 
@@ -190,7 +196,22 @@ From the review of generator milestone 4a; none affects generated `std` code.
   hostile-caller tests (no short or zero work buffer).
 * Still rejected at generation time: writer `io_limit`, private and
   non-classy structs, local arrays over 1 KiB, slice types other than u8,
-  tables from non-destination memory, token I/O (needed by json/cbor).
+  tables from non-destination memory, token readers, and an extended-token
+  write whose `value_extension` is a constant below 2**32 (upstream's C
+  computes that case in 32 bits).
+* CBOR: two upstream behaviours are reproduced as they are: an array or map
+  whose zero length is not inline is treated as indefinite-length, and an
+  empty chunk inside an indefinite-length string ends the item early.
+* JSON/CBOR: the decoders make no progress below their minimum buffer sizes
+  (json: 100 source bytes; cbor: 9 source bytes and 2 tokens), as upstream.
+  JSON tokenising is 1.8-3.8x slower than upstream's scalar C.
+* JSON tests: a mutant that clears the continued bit of a string token of
+  65532 bytes or more on the byte-at-a-time path survives the suite; a
+  70000-byte string under random 1-12 byte source fills kills it. One shell
+  overlap mutant survives because no test ends a token array inside the
+  first 8 bytes of the decoder object.
+* `Wuffs.Base.UTF8.Valid_UTF_8_Length` belongs with the IO package; it lives
+  in `ada/src/token` because the IO package was frozen when it was written.
 * JPEG: the reference is upstream's *scalar* C build. Upstream's AVX2 IDCT
   saturates in 16-bit lanes where its scalar IDCT wraps, so the two upstream
   builds give different pixels for out-of-range coefficients in corrupt

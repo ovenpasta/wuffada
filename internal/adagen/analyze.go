@@ -77,7 +77,9 @@ type argInfo struct {
 
 	// v is the parameter: for a slice, the Ada array; for an io_reader or
 	// io_writer, the Ada array of the buffer's data, and then meta is the
-	// second parameter, the buffer's Wuffs.Base.IO.Buffer_Meta.
+	// second parameter, the buffer's Wuffs.Base.IO.Buffer_Meta; for a
+	// token_writer, the Ada array of tokens (Wuffs.U64_Array) and its
+	// Wuffs.Base.Tokens.Token_Buffer_Meta.
 	v    *variable
 	meta *variable
 
@@ -150,6 +152,7 @@ var supportedInterfaces = map[string]string{
 	"hasher_bitvec256": "Wuffs.Runtime.Hasher_Bitvec256",
 	"io_transformer":   "Wuffs.Runtime.IO_Transformer",
 	"image_decoder":    "Wuffs.Runtime.Image_Decoder",
+	"token_decoder":    "Wuffs.Runtime.Token_Decoder",
 }
 
 func (g *gen) analyze() error {
@@ -502,6 +505,11 @@ func (g *gen) analyzeFunc(fi *funcInfo, pkgPrefix string) error {
 		case kIOWriter:
 			arg.v = &variable{kind: varParam, name: name, typ: typBytesVar, decl: typBytesVar.name, mode: "in out"}
 			arg.meta = &variable{kind: varParam, name: name + "_Meta", typ: typMeta, decl: typMeta.name, mode: "in out"}
+		case kTokenWriter:
+			// As an io_writer: the token array and its meta.
+			arg.v = &variable{kind: varParam, name: name, typ: typTokenArray, decl: typTokenArray.name, mode: "in out"}
+			arg.meta = &variable{kind: varParam, name: name + "_Meta", typ: typTokenMeta, decl: typTokenMeta.name,
+				mode: "in out"}
 		default:
 			return errNotYet("parameter %s of type %q", o.Name().Str(g.tm), o.XType().Str(g.tm))
 		}

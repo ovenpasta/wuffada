@@ -48,6 +48,8 @@ const (
 	endianPkg = "Wuffs.Base.Endian" // Peek and poke.
 	ioPkg     = "Wuffs.Base.IO"     // io_reader and io_writer primitives.
 	rangesPkg = "Wuffs.Base.Ranges" // range_ii_u64 and friends.
+	tokensPkg = "Wuffs.Base.Tokens" // token_writer primitives (ada/src/token).
+	utf8Pkg   = "Wuffs.Base.UTF8"   // UTF-8 (ada/src/token).
 
 	// The proved pixel library.
 	formatsPkg  = "Wuffs.Base.Pixel_Formats"
