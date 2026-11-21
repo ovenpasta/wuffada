@@ -410,6 +410,21 @@ func (l *lowerer) declareLocals() error {
 		case kIOReader, kIOWriter:
 			// It means something only inside an io_bind block.
 			l.ioLocals[id] = true
+		case kX86Util:
+			// An empty struct: only its methods are used, and they are
+			// lowered without it (x86Method).
+		case kVec:
+			// Only SIMD implementations have vectors, and they are never
+			// coroutines (analyzeFuncs): a vector is never live across a
+			// suspension point. (Upstream's C would save it in the struct.)
+			if l.fi.simd == "" || l.fi.coroutine {
+				return fmt.Errorf("var %s: a vector outside of a SIMD function", id.Str(l.g.tm))
+			}
+			zero := x86Pkg + ".Zero_M128I"
+			if typ.bits == 256 {
+				zero = x86Pkg + ".Zero_M256I"
+			}
+			l.locals[id] = l.newLocal(name, typ, raw(zero))
 		case kTable:
 			// The default initial value is the empty table. Like a slice, a
 			// table is not saved across a suspension.
@@ -1045,7 +1060,7 @@ func (l *lowerer) assign(n *a.Assign) ([]stmt, error) {
 		if rv.typ.kind != lv.typ.kind {
 			return nil, fmt.Errorf("cannot assign %q to %q: different types", rhs.Str(l.g.tm), lhs.Str(l.g.tm))
 		}
-	case kOpaque:
+	case kOpaque, kVec:
 		if rv.typ != lv.typ {
 			return nil, fmt.Errorf("cannot assign %q to %q: different types", rhs.Str(l.g.tm), lhs.Str(l.g.tm))
 		}
@@ -1146,16 +1161,21 @@ func (l *lowerer) assignSliceElement(n *a.Assign) ([]stmt, error) {
 	return l.flush(sCall{callNamed("Wuffs.Runtime.Set", "S", sv.e, "I", i, "V", rv.e)}), nil
 }
 
-// choose lowers a choose statement, statically. A candidate that has a
-// "choose cpu_arch" assertion is never chosen, as if the CPU lacked the
-// capability (the C back-end guards each such candidate with a
-// wuffs_base__cpu_arch__have_etc call). If every candidate is like that,
-// which is the only case handled so far, the statement does nothing and the
-// choosy function keeps its default body.
+// choose lowers a choose statement. A candidate that has a "choose cpu_arch"
+// assertion is skipped if it was not generated (an ARM capability, or any
+// capability in a build without SIMD), as if the CPU lacked the capability;
+// a SIMD implementation is taken if Wuffs.Runtime.CPU says that the CPU has
+// its capability. The first other candidate is always taken. That is what
+// the C back-end does (writeStatementChoose: a chain of
+// wuffs_base__cpu_arch__have_etc() ? &f : ..., ending with the first
+// candidate without a requirement, or, if there is none, with the current
+// choice). If no candidate can ever be taken, the statement does nothing
+// and the choosy function keeps its current choice.
 func (l *lowerer) choose(n *a.Choose) ([]stmt, error) {
 	recv := l.fi.ast.Receiver()
 	target := l.g.funcs[t.QQID{recv[0], recv[1], n.Name()}]
 	names := ""
+	branches := []ifBranch(nil)
 	for i, o := range n.Args() {
 		id := o.AsExpr().Ident()
 		callee := l.g.funcs[t.QQID{recv[0], recv[1], id}]
@@ -1163,10 +1183,9 @@ func (l *lowerer) choose(n *a.Choose) ([]stmt, error) {
 			return nil, fmt.Errorf("choose: no such function %q", id.Str(l.g.tm))
 		}
 		if !callee.skipped {
-			// The first alternative without a cpu_arch requirement: C
-			// stores a pointer to it; here, its number (see findChoices).
+			// C stores a pointer to it; here, its number (see findChoices).
 			if target.choiceField == "" {
-				if callee != target {
+				if callee != target || len(branches) != 0 {
 					return nil, fmt.Errorf("internal error: choose %q was not analyzed", id.Str(l.g.tm))
 				}
 				return []stmt{sComment{fmt.Sprintf(
@@ -1183,12 +1202,23 @@ func (l *lowerer) choose(n *a.Choose) ([]stmt, error) {
 				return nil, fmt.Errorf("internal error: choose %q was not analyzed", id.Str(l.g.tm))
 			}
 			l.f.self.writes++
-			return []stmt{sAssign{eSel{eVar{l.f.self}, target.choiceField}, raw(fmt.Sprint(number))}}, nil
+			assign := []stmt{sAssign{eSel{eVar{l.f.self}, target.choiceField}, raw(fmt.Sprint(number))}}
+			if callee.simd != "" {
+				branches = append(branches, ifBranch{call(haveFeature(callee.simd)), assign})
+				continue
+			}
+			if len(branches) == 0 {
+				return assign, nil
+			}
+			return []stmt{sIf{branches: branches, els: assign}}, nil
 		}
 		if i != 0 {
 			names += ", "
 		}
 		names += id.Str(l.g.tm)
+	}
+	if len(branches) != 0 {
+		return []stmt{sIf{branches: branches}}, nil
 	}
 	return []stmt{sComment{fmt.Sprintf(
 		"Wuffs: choose %s = [%s]\nNothing to do: every alternative needs a cpu_arch (SIMD) capability.",

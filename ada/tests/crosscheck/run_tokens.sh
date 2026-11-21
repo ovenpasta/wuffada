@@ -18,6 +18,6 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 (cd "$root" && go run ./ada/tests/crosscheck/statustable \
-    ada/src/base/wuffs-base.ads ada/gen/wuffs-std-*.ads) > "$tmp/statuses"
+    ada/src/base/wuffs-base.ads ada/gen/wuffs-std-*.ads ada/gen/scalar/wuffs-std-*.ads) > "$tmp/statuses"
 "${CC:-cc}" -std=c99 -O2 -Wall -I "$root/wuffs/release/c" -o "$tmp/tokens" "$here/tokens.c"
 "$tmp/tokens" "$tmp/statuses"

@@ -10,6 +10,18 @@
 # 768 MB measured with WUFFS_ASAN=1) goes to one directory under
 # ${TMPDIR:-/tmp}, which is removed at the end.
 #
+# The library is built with SIMD (the default, WUFFS_SIMD=on; see
+# ada/wuffs_simd.gpr), so this needs an x86-64 CPU with SSE4.2, PCLMUL,
+# POPCNT, AVX2 and BMI2 (checked first). In each profile the whole suite runs
+# on the SIMD build, compared with upstream's DEFAULT C build (its SIMD
+# implementations selected at run time); then the SIMD build again with
+# every CPU feature hidden (WUFFS_TEST_CPU_DISABLE=all: the scalar
+# implementations), and a SIMD-off build (-XWUFFS_SIMD=off: no SIMD code at
+# all), both compared with upstream's SCALAR C build
+# (-DWUFFS_CONFIG__AVOID_CPU_ARCH) on a reduced selection: the hashers, the
+# decompressors and the hostile-caller tests in full, the image corpus
+# reduced to every run with reference pixels and every ninth other run.
+#
 # With WUFFS_ASAN=1 in the environment, it also builds the image tests a
 # third time, for the release profile with -fsanitize=address (in the
 # temporary directory), and runs them: the hostile-caller tests, the chaos
@@ -28,6 +40,11 @@ avail_kb="$(df -Pk "$tmp" | awk 'NR == 2 { print $4 }')"
 [ "${avail_kb:-0}" -ge 1048576 ] ||
     die "less than 1 GB free in $tmp (${avail_kb:-?} KB): set TMPDIR to a directory with more room"
 
+say "CPU: the SIMD tests need SSE4.2, PCLMUL, POPCNT, AVX2 and BMI2"
+"${CC:-cc}" -O2 -Wall -o "$tmp/cpu_c" ada/tests/simd/cpu_c.c
+"$tmp/cpu_c" | tee "$tmp/cpu.c"
+[ "$(grep -c ' 1$' "$tmp/cpu.c")" -eq 3 ] || die "this CPU lacks a feature that the SIMD tests need"
+
 say "Go: build, vet, gofmt"
 go build ./...
 go vet ./...
@@ -36,18 +53,30 @@ unformatted="$(gofmt -l cmd internal ada/tests)"
 
 say "Generate (twice: the output must not change)"
 ./gen.sh
-mkdir "$tmp/first"
+mkdir "$tmp/first" "$tmp/first/scalar" "$tmp/first/simd"
 cp ada/gen/*.ad[sb] ada/tests/wuffs-std-*.ad[sb] "$tmp/first"
+cp ada/gen/scalar/*.ad[sb] "$tmp/first/scalar"
+cp ada/gen/simd/*.ad[sb] "$tmp/first/simd"
 ./gen.sh
-for f in "$tmp"/first/*; do
-    name="$(basename "$f")"
+for f in "$tmp"/first/*.ad[sb] "$tmp"/first/scalar/* "$tmp"/first/simd/*; do
+    name="${f#"$tmp"/first/}"
     if [ -f "ada/gen/$name" ]; then
         cmp "$f" "ada/gen/$name" || die "non-deterministic output: $name"
     else
         cmp "$f" "ada/tests/$name" || die "non-deterministic output: $name"
     fi
 done
-ls -l ada/gen
+ls -l ada/gen ada/gen/scalar ada/gen/simd
+
+say "SIMD: the wrapper tests are those of the method table (ada/tests/simd/oracle/gen.py)"
+mkdir "$tmp/oracle" "$tmp/oracle/oracle"
+cp ada/tests/simd/oracle/gen.py "$tmp/oracle/oracle/"
+python3 "$tmp/oracle/oracle/gen.py"
+for f in x86_methods.ads x86_methods.list x86_test_cases.adb oracle/x86_oracle.c; do
+    cmp "$tmp/oracle/$f" "ada/tests/simd/$f" || die "ada/tests/simd/$f is stale: run ada/tests/simd/oracle/regen.sh"
+done
+grep -q "x86_oracle.c prints" ada/tests/simd/x86_oracle_data.ads || die "no oracle data"
+echo "x86_methods.ads, x86_methods.list, x86_test_cases.adb and x86_oracle.c are up to date"
 
 say "Go: test"
 go test ./...
@@ -94,11 +123,12 @@ ada/tests/crosscheck/run_tokadv.sh > "$tmp/tokadv.c.trace"
 echo "$(wc -l < "$tmp/tokadv.c.trace" | tr -d ' ') runs traced from C"
 [ -s "$tmp/tokadv.c.trace" ] || die "empty C trace"
 
-if grep -l 'pragma Warnings' ada/gen/wuffs-std-adler32.ad[sb] ada/gen/wuffs-std-crc32.ad[sb]; then
-    die "adler32 or crc32 suppresses warnings"
+if grep -l 'pragma Warnings' ada/gen/*/wuffs-std-adler32*.ad[sb] ada/gen/*/wuffs-std-crc32*.ad[sb] ada/src/simd/*.ad[sb]; then
+    die "adler32, crc32 or the SIMD runtime suppresses warnings"
 fi
 # Wuffs.Base.Pixel_Buffers.Rows is for proved callers only (docs/DESIGN.md).
-if grep -l 'Pixel_Buffers.Rows' ada/gen/*.ad[sb] ada/src/runtime/*.ad[sb] ada/src/runtime/*/*.ad[sb]; then
+if grep -l 'Pixel_Buffers.Rows' ada/gen/*.ad[sb] ada/gen/*/*.ad[sb] ada/src/runtime/*.ad[sb] ada/src/runtime/*/*.ad[sb] \
+    ada/src/simd/*.ad[sb] ada/src/simd/*/*.ad[sb]; then
     die "generated code or the runtime shell uses Wuffs.Base.Pixel_Buffers.Rows"
 fi
 
@@ -113,6 +143,11 @@ say "Cross-check: upstream's C decoders over the corpus"
 ada/tests/crosscheck/run_decode.sh < "$tmp/decode.manifest" > "$tmp/decode.c.trace"
 echo "$(wc -l < "$tmp/decode.c.trace" | tr -d ' ') runs traced from C"
 [ -s "$tmp/decode.c.trace" ] || die "empty C trace"
+
+say "Cross-check: the same, with upstream's scalar C build"
+ada/tests/crosscheck/run_decode.sh scalar < "$tmp/decode.manifest" > "$tmp/decode.cscalar.trace"
+cmp -s "$tmp/decode.c.trace" "$tmp/decode.cscalar.trace" ||
+    echo "(the scalar C trace differs from the default C trace)"
 
 say "Cross-check: the same, with C built as if for a 32-bit machine"
 ada/tests/crosscheck/run_decode.sh force32 < "$tmp/decode.manifest" > "$tmp/decode.c32.trace"
@@ -149,10 +184,18 @@ echo "$nimgcases runs, $nimgrefs of them with reference pixels; JPEG: $njpeg run
 [ "$nwebp" -ge 40000 ] || die "only $nwebp WebP and VP8 test runs"
 [ "$nwebprefs" -ge 900 ] || die "only $nwebprefs WebP and VP8 test runs with reference pixels"
 
-say "Cross-check: upstream's C image decoders over the corpus"
-ada/tests/crosscheck/run_image.sh < "$tmp/image.manifest" > "$tmp/image.c.trace"
+say "Cross-check: upstream's C image decoders over the corpus (default build, with SIMD)"
+ada/tests/crosscheck/run_image.sh default < "$tmp/image.manifest" > "$tmp/image.c.trace"
 echo "$(wc -l < "$tmp/image.c.trace" | tr -d ' ') lines traced from C"
 [ -s "$tmp/image.c.trace" ] || die "empty C trace"
+# The reduced selection for the scalar runs, and upstream's scalar build.
+awk '{ if ($7 != "-" || NR % 9 == 0) print }' "$tmp/image.manifest" > "$tmp/image.reduced.manifest"
+ada/tests/crosscheck/run_image.sh scalar < "$tmp/image.reduced.manifest" > "$tmp/image.reduced.cscalar.trace"
+nreduced="$(wc -l < "$tmp/image.reduced.manifest" | tr -d ' ')"
+nreducedrefs="$(grep -c -v ' - [^ ]*$' "$tmp/image.reduced.manifest" || true)"
+ada/tests/crosscheck/run_image.sh scalar < "$tmp/image.manifest" > "$tmp/image.cscalar.trace"
+echo "upstream's default and scalar builds differ in $(diff "$tmp/image.c.trace" "$tmp/image.cscalar.trace" | grep -c '^<' || true) trace lines (damaged JPEGs: the AVX2 IDCT saturates)"
+echo "reduced selection: $nreduced runs, $nreducedrefs with reference pixels"
 
 say "Corpus for the token decoders (Go's encoding/json and tokcheck's own CBOR walker as the independent references)"
 mkdir "$tmp/tokcorpus"
@@ -327,6 +370,90 @@ for profile in checked release; do
     }
     echo "test_image: trace ($(wc -l < "$tmp/image.ada.trace" | tr -d ' ') lines) is identical to upstream's C"
 
+    say "SIMD ($profile): the wrappers against the C oracle, CPU detection and selection"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_x86) || die "test_x86 ($profile)"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/tests/simd/check_selection.sh ada/bin/test_simd) ||
+        die "check_selection ($profile)"
+
+    say "SIMD ($profile): no instruction beyond x86-64 outside the SIMD units (objdump)"
+    isa="python3 ada/tests/simd/isacheck.py"
+    $isa --expect wuffs__std__crc32__x86_sse42=pclmul --expect wuffs__std__adler32__x86_sse42=pmaddubsw \
+        ada/bin/test_hashers || die "isacheck test_hashers ($profile)"
+    $isa --expect wuffs__std__crc64__x86_sse42=pclmul ada/bin/test_hashers2 || die "isacheck test_hashers2 ($profile)"
+    $isa --expect wuffs__std__png__x86_sse42=pblendvb --expect wuffs__std__jpeg__x86_avx2=vpmaddwd \
+        --expect wuffs__std__deflate__x86_bmi2=shlx,shrx,sarx,bzhi ada/bin/test_image ||
+        die "isacheck test_image ($profile)"
+    for b in test_decode test_hostile test_entry test_tokens test_runtime test_m1 test_adv test_tokadv \
+        test_simd test_x86 bench_main; do
+        $isa "ada/bin/$b" > /dev/null || { $isa "ada/bin/$b"; die "isacheck $b ($profile)"; }
+    done
+    echo "isacheck: the other test programs: no instruction beyond x86-64 outside the SIMD units"
+
+    say "SIMD ($profile): the scalar implementations (every CPU feature hidden), against upstream's scalar C"
+    export WUFFS_TEST_CPU_DISABLE=all
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_hashers < "$tmp/manifest") > "$tmp/hashers.out" ||
+        { cat "$tmp/hashers.out"; die "test_hashers, scalar ($profile)"; }
+    tail -n 1 "$tmp/hashers.out"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_hashers2 < "$tmp/manifest2") > "$tmp/hashers.out" ||
+        { cat "$tmp/hashers.out"; die "test_hashers2, scalar ($profile)"; }
+    tail -n 1 "$tmp/hashers.out"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_decode < "$tmp/decode.manifest") > "$tmp/decode.out" ||
+        { grep -v '^= ' "$tmp/decode.out" | head -n 50; die "test_decode, scalar ($profile)"; }
+    grep '^= ' "$tmp/decode.out" | cmp - "$tmp/decode.cscalar.trace" || die "test_decode, scalar: trace differs ($profile)"
+    echo "test_decode, scalar: trace identical to upstream's scalar C"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/test_image < "$tmp/image.reduced.manifest") > "$tmp/image.out" ||
+        { grep -v '^= ' "$tmp/image.out" | head -n 50; die "test_image, scalar ($profile)"; }
+    grep -q "^test_image: cases: $nreduced, compared with the reference decoder: $nreducedrefs\$" "$tmp/image.out" ||
+        die "test_image, scalar, did not run the reduced selection ($profile)"
+    grep '^= ' "$tmp/image.out" | cmp - "$tmp/image.reduced.cscalar.trace" ||
+        die "test_image, scalar: trace differs from upstream's scalar C ($profile)"
+    echo "test_image, scalar: $nreduced runs, trace identical to upstream's scalar C"
+    unset WUFFS_TEST_CPU_DISABLE
+
+    say "SIMD off ($profile): the library without SIMD code, against upstream's scalar C (reduced selection)"
+    (cd ada && alr exec -- gprbuild -f -P wuffs_gen.gpr -XWUFFS_PROFILE="$profile" -XWUFFS_SIMD=off) \
+        > "$tmp/build.scalar.$profile" 2>&1 || { cat "$tmp/build.scalar.$profile"; die "SIMD-off build failed ($profile)"; }
+    nwarn="$(grep -c -i -E 'warning|\(style\)' "$tmp/build.scalar.$profile" || true)"
+    echo "warnings and style messages (SIMD off, $profile): $nwarn"
+    [ "$nwarn" -eq 0 ] || { cat "$tmp/build.scalar.$profile"; die "the SIMD-off $profile build has warnings"; }
+    if ls "ada/obj/gen/$profile-scalar" | grep -q -E 'x86|cpu'; then
+        die "the SIMD-off build compiled a SIMD unit ($profile)"
+    fi
+    awk -F '\t' '$2 > 8192 { bad = 1; print } END { exit bad }' "ada/obj/gen/$profile-scalar"/*.su ||
+        die "a frame exceeds 8192 bytes (SIMD off, $profile)"
+    for b in test_hashers test_hashers2 test_decode test_image test_hostile test_entry; do
+        $isa "ada/bin/scalar/$b" | grep -q ': 0 functions of SIMD units hold instructions beyond x86-64 (0 distinct mnemonics); 0 other functions do$' ||
+            { $isa "ada/bin/scalar/$b"; die "isacheck: SIMD-off $b has an instruction beyond x86-64 ($profile)"; }
+    done
+    echo "isacheck: no instruction beyond x86-64 anywhere in the SIMD-off test programs"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/scalar/test_hashers < "$tmp/manifest") > "$tmp/hashers.out" ||
+        { cat "$tmp/hashers.out"; die "test_hashers, SIMD off ($profile)"; }
+    tail -n 1 "$tmp/hashers.out"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/scalar/test_hashers2 < "$tmp/manifest2") > "$tmp/hashers.out" ||
+        { cat "$tmp/hashers.out"; die "test_hashers2, SIMD off ($profile)"; }
+    tail -n 1 "$tmp/hashers.out"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/scalar/test_decode < "$tmp/decode.manifest") > "$tmp/decode.out" ||
+        { grep -v '^= ' "$tmp/decode.out" | head -n 50; die "test_decode, SIMD off ($profile)"; }
+    grep '^= ' "$tmp/decode.out" | cmp - "$tmp/decode.cscalar.trace" || die "test_decode, SIMD off: trace differs ($profile)"
+    echo "test_decode, SIMD off: trace identical to upstream's scalar C"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/scalar/test_hostile) || die "test_hostile, SIMD off ($profile)"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/scalar/test_entry) || die "test_entry, SIMD off ($profile)"
+    (ulimit -s "$stack_kib" && timeout "$run_limit" ada/bin/scalar/test_image < "$tmp/image.reduced.manifest") > "$tmp/image.out" ||
+        { grep -v '^= ' "$tmp/image.out" | head -n 50; die "test_image, SIMD off ($profile)"; }
+    grep -q "^test_image: cases: $nreduced, compared with the reference decoder: $nreducedrefs\$" "$tmp/image.out" ||
+        die "test_image, SIMD off, did not run the reduced selection ($profile)"
+    grep '^= ' "$tmp/image.out" | cmp - "$tmp/image.reduced.cscalar.trace" ||
+        die "test_image, SIMD off: trace differs from upstream's scalar C ($profile)"
+    echo "test_image, SIMD off: $nreduced runs, trace identical to upstream's scalar C"
+    (cd ada && alr exec -- gprbuild -f -P ../examples/decode_image.gpr -XWUFFS_PROFILE="$profile" -XWUFFS_SIMD=off) \
+        > "$tmp/build.example" 2>&1 || { cat "$tmp/build.example"; die "the SIMD-off example does not build ($profile)"; }
+    if grep -i -E 'warning|\(style\)' "$tmp/build.example"; then
+        die "the SIMD-off example's build has warnings ($profile)"
+    fi
+    (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image wuffs/test/data/bricks-color.jpeg "$tmp/example.pnm") ||
+        die "decode_image, SIMD off ($profile)"
+    go run ./ada/tests/pnmcheck wuffs/test/data/bricks-color.jpeg "$tmp/example.pnm" || die "decode_image, SIMD off: wrong pixels ($profile)"
+
     say "Example: examples/decode_image ($profile), with a ${stack_kib} KiB stack"
     (cd ada && alr exec -- gprbuild -f -P ../examples/decode_image.gpr -XWUFFS_PROFILE="$profile") > "$tmp/build.example" 2>&1 ||
         { cat "$tmp/build.example"; die "the example does not build ($profile)"; }
@@ -383,12 +510,32 @@ for profile in checked release; do
     [ -z "$(find "$tmp" -maxdepth 1 -name 'aaaa*')" ] || die "decode_image created a file for a long name"
 done
 
+# AddressSanitizer does not instrument the vector load and store builtins of
+# ada/src/simd, so this stage says nothing about the accesses that the SIMD
+# units make through them (see docs/DESIGN.md, "SIMD").
 if [ "${WUFFS_ASAN:-}" = 1 ]; then
     say "Ada: the image tests with AddressSanitizer (release profile)"
     (cd ada && alr exec -- gprbuild -q -P wuffs_gen.gpr -XWUFFS_PROFILE=release --relocate-build-tree="$tmp/asan" \
-        test_hostile.adb test_entry.adb test_image.adb test_tokens.adb -cargs -fsanitize=address -g -largs -fsanitize=address) \
+        test_hostile.adb test_entry.adb test_image.adb test_tokens.adb test_hashers.adb test_hashers2.adb test_decode.adb \
+        test_x86.adb -cargs -fsanitize=address -g -largs -fsanitize=address) \
         > "$tmp/build.asan" 2>&1 || { cat "$tmp/build.asan"; die "the AddressSanitizer build failed"; }
     export ASAN_OPTIONS=detect_leaks=0
+    # The SIMD implementations and the scalar ones (every CPU feature hidden).
+    for disable in "" all; do
+        WUFFS_TEST_CPU_DISABLE="$disable" timeout "$run_limit" "$tmp/asan/bin/test_hashers" < "$tmp/manifest" \
+            > "$tmp/hashers.out" 2> "$tmp/asan.err" || { cat "$tmp/asan.err" | head -n 50; die "test_hashers (ASan, \"$disable\")"; }
+        tail -n 1 "$tmp/hashers.out"
+        WUFFS_TEST_CPU_DISABLE="$disable" timeout "$run_limit" "$tmp/asan/bin/test_hashers2" < "$tmp/manifest2" \
+            > "$tmp/hashers.out" 2> "$tmp/asan.err" || { cat "$tmp/asan.err" | head -n 50; die "test_hashers2 (ASan, \"$disable\")"; }
+        tail -n 1 "$tmp/hashers.out"
+        WUFFS_TEST_CPU_DISABLE="$disable" timeout "$run_limit" "$tmp/asan/bin/test_decode" < "$tmp/decode.manifest" \
+            > "$tmp/decode.out" 2> "$tmp/asan.err" || { cat "$tmp/asan.err" | head -n 50; die "test_decode (ASan, \"$disable\")"; }
+        if [ "$disable" = all ]; then want="$tmp/decode.cscalar.trace"; else want="$tmp/decode.c.trace"; fi
+        grep '^= ' "$tmp/decode.out" | cmp - "$want" || die "test_decode's trace differs from upstream's C (ASan, \"$disable\")"
+        [ ! -s "$tmp/asan.err" ] || { head -n 50 "$tmp/asan.err"; die "AddressSanitizer reported something (hashers, decode)"; }
+    done
+    timeout "$run_limit" "$tmp/asan/bin/test_x86" 2> "$tmp/asan.err" || { cat "$tmp/asan.err" | head -n 50; die "test_x86 (ASan)"; }
+    echo "AddressSanitizer, hashers, decompressors (SIMD and scalar) and test_x86: nothing reported"
     timeout "$run_limit" "$tmp/asan/bin/test_hostile" || die "test_hostile (ASan)"
     timeout "$run_limit" "$tmp/asan/bin/test_entry" || die "test_entry (ASan)"
     timeout "$run_limit" "$tmp/asan/bin/test_image" < "$tmp/chaos.manifest" > "$tmp/chaos.out" 2> "$tmp/asan.err" ||

@@ -28,7 +28,8 @@ Upstream is pinned at `google/wuffs@a87f0bb` (2026-11-18). A checkout lives in
 | `ada/src/ycck/` | `Wuffs.Base.Pixel_Swizzler_YCCK`, `Color_YCC`, `Pixel_Buffers.Rows`: YCbCr/YCCK conversion and chroma upsampling for JPEG/VP8, hand-written (`ada/wuffs_ycck.gpr`) | **yes, proved** |
 | `ada/src/token/` | `Wuffs.Base.Tokens`, `Wuffs.Base.UTF8`: token values, token-buffer cursors and UTF-8 for the json/cbor token decoders, hand-written (`ada/wuffs_token.gpr`) | **yes, proved** |
 | `ada/src/runtime/` | `Wuffs.Runtime.*`, glue the generated code needs that SPARK cannot express (slice handles, interfaces) | no |
-| `ada/gen/` | generator output, `Wuffs.Std.<pkg>` (checked in) | no |
+| `ada/gen/` | generator output, `Wuffs.Std.<pkg>` (checked in); `scalar/` and `simd/` hold the six packages that differ | no |
+| `ada/src/simd/` | `Wuffs.Runtime.X86`: vector types, intrinsic wrappers, CPU detection | no |
 | `ada/tests/` | test drivers | no |
 | `cmd/wuffs-ada/`, `internal/adagen/` | the generator (Go) | — |
 
@@ -160,7 +161,43 @@ differential tests against upstream C are what catch generator bugs.
 
 ## SIMD
 
-Not in scope yet. `choose` statements resolve to the scalar default.
+x86 SIMD is generated for the functions upstream wrote in Wuffs: crc32,
+adler32, crc64, four PNG filters, deflate's BMI2 path and the JPEG IDCT.
+ARM functions are skipped. The hand-written swizzlers in the proved libraries
+are scalar.
+
+* `ada/src/simd` (not SPARK): `Wuffs.Runtime.X86` vector types and one thin
+  wrapper per Wuffs cpu_arch method over the GCC builtin that implements the
+  intrinsic upstream's C uses (`METHODS.md` is the table). The loads and the
+  store are the only code that uses addresses; their preconditions are the
+  lengths the Wuffs checker proved.
+* Each SIMD function is in a private child unit (`Wuffs.Std.<Pkg>.X86_SSE42`,
+  `X86_AVX2`, `X86_BMI2`), the only units compiled with `-m` switches
+  (`ada/wuffs_simd.gpr`). `test.sh` checks with objdump that nothing else
+  holds an instruction beyond SSE2, so the default build runs on any x86-64.
+* `choose` selects at run time through `Wuffs.Runtime.CPU`: upstream's CPUID
+  bits, cached. One test more than upstream: AVX2 also needs the operating
+  system to save the AVX state (OSXSAVE and XCR0), where upstream's AVX2 code
+  would die with an illegal instruction.
+* `-XWUFFS_SIMD=off` builds the scalar-only library (`ada/gen/scalar`, the
+  code as it was before SIMD). It is required for targets other than x86-64.
+* A SIMD build is compared with upstream's default C build, a scalar build
+  (and a SIMD build with features hidden) with upstream's scalar build.
+* The wrappers cannot be proved (an intrinsic has no Ada body): they are
+  tested against digests from a C program that calls the real intrinsics.
+
+Limits:
+
+* AddressSanitizer does not instrument the vector load and store builtins,
+  so the sanitizer stage says nothing about those accesses. The checked
+  profile's preconditions and, in release, the Wuffs checker's proof cover
+  them.
+* The SIMD units need optimisation: two wrappers pass computed immediates
+  that GCC only accepts once folded, so `-O0` fails to compile them.
+* GNAT 16.1 miscompiles an `others` aggregate of a vector type with 8-bit
+  lanes (zeroes); the wrappers do not use one.
+* PNG and JPEG decoding are still 1.5-3x slower than upstream's SIMD build:
+  the deflate core and the swizzlers are scalar.
 
 ## Milestones
 
@@ -176,7 +213,8 @@ Not in scope yet. `choose` statements resolve to the scalar default.
 4. Done: JPEG (baseline and progressive) and WebP (lossy VP8 and lossless
    VP8L), scalar paths.
 5. Done: json and cbor. Every package of upstream's std is now generated.
-6. Next: SIMD; the known follow-ups below.
+6. Done: x86 SIMD for the functions upstream wrote in Wuffs.
+7. Next: SIMD swizzlers; the known follow-ups below.
 
 ## Known follow-ups
 

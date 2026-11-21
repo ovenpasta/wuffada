@@ -55,10 +55,14 @@ func (s *structInfo) field(id t.ID) *fieldInfo {
 
 type constInfo struct {
 	// used means that generated code refers to the constant by name.
-	used bool
-	ast  *a.Const
-	name string // Ada name.
-	typ  *adaType
+	// inSpec means that a SIMD implementation does, so that a private
+	// constant is declared in the private part of the package spec, where
+	// the child unit sees it, rather than in the package body.
+	used   bool
+	inSpec bool
+	ast    *a.Const
+	name   string // Ada name.
+	typ    *adaType
 }
 
 type statusInfo struct {
@@ -124,6 +128,14 @@ type funcInfo struct {
 
 	// skipped means that no Ada is generated for the function.
 	skipped bool
+
+	// simd is the x86 cpu_arch capability ("x86_sse42", "x86_avx2" or
+	// "x86_bmi2") of a function that is generated as a SIMD implementation,
+	// in the private child unit of that feature (simdUnitName); "" for
+	// every other function. useType is what g.useType is for the package
+	// body, for the child unit's body.
+	simd    string
+	useType map[int]bool
 
 	// sigErr is why a function of a used package has no Ada signature. It is
 	// reported only if the function is called.
@@ -376,12 +388,31 @@ func (g *gen) analyzeFuncs() error {
 
 			// The rule for what is skipped: exactly those functions that
 			// carry a "choose cpu_arch >= etc" assertion, which the parser
-			// records as ast.FlagsHasChooseCPUArch. See also the lowering of
+			// records as ast.FlagsHasChooseCPUArch, except, in a SIMD build,
+			// those whose capability is an x86 one. See also the lowering of
 			// the choose statement.
 			if n.HasChooseCPUArch() {
-				fi.skipped = true
-				g.skipped = append(g.skipped, n.QQID().Str(g.tm))
-				continue
+				feature, err := g.cpuArchOf(n)
+				if err != nil {
+					return fmt.Errorf("func %s (at %s:%d): %v", n.QQID().Str(g.tm), n.Filename(), n.Line(), err)
+				}
+				if !g.opts.SIMD || simdSwitches[feature] == "" {
+					fi.skipped = true
+					g.skipped = append(g.skipped, n.QQID().Str(g.tm))
+					continue
+				}
+				if n.Public() || n.Effect().Coroutine() {
+					return fmt.Errorf("func %s (at %s:%d): %v", n.QQID().Str(g.tm), n.Filename(), n.Line(),
+						errNotYet("a SIMD function that is public or a coroutine"))
+				}
+				fi.simd = feature
+				seen := false
+				for _, o := range g.simdUnits {
+					seen = seen || o == feature
+				}
+				if !seen {
+					g.simdUnits = append(g.simdUnits, feature)
+				}
 			}
 			recv := n.Receiver()
 			if recv[0] != 0 || g.structs[recv[1]] == nil {
@@ -417,7 +448,10 @@ func (g *gen) analyzeFunc(fi *funcInfo, pkgPrefix string) error {
 	for _, o := range n.Asserts() {
 		// The Wuffs compiler itself rejects these (lang/check: "function
 		// assertions are not supported yet"), except for the "choose
-		// cpu_arch" ones.
+		// cpu_arch" ones, which only a SIMD implementation has here.
+		if o.AsAssert().IsChooseCPUArch() && fi.simd != "" {
+			continue
+		}
 		return errNotYet("function assertion %q", o.AsAssert().Condition().Str(g.tm))
 	}
 
@@ -601,9 +635,13 @@ func (g *gen) findChoices() error {
 							target.candidates = append(target.candidates, c)
 						}
 					}
-					// C takes the first alternative that has no cpu_arch
-					// requirement.
-					break
+					// C takes the first alternative whose cpu_arch
+					// requirement the CPU meets: a SIMD implementation
+					// may or may not be taken, the first alternative
+					// without a requirement always is.
+					if c.simd == "" {
+						break
+					}
 				}
 				return nil
 			}); err != nil {
@@ -659,7 +697,7 @@ func (g *gen) findChoices() error {
 				}
 				args = append(args, f.params[i].name, actual)
 			}
-			return callNamed(f.name, args...), nil
+			return callNamed(g.qualifiedName(g.funcOfIR(f), f), args...), nil
 		}
 		stmtOf := func(f *fn) ([]stmt, error) {
 			c, err := callOf(f)

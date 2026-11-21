@@ -8,6 +8,12 @@
 #
 # Each package's status-code namespace (package id) comes from the table in
 # internal/adagen/package_ids.txt, which is compiled into wuffs-ada.
+#
+# Every std package is generated twice, with and without -simd (see
+# ada/wuffs_simd.gpr). A file that is the same both ways goes to ada/gen; the
+# two versions of a file that differs go to ada/gen/scalar and ada/gen/simd,
+# and the SIMD implementations' child units (only made with -simd) to
+# ada/gen/simd.
 set -eu
 cd "$(dirname "$0")"
 
@@ -15,17 +21,22 @@ go build -o bin/wuffs-ada ./cmd/wuffs-ada
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-mkdir "$tmp/gen" "$tmp/tests"
+mkdir "$tmp/gen" "$tmp/gensimd" "$tmp/tests" "$tmp/common" "$tmp/scalar" "$tmp/simd"
 
 gen() {
     # usage: gen OUTDIR PACKAGE_NAME FILES...
+    # For OUTDIR "$tmp/gen" (a std package), also with -simd, to "$tmp/gensimd".
     outdir="$1"
     name="$2"
     shift 2
     bin/wuffs-ada gen -package_name "$name" -wuffsroot wuffs -o "$outdir" "$@"
+    if [ "$outdir" = "$tmp/gen" ]; then
+        bin/wuffs-ada gen -simd -package_name "$name" -wuffsroot wuffs -o "$tmp/gensimd" "$@"
+    fi
 }
 
 bin/wuffs-ada genstd -o "$tmp/gen"
+bin/wuffs-ada genstd -o "$tmp/gensimd"
 
 gen "$tmp/gen" adler32 \
     wuffs/std/adler32/common_adler32.wuffs \
@@ -159,12 +170,30 @@ gen "$tmp/tests" advtest internal/adagen/testdata/advtest.wuffs
 # ada/tests/test_tokadv.adb.
 gen "$tmp/tests" tokadv internal/adagen/testdata/tokadv.wuffs
 
+# Split the two builds' files: common, scalar-only and SIMD-only.
+for f in "$tmp"/gen/*; do
+    name="$(basename "$f")"
+    if cmp -s "$f" "$tmp/gensimd/$name"; then
+        cp "$f" "$tmp/common/"
+    else
+        cp "$f" "$tmp/scalar/"
+        [ -f "$tmp/gensimd/$name" ] || { echo "gen.sh: $name: not made with -simd" >&2; exit 1; }
+        cp "$tmp/gensimd/$name" "$tmp/simd/"
+    fi
+done
+for f in "$tmp"/gensimd/*; do
+    [ -f "$tmp/gen/$(basename "$f")" ] || cp "$f" "$tmp/simd/"
+done
+
 # Success: replace the checked-in output.
 # (ada/tests also holds hand-written children of generated packages, the
 # wuffs-std-*-probe.ads files: only the generated test packages go.)
-rm -f ada/gen/*.ads ada/gen/*.adb
+mkdir -p ada/gen/scalar ada/gen/simd
+rm -f ada/gen/*.ads ada/gen/*.adb ada/gen/scalar/*.ad[sb] ada/gen/simd/*.ad[sb]
 for f in "$tmp"/tests/*; do
     rm -f "ada/tests/$(basename "$f")"
 done
-cp "$tmp"/gen/* ada/gen/
+cp "$tmp"/common/* ada/gen/
+cp "$tmp"/scalar/* ada/gen/scalar/
+cp "$tmp"/simd/* ada/gen/simd/
 cp "$tmp"/tests/* ada/tests/

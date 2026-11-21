@@ -78,6 +78,9 @@ func doGen(args []string) error {
 	wuffsRoot := flags.String("wuffsroot", "wuffs",
 		"the root directory of the Wuffs repository: `use \"std/foo\"` refers to the sources in its std/foo directory")
 	outDir := flags.String("o", "", "the directory to write the Ada source files to (default: print to stdout)")
+	simd := flags.Bool("simd", false,
+		"also generate the x86 SIMD implementations (functions that need a cpu_arch capability), "+
+			"in child units, and select them at run time")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -132,20 +135,36 @@ func doGen(args []string) error {
 		PackageName: *packageName,
 		PackageID:   uint32(*packageID),
 		ResolveUse:  resolveUse,
+		SIMD:        *simd,
 	})
 	if err != nil {
 		return err
 	}
 
-	if *outDir == "" {
-		if _, err := os.Stdout.Write(out.Spec); err != nil {
+	units := append([]*adagen.Unit{{
+		UnitName: out.UnitName, SpecFile: out.SpecFile, BodyFile: out.BodyFile, Spec: out.Spec, Body: out.Body,
+	}}, out.Children...)
+	for i, u := range units {
+		if *outDir == "" {
+			if i > 0 {
+				if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+					return err
+				}
+			}
+			if _, err := os.Stdout.Write(u.Spec); err != nil {
+				return err
+			}
+			if _, err := os.Stdout.Write(append([]byte("\n"), u.Body...)); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(*outDir, u.SpecFile), u.Spec, 0644); err != nil {
 			return err
 		}
-		_, err := os.Stdout.Write(append([]byte("\n"), out.Body...))
-		return err
+		if err := os.WriteFile(filepath.Join(*outDir, u.BodyFile), u.Body, 0644); err != nil {
+			return err
+		}
 	}
-	if err := os.WriteFile(filepath.Join(*outDir, out.SpecFile), out.Spec, 0644); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(*outDir, out.BodyFile), out.Body, 0644)
+	return nil
 }

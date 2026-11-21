@@ -16,6 +16,7 @@
 #define WUFFS_CONFIG__MODULE__BASE
 #define WUFFS_CONFIG__MODULE__ADLER32
 #define WUFFS_CONFIG__MODULE__CRC32
+#define WUFFS_CONFIG__MODULE__CRC64
 #define WUFFS_CONFIG__MODULE__DEFLATE
 #define WUFFS_CONFIG__MODULE__GIF
 #define WUFFS_CONFIG__MODULE__GZIP
@@ -37,6 +38,7 @@ static uint64_t g_result;
 static int g_failed;
 
 static wuffs_adler32__hasher g_adler;
+static wuffs_crc64__ecma_hasher g_crc64;
 static wuffs_crc32__ieee_hasher g_crc;
 static wuffs_gzip__decoder g_gzip;
 static wuffs_png__decoder g_png;
@@ -107,6 +109,11 @@ static void once(const char* kind) {
       g_failed = 1;
     }
     g_result = wuffs_adler32__hasher__update_u32(&g_adler, s);
+  } else if (!strcmp(kind, "crc64")) {
+    if (wuffs_crc64__ecma_hasher__initialize(&g_crc64, sizeof g_crc64, WUFFS_VERSION, 0).repr) {
+      g_failed = 1;
+    }
+    g_result = wuffs_crc64__ecma_hasher__update_u64(&g_crc64, s);
   } else if (!strcmp(kind, "gzip")) {
     wuffs_base__io_buffer src = wuffs_base__ptr_u8__reader(g_file, g_len, true);
     wuffs_base__io_buffer dst = wuffs_base__ptr_u8__writer(g_pix, CAP_PIX);

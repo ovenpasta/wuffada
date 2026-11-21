@@ -59,6 +59,17 @@ const (
 	kTokenWriter
 	kTokenArray // Wuffs.U64_Array: the array of a token buffer.
 	kTokenMeta  // Wuffs.Base.Tokens.Token_Buffer_Meta.
+
+	// kVec is Wuffs "base.x86_m128i" or "base.x86_m256i" (bits is 128 or
+	// 256): Wuffs.Runtime.X86.M128I or M256I, a GCC vector type. Only in a
+	// SIMD build, and only in the functions that are generated as SIMD
+	// implementations (funcInfo.simd).
+	kVec
+
+	// kX86Util is Wuffs "base.x86_sse42_utility" or "base.x86_avx2_utility"
+	// (bits is 128 or 256): an empty struct with built-in methods, of which
+	// a local variable has no Ada object.
+	kX86Util
 )
 
 // adaType is the Ada type of a Wuffs type, variable or expression.
@@ -113,6 +124,11 @@ var (
 	typTokenArray  = &adaType{kind: kTokenArray, name: "Wuffs.U64_Array"}
 	typTokenMeta   = &adaType{kind: kTokenMeta, name: tokensPkg + ".Token_Buffer_Meta"}
 	typTokenCursor = &adaType{kind: kCursor, name: tokensPkg + ".Token_Writer"}
+
+	typM128I     = &adaType{kind: kVec, name: x86Pkg + ".M128I", bits: 128}
+	typM256I     = &adaType{kind: kVec, name: x86Pkg + ".M256I", bits: 256}
+	typSSE42Util = &adaType{kind: kX86Util, name: "base.x86_sse42_utility", bits: 128}
+	typAVX2Util  = &adaType{kind: kX86Util, name: "base.x86_avx2_utility", bits: 256}
 
 	typPixelFormat = &adaType{kind: kOpaque, name: formatsPkg + ".Pixel_Format",
 		zero: formatsPkg + ".Make_Pixel_Format (Repr => 0)"}
@@ -293,7 +309,22 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 			}
 		}
 		if x.IsCPUArchType() || x.IsEtcUtilityType() {
-			return nil, fmt.Errorf("cpu_arch type %q is not supported: SIMD is out of scope", x.Str(g.tm))
+			if g.opts.SIMD && qid[0] == t.IDBase {
+				switch qid[1] {
+				case t.IDX86M128I:
+					return typM128I, nil
+				case t.IDX86M256I:
+					return typM256I, nil
+				case t.IDX86SSE42Utility:
+					return typSSE42Util, nil
+				case t.IDX86AVX2Utility:
+					return typAVX2Util, nil
+				}
+			}
+			if g.opts.SIMD {
+				return nil, fmt.Errorf("cpu_arch type %q is not supported: only the x86 ones are", x.Str(g.tm))
+			}
+			return nil, fmt.Errorf("cpu_arch type %q is not supported in a build without SIMD", x.Str(g.tm))
 		}
 		if bits := uintBits(qid); bits != 0 {
 			base := numType(bits)

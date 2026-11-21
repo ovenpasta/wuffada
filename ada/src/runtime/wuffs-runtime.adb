@@ -9,6 +9,9 @@ package body Wuffs.Runtime is
    package SE renames System.Storage_Elements;
    package IO renames Wuffs.Base.IO;
 
+   function Uintptr_Low_12_Bits (S : Wuffs.Bytes) return Wuffs.U32 is
+     (Wuffs.U32 (SE."mod" (SE.To_Integer (S'Address), 4096)));
+
    --  The enclosing run of two views that share an element: where it
    --  starts, how long it is, and where each view starts in it.
    type Union is record

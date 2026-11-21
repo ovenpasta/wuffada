@@ -4,7 +4,19 @@
 --  object directory, and likewise the proved pixel library's (src/pixel),
 --  YCCK library's (src/ycck) and token library's (src/token).
 with "wuffs_common.gpr";
+with "wuffs_simd.gpr";
 project Wuffs_Gen is
+
+   --  WUFFS_SIMD=on|off: see wuffs_simd.gpr.  A SIMD-off build has its own
+   --  object and executable directories (suffix "-scalar").
+   --
+   --  Test builds only, in a SIMD build.  "env" (the default) substitutes a
+   --  Wuffs.Runtime.CPU that hides the CPU features named in the environment
+   --  variable WUFFS_TEST_CPU_DISABLE (see ada/tests/cpu_env), so that one
+   --  build tests both the SIMD and the scalar implementations; "native" is
+   --  the library's own, as a program gets it.
+   type CPU_Type is ("env", "native");
+   CPU : CPU_Type := external ("WUFFS_TEST_CPU", "env");
 
    --  Test builds only.  "force32" substitutes a Wuffs.Runtime.Target that
    --  claims a 32-bit machine (see ada/tests/target32); its objects and
@@ -16,16 +28,36 @@ project Wuffs_Gen is
    --  (test.sh compiles the generator's golden outputs this way).
    Extra_Src := external ("WUFFS_EXTRA_SRC", "");
 
-   Dirs := ("src/root", "src/base", "src/pixel", "src/ycck", "src/token", "src/runtime", "gen", "tests");
-   Obj_Suffix := "";
+   Dirs := ("src/root", "src/base", "src/pixel", "src/ycck", "src/token", "src/runtime", "gen", "tests")
+     & Wuffs_Simd.Gen_Dirs;
+   Obj_Suffix := Wuffs_Simd.Obj_Suffix;
    Exec := "bin";
+   Mains := ("test_hashers.adb", "test_m1.adb", "test_runtime.adb", "test_decode.adb", "test_adv.adb", "test_image.adb",
+             "test_hostile.adb", "test_entry.adb", "test_hashers2.adb", "bench_main.adb", "test_tokens.adb",
+             "test_tokadv.adb");
+   case Wuffs_Simd.Simd is
+      when "on" =>
+         --  The SIMD tests (ada/tests/simd).
+         Dirs := Dirs & ("tests/simd");
+         Mains := Mains & ("test_x86.adb", "test_simd.adb");
+         case CPU is
+            when "env" =>
+               Dirs := Dirs & ("tests/cpu_env");
+            when "native" =>
+               Dirs := Dirs & Wuffs_Simd.CPU_Dirs;
+               Obj_Suffix := Obj_Suffix & "-native";
+               Exec := Exec & "/native";
+         end case;
+      when "off" =>
+         Exec := Exec & "/scalar";
+   end case;
    case Target is
       when "native" =>
          Dirs := Dirs & ("src/runtime/target");
       when "force32" =>
          Dirs := Dirs & ("tests/target32");
-         Obj_Suffix := "-force32";
-         Exec := "bin/force32";
+         Obj_Suffix := Obj_Suffix & "-force32";
+         Exec := Exec & "/force32";
    end case;
    case Extra_Src is
       when "" =>
@@ -38,10 +70,14 @@ project Wuffs_Gen is
    for Object_Dir use "obj/gen/" & Wuffs_Common.Profile & Obj_Suffix;
    for Exec_Dir use Exec;
    for Create_Missing_Dirs use "True";
-   for Main use
-     ("test_hashers.adb", "test_m1.adb", "test_runtime.adb", "test_decode.adb", "test_adv.adb", "test_image.adb", "test_hostile.adb", "test_entry.adb", "test_hashers2.adb", "bench_main.adb",
-      "test_tokens.adb", "test_tokadv.adb");
-   package Compiler is
-      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+   for Main use Mains;
+   package Compiler extends Wuffs_Simd.Compiler is
+      case Wuffs_Simd.Simd is
+         when "on" =>
+            --  The tests of the intrinsics call every one of them.
+            for Switches ("x86_test_cases.adb") use Wuffs_Common.Switches & Wuffs_Simd.AVX2_Switches;
+         when "off" =>
+            null;
+      end case;
    end Compiler;
 end Wuffs_Gen;

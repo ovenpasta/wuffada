@@ -58,6 +58,13 @@ const (
 
 	// targetPkg answers questions about the machine: see its spec.
 	targetPkg = "Wuffs.Runtime.Target"
+
+	// The SIMD runtime (ada/src/simd), in a SIMD build only: the vector
+	// types, the methods of the x86 cpu_arch types and the CPU's features.
+	x86Pkg   = "Wuffs.Runtime.X86"
+	sse42Pkg = "Wuffs.Runtime.X86.SSE42"
+	avx2Pkg  = "Wuffs.Runtime.X86.AVX2"
+	cpuPkg   = "Wuffs.Runtime.CPU"
 )
 
 // Options configures Generate.
@@ -77,6 +84,16 @@ type Options struct {
 	// SourceNames are the names of the source files, for the "generated
 	// from" header. They default to the names recorded in the ASTs.
 	SourceNames []string
+
+	// SIMD means generating the functions that need an x86 cpu_arch
+	// capability ("choose cpu_arch >= x86_sse42", x86_avx2 or x86_bmi2),
+	// each feature's into a private child unit of its own (see Output), and
+	// making every choose statement that names one ask the CPU first, as
+	// upstream's C does. Without it, those functions are skipped and every
+	// choose statement takes its first alternative without a cpu_arch
+	// requirement, as upstream's C built with WUFFS_CONFIG__AVOID_CPU_ARCH
+	// does. Functions that need an ARM capability are skipped either way.
+	SIMD bool
 }
 
 // Output is a generated Ada package.
@@ -90,6 +107,21 @@ type Output struct {
 	// Skipped lists the Wuffs functions that were not generated because they
 	// need a cpu_arch (SIMD) capability.
 	Skipped []string
+
+	// Children are the private child units that hold the SIMD
+	// implementations (Options.SIMD), one per x86 feature, such as
+	// "Wuffs.Std.Crc32.X86_SSE42". Each must be compiled with the switches of
+	// its feature (see ada/wuffs_simd.gpr).
+	Children []*Unit
+}
+
+// Unit is a generated Ada compilation unit (a spec and its body).
+type Unit struct {
+	UnitName string
+	SpecFile string
+	BodyFile string
+	Spec     []byte
+	Body     []byte
 }
 
 // StdRootSpec is the source text of the parent package of every generated
@@ -128,6 +160,10 @@ type gen struct {
 	funcList   []*funcInfo
 	skipped    []string
 
+	// simdUnits are the x86 features ("x86_sse42" and so on) that have SIMD
+	// implementations, in the order of their first function.
+	simdUnits []string
+
 	// useType records which modular types' operators the body uses.
 	useType map[int]bool
 }
@@ -161,7 +197,16 @@ func Generate(tm *t.Map, files []*a.File, opts Options) (*Output, error) {
 		return nil, fmt.Errorf("adagen: %v", err)
 	}
 	for _, fi := range g.funcList {
-		if err := g.lowerFunc(fi); err != nil {
+		// A SIMD implementation's body goes in its child unit, which has use
+		// clauses of its own.
+		bodyUseType := g.useType
+		if fi.simd != "" {
+			fi.useType = map[int]bool{}
+			g.useType = fi.useType
+		}
+		err := g.lowerFunc(fi)
+		g.useType = bodyUseType
+		if err != nil {
 			filename, line := fi.ast.Filename(), fi.ast.Line()
 			return nil, fmt.Errorf("adagen: func %s (at %s:%d): %v",
 				fi.ast.QQID().Str(g.tm), filename, line, err)
@@ -214,6 +259,9 @@ func Generate(tm *t.Map, files []*a.File, opts Options) (*Output, error) {
 	body := g.genBody()
 	out.Spec = []byte(g.header() + g.withClauses(spec, "") + spec)
 	out.Body = []byte(g.header() + g.withClauses(body, spec) + body)
+	for _, feature := range g.simdUnits {
+		out.Children = append(out.Children, g.genSIMDUnit(feature))
+	}
 	return out, nil
 }
 

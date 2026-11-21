@@ -1,0 +1,65 @@
+--  Part of wuffada (wuffs-ada: Wuffs to Ada).
+--  SPDX-License-Identifier: Apache-2.0 OR MIT
+
+--  SIMD: which source directories and compiler switches a build of the
+--  generated library uses.  Shared by ada/wuffs_gen.gpr (the tests) and
+--  examples/decode_image.gpr.
+--
+--  WUFFS_SIMD=on (the default; x86-64 only): the generated packages that
+--  have x86 SIMD implementations (ada/gen/simd) and their runtime
+--  (ada/src/simd).  Each SIMD implementation is a private child unit,
+--  compiled with the -m options of upstream's target attribute for its
+--  "cpu_arch" (wuffs/internal/cgen/statement.go, cpuArchCNames), and is
+--  only called after the CPU has been asked (Wuffs.Runtime.CPU).  Nothing
+--  else gets those options: the library still runs on any x86-64 CPU.
+--
+--  WUFFS_SIMD=off: no SIMD code at all (ada/gen/scalar: the same packages,
+--  generated without their SIMD implementations).  For other targets, and
+--  for the scalar-only tests.
+with "wuffs_common.gpr";
+abstract project Wuffs_Simd is
+
+   for Source_Dirs use ();
+
+   type Simd_Type is ("on", "off");
+   Simd : Simd_Type := external ("WUFFS_SIMD", "on");
+
+   --  The options of upstream's WUFFS_BASE__MAYBE_ATTRIBUTE_TARGET for each
+   --  "cpu_arch".
+   SSE42_Switches := ("-msse4.2", "-mpclmul", "-mpopcnt");
+   AVX2_Switches  := SSE42_Switches & ("-mavx2");
+   BMI2_Switches  := ("-mbmi2");
+
+   --  The library's source directories that depend on the mode, and
+   --  (separately, as a test build substitutes its own) the one of
+   --  Wuffs.Runtime.CPU.
+   Gen_Dirs := ();
+   CPU_Dirs := ();
+   Obj_Suffix := "";
+   case Simd is
+      when "on" =>
+         Gen_Dirs := (Wuffs_Simd'Project_Dir & "src/simd", Wuffs_Simd'Project_Dir & "gen/simd");
+         CPU_Dirs := (Wuffs_Simd'Project_Dir & "src/simd/cpu");
+      when "off" =>
+         Gen_Dirs := (Wuffs_Simd'Project_Dir & "gen/scalar");
+         Obj_Suffix := "-scalar";
+   end case;
+
+   package Compiler is
+      for Default_Switches ("Ada") use Wuffs_Common.Switches;
+      case Simd is
+         when "on" =>
+            for Switches ("wuffs-runtime-x86-sse42.adb") use Wuffs_Common.Switches & SSE42_Switches;
+            for Switches ("wuffs-runtime-x86-avx2.ads") use Wuffs_Common.Switches & AVX2_Switches;
+            for Switches ("wuffs-std-adler32-x86_sse42.adb") use Wuffs_Common.Switches & SSE42_Switches;
+            for Switches ("wuffs-std-crc32-x86_sse42.adb") use Wuffs_Common.Switches & SSE42_Switches;
+            for Switches ("wuffs-std-crc64-x86_sse42.adb") use Wuffs_Common.Switches & SSE42_Switches;
+            for Switches ("wuffs-std-png-x86_sse42.adb") use Wuffs_Common.Switches & SSE42_Switches;
+            for Switches ("wuffs-std-jpeg-x86_avx2.adb") use Wuffs_Common.Switches & AVX2_Switches;
+            for Switches ("wuffs-std-deflate-x86_bmi2.adb") use Wuffs_Common.Switches & BMI2_Switches;
+         when "off" =>
+            null;
+      end case;
+   end Compiler;
+
+end Wuffs_Simd;

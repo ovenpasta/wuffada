@@ -378,25 +378,43 @@ func TestCheckedIn(tt *testing.T) {
 			tt.Errorf("%s: no package id: %v", tc.name, err)
 			continue
 		}
-		out, err := generate(Options{
-			PackageName: tc.name,
-			PackageID:   id,
-			ResolveUse:  UseResolver(filepath.Join(root, "wuffs")),
-		}, tc.files, srcs)
-		if err != nil {
-			tt.Errorf("%s: %v", tc.name, err)
-			continue
+		// A std package is generated with and without SIMD (gen.sh): a file
+		// that is the same both ways is in ada/gen, the two versions of
+		// one that is not are in ada/gen/scalar and ada/gen/simd.
+		modes := []string{"scalar"}
+		if tc.outDir == "ada/gen" {
+			modes = append(modes, "simd")
 		}
-		for _, x := range []struct {
-			file string
-			got  []byte
-		}{{out.SpecFile, out.Spec}, {out.BodyFile, out.Body}} {
-			filename := filepath.Join(root, filepath.FromSlash(tc.outDir), x.file)
-			want, err := os.ReadFile(filename)
+		for _, mode := range modes {
+			out, err := generate(Options{
+				PackageName: tc.name,
+				PackageID:   id,
+				ResolveUse:  UseResolver(filepath.Join(root, "wuffs")),
+				SIMD:        mode == "simd",
+			}, tc.files, srcs)
 			if err != nil {
-				tt.Errorf("%s: %v (run ./gen.sh)", tc.name, err)
-			} else if !bytes.Equal(x.got, want) {
-				tt.Errorf("%s: %s is stale (run ./gen.sh)", tc.name, filename)
+				tt.Errorf("%s (%s): %v", tc.name, mode, err)
+				continue
+			}
+			type genFile struct {
+				file string
+				got  []byte
+			}
+			files := []genFile{{out.SpecFile, out.Spec}, {out.BodyFile, out.Body}}
+			for _, c := range out.Children {
+				files = append(files, genFile{c.SpecFile, c.Spec}, genFile{c.BodyFile, c.Body})
+			}
+			for _, x := range files {
+				filename := filepath.Join(root, filepath.FromSlash(tc.outDir), x.file)
+				if _, err := os.Stat(filename); err != nil && tc.outDir == "ada/gen" {
+					filename = filepath.Join(root, filepath.FromSlash(tc.outDir), mode, x.file)
+				}
+				want, err := os.ReadFile(filename)
+				if err != nil {
+					tt.Errorf("%s: %v (run ./gen.sh)", tc.name, err)
+				} else if !bytes.Equal(x.got, want) {
+					tt.Errorf("%s: %s is stale (run ./gen.sh)", tc.name, filename)
+				}
 			}
 		}
 	}

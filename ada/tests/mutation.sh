@@ -27,6 +27,14 @@
 # test_hostile, test_entry and the Go tests are run (for the json/cbor
 # mutants T01 .. T17), not the image, decompressor and hasher stages.
 #
+# With MUTATION_SIMD=1 (for the SIMD mutants S01 .. S16) the tests are
+# instead those of a SIMD build: the generator's tests (rejects and SIMD),
+# test_x86 (the wrappers against the C oracle), check_selection.sh
+# (test_simd: CPU detection against __builtin_cpu_supports and the
+# selection with every feature hidden in turn), test_hashers and
+# test_hashers2 (every chunk size and alignment), test_decode and test_image
+# (the reduced corpus, see below), compared with upstream's DEFAULT C build.
+#
 # LIMITATION: by default the image corpus is REDUCED, to every run that has
 # reference pixels and every ninth of the others, so "SURVIVED" here does
 # not mean that ./test.sh, which runs all of it, misses the fault. Set
@@ -50,6 +58,23 @@ ln -s "$root/wuffs" "$copy/wuffs"
 cd "$copy"
 
 tokens_only="${MUTATION_TOKENS:-}"
+simd_only="${MUTATION_SIMD:-}"
+if [ "$simd_only" = 1 ]; then
+    mkdir "$scratch/corpus" "$scratch/webpref" "$scratch/dcorpus"
+    "${CC:-cc}" -std=c99 -O2 -Wall -o "$scratch/webpref.bin" ada/tests/crosscheck/webpref.c -lwebp
+    find wuffs/test/data ada/tests/webpcorpus -name '*.webp' | LC_ALL=C sort |
+        "$scratch/webpref.bin" "$scratch/webpref" > "$scratch/webpref/list.out"
+    go run ./ada/tests/imgcorpus -data wuffs/test/data -out "$scratch/corpus" -chaos "$scratch/chaos.manifest" \
+        -webpref "$scratch/webpref" 2> /dev/null > "$scratch/full.manifest"
+    awk '{ if ($7 != "-" || NR % 9 == 0) print }' "$scratch/full.manifest" > "$scratch/manifest"
+    ada/tests/crosscheck/run_image.sh default < "$scratch/manifest" > "$scratch/c.trace"
+    go run ./ada/tests/corpus -data wuffs/test/data -out "$scratch/dcorpus" 2> /dev/null > "$scratch/decode.manifest"
+    ada/tests/crosscheck/run_decode.sh < "$scratch/decode.manifest" > "$scratch/decode.c.trace"
+    find wuffs/test/data -maxdepth 1 -type f | LC_ALL=C sort > "$scratch/files"
+    xargs go run ./ada/tests/hashexpect < "$scratch/files" > "$scratch/manifest1"
+    xargs go run ./ada/tests/hashexpect2 < "$scratch/files" > "$scratch/manifest2"
+    echo "$(wc -l < "$scratch/manifest" | tr -d ' ') image runs per mutant (SIMD mode)"
+else
 mkdir "$scratch/tokcorpus"
 go run ./ada/tests/tokcorpus -data wuffs/test/data -out "$scratch/tokcorpus" > "$scratch/tokens.manifest"
 ada/tests/crosscheck/run_tokens.sh < "$scratch/tokens.manifest" > "$scratch/tokens.c.trace"
@@ -80,20 +105,66 @@ ada/tests/crosscheck/run_decode.sh < "$scratch/decode.manifest" > "$scratch/deco
 find wuffs/test/data -maxdepth 1 -type f | LC_ALL=C sort | xargs go run ./ada/tests/hashexpect2 > "$scratch/manifest2"
 echo "$(wc -l < "$scratch/manifest" | tr -d ' ') image runs and $(wc -l < "$scratch/chaos.manifest" | tr -d ' ') chaos runs per mutant"
 fi
+fi
 
 save() {
-    tar cf "$scratch/saved.tar" internal/adagen ada/src/runtime ada/gen ada/tests/wuffs-std-m1test.ads \
+    tar cf "$scratch/saved.tar" internal/adagen ada/src/runtime ada/src/simd ada/gen ada/tests/wuffs-std-m1test.ads \
         ada/tests/wuffs-std-m1test.adb ada/tests/wuffs-std-advtest.ads ada/tests/wuffs-std-advtest.adb \
         ada/tests/wuffs-std-tokadv.ads ada/tests/wuffs-std-tokadv.adb
 }
 
 restore() {
-    rm -rf internal/adagen ada/src/runtime ada/gen
+    rm -rf internal/adagen ada/src/runtime ada/src/simd ada/gen
     tar xf "$scratch/saved.tar"
+}
+
+# check_simd NAME PROFILE: the SIMD mode of check.
+check_simd() {
+    name="$1"
+    profile="${MUTATION_PROFILE:-$2}"
+    log="$scratch/$name.log"
+    if ! (cd ada && alr exec -- gprbuild -P wuffs_gen.gpr -XWUFFS_PROFILE="$profile" test_x86.adb test_simd.adb \
+        test_hashers.adb test_hashers2.adb test_decode.adb test_image.adb) >> "$log" 2>&1; then
+        echo "$name: killed by the Ada build (an error or a warning)"; return
+    fi
+    killers=""
+    if ! go test ./internal/adagen -run 'TestRejects|SIMD|X86' >> "$log" 2>&1; then
+        killers="$killers go-test"
+    fi
+    if ! (ulimit -s 256 && timeout 600 ada/bin/test_x86) >> "$log" 2>&1; then
+        killers="$killers test_x86"
+    fi
+    if ! (ulimit -s 256 && timeout 600 ada/tests/simd/check_selection.sh ada/bin/test_simd) >> "$log" 2>&1; then
+        killers="$killers check_selection"
+    fi
+    if ! (ulimit -s 256 && timeout 600 ada/bin/test_hashers < "$scratch/manifest1") >> "$log" 2>&1; then
+        killers="$killers test_hashers"
+    fi
+    if ! (ulimit -s 256 && timeout 600 ada/bin/test_hashers2 < "$scratch/manifest2") >> "$log" 2>&1; then
+        killers="$killers test_hashers2"
+    fi
+    if ! (ulimit -s 256 && timeout 900 ada/bin/test_decode < "$scratch/decode.manifest") > "$scratch/decode.out" 2>> "$log"; then
+        killers="$killers test_decode(checks)"
+    fi
+    if ! grep '^= ' "$scratch/decode.out" | cmp -s - "$scratch/decode.c.trace"; then
+        killers="$killers test_decode(trace-vs-C)"
+    fi
+    if ! (ulimit -s 256 && timeout 1800 ada/bin/test_image < "$scratch/manifest") > "$scratch/image.out" 2>> "$log"; then
+        killers="$killers test_image(checks)"
+    fi
+    grep -v '^= ' "$scratch/image.out" | tail -n 3 >> "$log" || true
+    grep '^= ' "$scratch/image.out" > "$scratch/ada.trace" || true
+    if ! cmp -s "$scratch/c.trace" "$scratch/ada.trace"; then
+        killers="$killers test_image(trace-vs-C)"
+    fi
+    report "$name" "$killers"
 }
 
 # check NAME PROFILE: builds and tests the tree as it is; prints one line.
 check() {
+    if [ "$simd_only" = 1 ]; then
+        check_simd "$@"; return
+    fi
     name="$1"
     # MUTATION_PROFILE, if set, replaces every mutant's own profile.
     profile="${MUTATION_PROFILE:-$2}"

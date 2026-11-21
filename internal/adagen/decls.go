@@ -34,6 +34,15 @@ func (g *gen) header() string {
 			p.comment("  " + s)
 		}
 	}
+	if len(g.simdUnits) > 0 {
+		p.comment("\nSIMD implementations, each in the private child unit of its cpu_arch\n" +
+			"capability, selected at run time:")
+		for _, fi := range g.funcList {
+			if fi.simd != "" {
+				p.comment("  " + fi.ast.QQID().Str(g.tm) + " (" + g.simdUnitName(fi.simd) + ")")
+			}
+		}
+	}
 	p.line("")
 	return p.b.String()
 }
@@ -45,7 +54,10 @@ func (g *gen) header() string {
 func (g *gen) withClauses(text string, specText string) string {
 	needs := func(s string, unit string) bool { return strings.Contains(s, unit+".") }
 	candidates := []string{"Ada.Strings.Text_Buffers", "Interfaces", "Wuffs.Runtime", targetPkg, basePkg, intsPkg, slicesPkg, endianPkg, ioPkg,
-		rangesPkg, tokensPkg, utf8Pkg, formatsPkg, buffersPkg, swizzlerPkg}
+		rangesPkg, tokensPkg, utf8Pkg, formatsPkg, buffersPkg, swizzlerPkg, x86Pkg, sse42Pkg, avx2Pkg, cpuPkg}
+	for _, feature := range g.simdUnits {
+		candidates = append(candidates, g.simdUnitName(feature))
+	}
 	for _, o := range g.usedPackages() {
 		candidates = append(candidates, o)
 	}
@@ -198,8 +210,14 @@ func (g *gen) genSpec() string {
 			p.line("is null;")
 		}
 	}
+	for _, c := range g.constList {
+		if !c.ast.Public() && c.inSpec {
+			p.line("")
+			g.printConst(p, c)
+		}
+	}
 	for _, fi := range g.funcList {
-		if !fi.ir.public {
+		if !fi.ir.public && fi.simd == "" {
 			p.line("")
 			p.comment("Wuffs: func " + fi.ir.wuffsName)
 			p.fnSpec(fi.ir)
@@ -241,7 +259,7 @@ func (g *gen) genBody() string {
 	for _, c := range g.constList {
 		// A private constant that only constant expressions mention has
 		// been folded away, and GNAT warns about unreferenced entities.
-		if !c.ast.Public() && c.used {
+		if !c.ast.Public() && c.used && !c.inSpec {
 			p.line("")
 			g.printConst(p, c)
 		}
@@ -255,6 +273,10 @@ func (g *gen) genBody() string {
 		g.printInitialize(p, s)
 	}
 	for _, fi := range g.funcList {
+		if fi.simd != "" {
+			// In its child unit (genSIMDUnit).
+			continue
+		}
 		p.line("")
 		p.fnBody(fi.ir)
 		if fi.dispatch != nil {

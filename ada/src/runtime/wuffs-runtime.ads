@@ -119,6 +119,12 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    is (Subslice_I (S, Wuffs.Base.Slices.Suffix_Offset (Length => S.Length, Up_To => Up_To)))
    with Inline;
 
+   --  Wuffs `s.uintptr_low_12_bits()`: the low 12 bits of the address of
+   --  S's first element (of where it would be, if S is empty).  C:
+   --  0xFFF & (uintptr_t)(s.ptr).  Only an alignment decision depends on it
+   --  (std/crc32 and std/crc64's SIMD implementations), never a result.
+   function Uintptr_Low_12_Bits (S : Wuffs.Bytes) return Wuffs.U32;
+
    ---------------------------------------------------------------------------
    --  Writable byte slices.
    ---------------------------------------------------------------------------

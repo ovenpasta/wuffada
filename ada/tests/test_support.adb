@@ -2,6 +2,7 @@ with Ada.Assertions;
 with Ada.Command_Line;
 with Ada.Text_IO;
 with Interfaces;
+with System.Storage_Elements;
 
 package body Test_Support is
 
@@ -12,6 +13,18 @@ package body Test_Support is
    with Volatile, Export, Convention => C, External_Name => "wuffada_test_hidden_zero";
 
    procedure Put_Failure (What : String; N : Integer; Detail : String);
+
+   procedure Unaligned_Copy (Data : Wuffs.Bytes; K : Natural; First : out Wuffs.Index) is
+      use type Wuffs.Index;
+      use type System.Storage_Elements.Integer_Address;
+      Base : Wuffs.Index := Buffer_Size / 2;
+   begin
+      while System.Storage_Elements.To_Integer (Buffer (Base)'Address) mod 64 /= 0 loop
+         Base := Base + 1;
+      end loop;
+      First := Base + Wuffs.Index (K);
+      Buffer (First .. First + Data'Length - 1) := Data;
+   end Unaligned_Copy;
 
    procedure Put_Failure (What : String; N : Integer; Detail : String) is
    begin

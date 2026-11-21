@@ -3,7 +3,7 @@
 
 --  A benchmark of generated decoders, for ada/tests/bench/run.sh (it is not
 --  a test and not part of test.sh).  Standard input has one line per
---  measurement, "KIND REPETITIONS PATH", with KIND one of crc32, adler32
+--  measurement, "KIND REPETITIONS PATH", with KIND one of crc32, adler32, crc64
 --  (hash the file), gzip (decompress it), png, gif (decode every frame to
 --  BGRA_PREMUL), json (tokenise the whole file in one call).  For each it
 --  prints
@@ -26,6 +26,7 @@ with Wuffs.Base.Pixel_Formats;
 with Wuffs.Base.Tokens;
 with Wuffs.Runtime;
 with Wuffs.Std.Adler32;
+with Wuffs.Std.Crc64;
 with Wuffs.Std.Crc32;
 with Wuffs.Std.Gif;
 with Wuffs.Std.Gzip;
@@ -48,6 +49,7 @@ procedure Bench_Main is
    use type Ada.Real_Time.Time_Span;
 
    Adler : Wuffs.Std.Adler32.Hasher;
+   Crc64 : Wuffs.Std.Crc64.Ecma_Hasher;
    Crc   : Wuffs.Std.Crc32.Ieee_Hasher;
    Gzip  : Wuffs.Std.Gzip.Decoder renames Decode_Support.Gzip_Decoder;
 
@@ -65,6 +67,7 @@ procedure Bench_Main is
    procedure Hash_Crc32;
 
    procedure Hash_Adler32;
+   procedure Hash_Crc64;
 
    procedure Decode_Gzip;
 
@@ -132,6 +135,12 @@ procedure Bench_Main is
       Wuffs.Std.Adler32.Initialize (Adler);
       Result := Wuffs.U64 (Adler.Update_U32 (IMS.File (0 .. Len - 1)));
    end Hash_Adler32;
+
+   procedure Hash_Crc64 is
+   begin
+      Wuffs.Std.Crc64.Initialize (Crc64);
+      Result := Crc64.Update_U64 (IMS.File (0 .. Len - 1));
+   end Hash_Crc64;
 
    procedure Decode_Gzip is
       Src_Meta : IO.Buffer_Meta := (Wi => Len, Ri => 0, Pos => 0, Closed => True);
@@ -279,6 +288,8 @@ procedure Bench_Main is
                Hash_Crc32;
             elsif Kind = "adler32" then
                Hash_Adler32;
+            elsif Kind = "crc64" then
+               Hash_Crc64;
             elsif Kind = "gzip" then
                Decode_Gzip;
             elsif Kind = "png" then

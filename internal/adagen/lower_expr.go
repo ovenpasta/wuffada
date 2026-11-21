@@ -278,6 +278,11 @@ func (l *lowerer) expr(n *a.Expr) (val, error) {
 	if n.Operator() == 0 && l.locals[n.Ident()] == nil {
 		if c := l.g.consts[n.Ident()]; c != nil {
 			c.used = true
+			if l.fi.simd != "" {
+				// A SIMD implementation's child unit sees the package's
+				// spec, not its body.
+				c.inSpec = true
+			}
 			return val{e: raw(c.name), typ: c.typ}, nil
 		}
 	}

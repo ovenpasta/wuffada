@@ -36,6 +36,9 @@ func (l *lowerer) call(n *a.Expr) (val, error) {
 	name := method.Ident().Str(l.g.tm)
 
 	switch {
+	case isX86Type(recvTyp) || recvTyp.IsCPUArchType():
+		return l.x86Method(n, recv, name, args)
+
 	case recvTyp.IsIOType():
 		rv, err := l.expr(recv)
 		if err != nil {
@@ -198,9 +201,15 @@ func (l *lowerer) procResult(fn string, typ *adaType, outName string, namesAndAr
 var (
 	peekRE     = regexp.MustCompile(`^peek_u(8|16|24|32|40|48|56|64)(le|be)?(?:_as_u(8|16|32|64))?$`)
 	readRE     = regexp.MustCompile(`^read_u(8|16|24|32|40|48|56|64)(le|be)?(?:_as_u(8|16|32|64))?$`)
-	peekPokeRE = regexp.MustCompile(`^(peek|poke)_u(8|16|24|32|40|48|56|64)(le|be)?$`)
+	peekPokeRE = regexp.MustCompile(`^(peek|poke)_u(8|16|24|32|40|48|56|64)(le|be)?(?:_as_u(32|64))?$`)
 	writeRE    = regexp.MustCompile(`^write_u(8|16|24|32|40|48|56|64)(le|be)?_fast$`)
 )
+
+// atoi converts a string of digits that a regular expression has matched.
+func atoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
+}
 
 // widthOf returns the width of the modular type that holds an n-bit value.
 func widthOf(n int) int {
@@ -827,6 +836,18 @@ func (l *lowerer) sliceMethod(n *a.Expr, recv *a.Expr, name string, args []*a.No
 		}
 		return val{e: callNamed("Wuffs.Runtime."+mangle(name), "S", h.e, "Up_To", vs[0].e), typ: h.typ}, nil
 
+	case "uintptr_low_12_bits":
+		// C: (uint32_t)(0xFFF & (uintptr_t)(s.ptr)). The address of the
+		// slice's first element (or of where it would be, if it is empty).
+		if len(args) != 0 {
+			break
+		}
+		b, err := l.toBytes(rv, false)
+		if err != nil {
+			return val{}, err
+		}
+		return val{e: call("Wuffs.Runtime.Uintptr_Low_12_Bits", b.e), typ: typU32}, nil
+
 	case "copy_from_slice":
 		vs, err := l.argValues(n, args, 1)
 		if err != nil {
@@ -881,7 +902,8 @@ func (l *lowerer) sliceMethod(n *a.Expr, recv *a.Expr, name string, args []*a.No
 		}
 		return l.procResult("Wuffs.Runtime.Copy_From_Slice", typU64, "N", "Dst", dst.e, "Src", src.e), nil
 	}
-	if m := peekPokeRE.FindStringSubmatch(name); m != nil && (m[2] == "8") == (m[3] == "") {
+	if m := peekPokeRE.FindStringSubmatch(name); m != nil && (m[2] == "8") == (m[3] == "") &&
+		(m[4] == "" || (m[1] == "peek" && widthOf(atoi(m[2])) <= atoi(m[4]))) {
 		// Wuffs.Base.Endian, at the slice's first element. The Wuffs
 		// compiler has proved that the slice is long enough.
 		bits, _ := strconv.Atoi(m[2])
@@ -894,7 +916,12 @@ func (l *lowerer) sliceMethod(n *a.Expr, recv *a.Expr, name string, args []*a.No
 			if err != nil {
 				return val{}, err
 			}
-			return val{e: callNamed(fn, "Data", b.e, "Pos", bytesFirst(b)), typ: numType(widthOf(bits))}, nil
+			v := val{e: callNamed(fn, "Data", b.e, "Pos", bytesFirst(b)), typ: numType(widthOf(bits))}
+			if m[4] != "" {
+				// "_as_u32" or "_as_u64": C returns the wider type.
+				v = widen(v.e, widthOf(bits), atoi(m[4]))
+			}
+			return v, nil
 		}
 		vs, err := l.argValues(n, args, 1)
 		if err != nil {
@@ -1155,6 +1182,13 @@ func (l *lowerer) userCall(n *a.Expr, recv *a.Expr, method t.ID, args []*a.Node)
 	}
 	if callee.skipped {
 		return val{}, fmt.Errorf("call %q of a function that was skipped as it needs a cpu_arch capability", n.Str(l.g.tm))
+	}
+	if callee.simd != "" {
+		// Only a choose statement, which asks the CPU first, may select a
+		// SIMD implementation. (Wuffs' checker already rejects a direct call
+		// of a cpu_arch function: "only via choose".)
+		return val{}, fmt.Errorf("call %q of a SIMD function (%s): only a choose statement may select one",
+			n.Str(l.g.tm), callee.simd)
 	}
 	if callee.sigErr != nil {
 		return val{}, fmt.Errorf("call %q: %v", n.Str(l.g.tm), callee.sigErr)

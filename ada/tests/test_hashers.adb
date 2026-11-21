@@ -34,7 +34,11 @@ procedure Test_Hashers is
 
    type Size_List is array (Positive range <>) of Wuffs.Index;
 
-   Chunk_Sizes : constant Size_List := [1, 2, 3, 7, 8, 9, 31, 32, 33, 4095, 4096, 4097];
+   --  Also the lengths around the SIMD implementations' block sizes (16,
+   --  32, 64 and 128 bytes, and the 5536 bytes of adler32's).
+   Chunk_Sizes : constant Size_List :=
+     [1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257,
+      4095, 4096, 4097, 5535, 5536, 5537];
 
    function Feed
      (H : in out Wuffs.Runtime.Hasher_U32'Class; Data : Wuffs.Bytes; Sizes : Size_List)
@@ -115,6 +119,41 @@ procedure Test_Hashers is
       Wuffs.Std.Crc32.Initialize (Crc);
       Got := Feed (Crc, Data, Chunk_Sizes);
       Test_Support.Check_U32 (Got, Want_Crc, "crc32, mixed pieces", -1, What);
+
+      --  At every alignment (mod 64) of the first byte, for the SIMD
+      --  implementations' alignment logic: in one piece for files up to
+      --  256 KiB, in mixed pieces for files up to 16 KiB.
+      if Data'Length <= 256 * 1024 then
+         for K in 0 .. 63 loop
+            declare
+               First : Wuffs.Index;
+            begin
+               Test_Support.Unaligned_Copy (Data, K, First);
+               declare
+                  Copy : Wuffs.Bytes renames Test_Support.Buffer (First .. First + Data'Length - 1);
+               begin
+                  Wuffs.Std.Adler32.Initialize (Adler);
+                  Adler.Update (Copy);
+                  Test_Support.Check_U32
+                    (Adler.Checksum_U32, Want_Adler, "adler32, at alignment", K, What);
+                  Wuffs.Std.Crc32.Initialize (Crc);
+                  Crc.Update (Copy);
+                  Test_Support.Check_U32
+                    (Crc.Checksum_U32, Want_Crc, "crc32, at alignment", K, What);
+                  if Data'Length <= 16 * 1024 then
+                     Wuffs.Std.Adler32.Initialize (Adler);
+                     Got := Feed (Adler, Copy, Chunk_Sizes);
+                     Test_Support.Check_U32
+                       (Got, Want_Adler, "adler32, mixed pieces, alignment", K, What);
+                     Wuffs.Std.Crc32.Initialize (Crc);
+                     Got := Feed (Crc, Copy, Chunk_Sizes);
+                     Test_Support.Check_U32
+                       (Got, Want_Crc, "crc32, mixed pieces, alignment", K, What);
+                  end if;
+               end;
+            end;
+         end loop;
+      end if;
    end Check_Data;
 
    --  Copies Text into the shared buffer at a non-zero offset (so that the

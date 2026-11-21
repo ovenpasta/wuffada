@@ -19,7 +19,8 @@ mutation.sh), T01 to T19 for the json/cbor (token I/O) milestone (run those in
 both profiles, with MUTATION_TOKENS=1: see mutation.sh); T18 is T01's
 fault in a form that the Ada build cannot see, and T19 is T09's (which,
 in the release profile, GNAT's -gnatwc reports as a condition that is
-always False).
+always False). S01 to S16 are for the SIMD milestone (run them in both
+profiles, with MUTATION_SIMD=1: see mutation.sh).
 """
 
 import glob
@@ -30,6 +31,9 @@ G = "internal/adagen/"
 RT = "ada/src/runtime/wuffs-runtime.adb"
 RTS = "ada/src/runtime/wuffs-runtime.ads"
 GEN = "ada/gen/wuffs-std-"
+GENS = "ada/gen/simd/wuffs-std-"
+SSE42 = "ada/src/simd/wuffs-runtime-x86-sse42.ads"
+CPUID = "ada/src/simd/wuffs-runtime-x86-cpuid.adb"
 
 
 def rep(path, old, new, count=1):
@@ -493,6 +497,48 @@ MUTANTS = {
         G + "lower_call.go", "\t\t\tnamed = append(named, adaNames[i], vs[i].e)\n",
         "\t\t\tif adaNames[i] == \"Continued\" {\n\t\t\t\tnamed = append(named, adaNames[i], raw(\"0\"))\n"
         "\t\t\t\tcontinue\n\t\t\t}\n\t\t\tnamed = append(named, adaNames[i], vs[i].e)\n")),
+    # The SIMD milestone.
+    "S01-adler32-simd-shift-count": ("gen", "checked", lambda: rep(
+        GENS + "adler32-x86_sse42.adb", "Imm8 => 5)", "Imm8 => 4)")),
+    "S02-wrapper-sub-epi16-operands-swapped": ("src", "checked", lambda: rep(
+        SSE42, "is (From_V8HI (B_Psubw128 (To_V8HI (X), To_V8HI (B))));",
+        "is (From_V8HI (B_Psubw128 (To_V8HI (B), To_V8HI (X))));")),
+    "S03-png-simd-sub-epi16-operands-swapped": ("gen", "checked", lambda: rep(
+        GENS + "png-x86_sse42.adb", "V_Pa128 := Wuffs.Runtime.X86.SSE42.Mm_Sub_Epi16 (X => V_B128, B => V_C128);",
+        "V_Pa128 := Wuffs.Runtime.X86.SSE42.Mm_Sub_Epi16 (X => V_C128, B => V_B128);", count=7)),
+    "S04-adler32-simd-shuffle-constant": ("gen", "checked", lambda: nth_rep(
+        GENS + "adler32-x86_sse42.adb", "Imm8 => 177)", "Imm8 => 180)", 0)),
+    "S05-wrapper-load-offset-by-one": ("src", "checked", lambda: rep(
+        SSE42, "function Make_M128i_Slice128 (A : Wuffs.Bytes) return M128I\n   is (From_V16QI (B_Lddqu (A (A'First)'Address)));",
+        "function Make_M128i_Slice128 (A : Wuffs.Bytes) return M128I\n   is (From_V16QI (B_Lddqu (A (A'First + 1)'Address)));")),
+    "S06-adler32-simd-tail-dropped": ("gen", "checked", lambda: rep(
+        GENS + "adler32-x86_sse42.adb", "if V_Tail_Index < Wuffs.U64 (M_X.Length) then",
+        "if V_Tail_Index > Wuffs.U64 (M_X.Length) then")),
+    "S07-crc32-simd-byte-tail-dropped": ("gen", "checked", lambda: rep(
+        GENS + "crc32-x86_sse42.adb", "      while Wuffs.U64 (M_X.Length) > 0 loop\n         V_S :=",
+        "      while Wuffs.U64 (M_X.Length) > 8 loop\n         V_S :=")),
+    "S08-cpuid-wrong-sse42-feature-bit": ("src", "checked", lambda: rep(
+        CPUID, "SSE42_Ecx1 : constant Unsigned_32 := 16#0090_0002#;",
+        "SSE42_Ecx1 : constant Unsigned_32 := 16#0090_0006#;")),
+    "S09-gen-choose-always-scalar": ("src", "checked", lambda: rep(
+        G + "lower.go", "branches = append(branches, ifBranch{call(haveFeature(callee.simd)), assign})",
+        "branches = append(branches, ifBranch{raw(\"False\"), assign})")),
+    "S10-gen-choose-always-simd": ("src", "checked", lambda: rep(
+        G + "lower.go", "branches = append(branches, ifBranch{call(haveFeature(callee.simd)), assign})",
+        "branches = append(branches, ifBranch{raw(\"True\"), assign})")),
+    "S11-crc32-simd-wrong-clmul-selector": ("gen", "checked", lambda: nth_rep(
+        GENS + "crc32-x86_sse42.adb", "B => V_Kk, Imm8 => 17);", "B => V_Kk, Imm8 => 16);", 0)),
+    "S12-jpeg-simd-idct-constant": ("gen", "checked", lambda: nth_rep(
+        GENS + "jpeg-x86_avx2.adb", "(A00 => 16#29CF#,", "(A00 => 16#29CE#,", 0)),
+    "S13-wrapper-add-epi16-wrong-lane-view": ("src", "checked", lambda: rep(
+        SSE42, "is (From_V8HI (B_Paddw128 (To_V8HI (X), To_V8HI (B))));",
+        "is (From_V16QI (B_Paddb128 (To_V16QI (X), To_V16QI (B))));")),
+    "S14-wrapper-min-epi16-wrong-builtin": ("src", "checked", lambda: rep(
+        SSE42, 'External_Name => "__builtin_ia32_pminsw128";', 'External_Name => "__builtin_ia32_pmaxsw128";')),
+    "S15-wrapper-single-u32-wrong-lane": ("src", "checked", lambda: rep(
+        SSE42, "is (From_U32x4 ([A, 0, 0, 0]));", "is (From_U32x4 ([0, A, 0, 0]));")),
+    "S16-deflate-bmi2-bits-constant": ("gen", "checked", lambda: rep(
+        GENS + "deflate-x86_bmi2.adb", "V_N_Bits := V_N_Bits or 56;", "V_N_Bits := V_N_Bits or 48;")),
 }
 
 

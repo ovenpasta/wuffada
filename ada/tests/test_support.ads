@@ -12,6 +12,13 @@ package Test_Support is
 
    Buffer : Wuffs.Bytes (0 .. Buffer_Last);
 
+   --  Copies Data (which must lie in the lower half of Buffer) into the
+   --  upper half of Buffer, at an index whose address is K bytes past a
+   --  multiple of 64, and returns that index in First: for the tests of
+   --  SIMD implementations at every alignment.
+   procedure Unaligned_Copy (Data : Wuffs.Bytes; K : Natural; First : out Wuffs.Index)
+   with Pre => K < 64 and then Data'Length <= Buffer_Size / 2 - 128;
+
    Checks   : Natural := 0;
    Failures : Natural := 0;
 

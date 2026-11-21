@@ -6,19 +6,22 @@
 --    cd ada && alr exec -- gprbuild -P ../examples/decode_image.gpr -XWUFFS_PROFILE=release
 --    ../examples/bin/decode_image INPUT OUTPUT
 
+--  With SIMD by default (x86-64): -XWUFFS_SIMD=off builds the scalar-only
+--  library (see ada/wuffs_simd.gpr).
+
 with "../ada/wuffs_common.gpr";
+with "../ada/wuffs_simd.gpr";
 project Decode_Image is
 
    for Source_Dirs use
      ("../ada/src/root", "../ada/src/base", "../ada/src/pixel", "../ada/src/ycck", "../ada/src/token",
-      "../ada/src/runtime", "../ada/src/runtime/target", "../ada/gen", "decode_image");
-   for Object_Dir use "obj/" & Wuffs_Common.Profile;
+      "../ada/src/runtime", "../ada/src/runtime/target", "../ada/gen", "decode_image")
+     & Wuffs_Simd.Gen_Dirs & Wuffs_Simd.CPU_Dirs;
+   for Object_Dir use "obj/" & Wuffs_Common.Profile & Wuffs_Simd.Obj_Suffix;
    for Exec_Dir use "bin";
    for Create_Missing_Dirs use "True";
    for Main use ("decode_image.adb");
 
-   package Compiler is
-      for Default_Switches ("Ada") use Wuffs_Common.Switches;
-   end Compiler;
+   package Compiler renames Wuffs_Simd.Compiler;
 
 end Decode_Image;
