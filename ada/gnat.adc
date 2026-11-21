@@ -1,5 +1,10 @@
 --  Library-wide configuration pragmas. See docs/DESIGN.md, "Stack and heap".
-pragma Restrictions (No_Recursion);
-pragma Restrictions (No_Secondary_Stack);
-pragma Restrictions (No_Allocators);
-pragma Restrictions (No_Implicit_Heap_Allocations);
+--
+--  Restriction_Warnings, not Restrictions: with -gnatwe (wuffs_common.gpr) a
+--  violation in a unit of this project is still a compile error, but the
+--  restrictions do not become partition-wide, so a program that uses the
+--  library may itself allocate, recurse and use the secondary stack.
+pragma Restriction_Warnings (No_Recursion);
+pragma Restriction_Warnings (No_Secondary_Stack);
+pragma Restriction_Warnings (No_Allocators);
+pragma Restriction_Warnings (No_Implicit_Heap_Allocations);

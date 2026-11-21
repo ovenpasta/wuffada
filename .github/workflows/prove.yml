@@ -1,0 +1,22 @@
+name: Proofs
+
+#  GNATprove on the hand-written libraries. Long: run weekly and on demand.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  prove:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: alire-project/setup-alire@v6
+      #  wuffs_ycck.gpr covers the root package and the base, pixel and
+      #  ycck libraries.
+      - name: Base, pixel and YCCK libraries
+        run: cd ada/prove && alr --non-interactive exec -- gnatprove -P ../wuffs_ycck.gpr
+      - name: Token and UTF-8 library
+        run: cd ada/prove && alr --non-interactive exec -- gnatprove -P ../wuffs_token.gpr

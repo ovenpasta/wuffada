@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  WUFFS_COMMIT: a87f0bb85b9406d29f48a1c03b6f42c4585145f6
+
+jobs:
+  #  The library as a user gets it: every build variant, the example, and
+  #  the release archive built on its own.
+  library:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: alire-project/setup-alire@v6
+
+      - name: Build (release, SIMD)
+        run: cd ada && alr --non-interactive build
+      - name: Build (checked, SIMD)
+        run: cd ada && alr --non-interactive build -- -XWUFFS_PROFILE=checked
+      - name: Build (release, scalar only)
+        run: cd ada && alr --non-interactive build -- -XWUFFS_SIMD=off
+      - name: Build (checked, scalar only)
+        run: cd ada && alr --non-interactive build -- -XWUFFS_PROFILE=checked -XWUFFS_SIMD=off
+
+      - name: Build and run the example
+        run: |
+          cd ada && alr --non-interactive exec -- gprbuild -j0 -P ../examples/decode_image.gpr -XWUFFS_PROFILE=release
+          cd ..
+          for f in $(ls ada/tests/jpegcorpus/*.jpeg | head -5) $(ls ada/tests/webpcorpus/lossy-*.webp ada/tests/webpcorpus/lossless-*.webp | head -10); do
+            examples/bin/decode_image "$f" /tmp/out.pnm
+            head -c 2 /tmp/out.pnm | grep -q '^P[67]$'
+          done
+
+      - name: The release archive builds on its own
+        run: |
+          ./release.sh 0.0.0-ci /tmp/dist
+          cd /tmp/dist && tar xzf wuffs_ada-0.0.0-ci.tar.gz && cd wuffs_ada-0.0.0-ci
+          alr --non-interactive build
+          alr --non-interactive build -- -XWUFFS_SIMD=off -XWUFFS_PROFILE=checked
+
+  #  The generator, and that the checked-in generated Ada is its output.
+  generator:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Wuffs at the pinned commit
+        run: |
+          git clone https://github.com/google/wuffs
+          git -C wuffs checkout "$WUFFS_COMMIT"
+      - run: go build ./... && go vet ./...
+      - run: go test ./...
+      - name: Generated sources are up to date
+        run: |
+          ./gen.sh
+          git diff --exit-code -- ada/gen ada/tests

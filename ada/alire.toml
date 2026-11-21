@@ -1,9 +1,30 @@
 name = "wuffs_ada"
-description = "Pure Ada/SPARK Wuffs base library and generated decoders"
+description = "Memory-safe image and data decoders: Wuffs compiled to Ada/SPARK"
 version = "0.1.0-dev"
-licenses = "MIT OR Apache-2.0"
-project-files = ["wuffs_base.gpr", "wuffs_gen.gpr"]
-tags = ["spark", "image", "decoder"]
 
+authors = ["Aldo Nicolas Bruno"]
+maintainers = ["Aldo Nicolas Bruno <ovenpasta@pizzahack.eu>"]
+maintainers-logins = ["ovenpasta"]
+licenses = "Apache-2.0 OR MIT"
+website = "https://github.com/ovenpasta/wuffada"
+tags = ["image", "decoder", "png", "jpeg", "gif", "webp", "spark", "compression", "safety"]
+project-files = ["wuffs_ada.gpr"]
+
+long-description = """
+Pure Ada decoders for PNG, JPEG, GIF, WebP, BMP and more, for the deflate,
+bzip2, LZMA and XZ families, and for JSON and CBOR, generated from the
+Wuffs standard library (https://github.com/google/wuffs), on a hand-written
+base library that is proved free of run-time errors with SPARK. No C, no
+heap allocation, a small bounded stack.
+
+Client units must be compiled as Ada 2022 (`-gnat2022`): the specs use it.
+"""
+
+#  The specs use Ada 2022 and the SIMD units use GNAT vector types; only
+#  GNAT 16 has been tested.
 [[depends-on]]
-gnatprove = "^16.1.0"
+gnat = ">=16"
+
+[gpr-externals]
+WUFFS_PROFILE = ["release", "checked"]
+WUFFS_SIMD = ["on", "off"]

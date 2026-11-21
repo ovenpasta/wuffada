@@ -35,20 +35,21 @@ read it before changing anything.
 
 ## Commands
 
-Ada tools come from Alire; run them from `ada/`.
+Ada tools come from Alire; run them from `ada/` (GNATprove from `ada/prove`,
+a separate crate so that users of the library do not download a prover).
 
 ```sh
 # Base library: prove, then test in both profiles
+(cd ada/prove && alr exec -- gnatprove -P ../wuffs_base.gpr)   # must end "all checks proved"
 cd ada
-alr exec -- gnatprove -P wuffs_base.gpr              # must end "all checks proved"
 alr exec -- gprbuild -P wuffs_base_tests.gpr && bin/base_tests
 alr exec -- gprbuild -P wuffs_base_tests.gpr -XWUFFS_PROFILE=release && bin/base_tests
 tests_base/oracle/regen.sh                           # regenerate expected values from upstream C
 
 # Pixel and YCCK libraries: same pattern (each proof run is 10-17 minutes)
-alr exec -- gnatprove -P wuffs_pixel.gpr
+(cd prove && alr exec -- gnatprove -P ../wuffs_pixel.gpr)
 alr exec -- gprbuild -P wuffs_pixel_tests.gpr && bin/pixel_tests
-alr exec -- gnatprove -P wuffs_ycck.gpr
+(cd prove && alr exec -- gnatprove -P ../wuffs_ycck.gpr)
 tests_ycck/run_all.sh                                # generator checks, tests and fuzz, both profiles
 
 # Generator: regenerate ada/gen, build both profiles, run everything
@@ -85,7 +86,8 @@ If `wuffs/` is missing: `git clone https://github.com/google/wuffs && git -C wuf
 
 **Stack and heap (everything)**
 - `ada/gnat.adc`: no recursion, no secondary stack, no allocators, no implicit
-  heap allocation.
+  heap allocation, as `Restriction_Warnings` (errors through `-gnatwe`, but not
+  partition-wide: programs that use the library are not restricted).
 - Frames over 8 KiB and all warnings are build errors (`wuffs_common.gpr`).
 - Decoder records are `limited`, placed by the caller, never declared locally,
   never returned, never built with a whole-record aggregate.

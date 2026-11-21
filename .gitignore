@@ -13,3 +13,6 @@ __pycache__/
 *.pyc
 /examples/obj/
 /examples/bin/
+/ada/prove/alire/
+/ada/prove/config/
+/dist/

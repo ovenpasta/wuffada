@@ -1,0 +1,39 @@
+name: Tests
+
+#  The whole suite (./test.sh): both profiles, SIMD and scalar, every
+#  decoder against upstream's C. It takes a while.
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  WUFFS_COMMIT: a87f0bb85b9406d29f48a1c03b6f42c4585145f6
+
+jobs:
+  test:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: alire-project/setup-alire@v6
+      - name: Tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libwebp-dev xz-utils bzip2 python3
+      - name: Wuffs at the pinned commit
+        run: |
+          git clone https://github.com/google/wuffs
+          git -C wuffs checkout "$WUFFS_COMMIT"
+      - name: Toolchain
+        run: cd ada && alr --non-interactive build
+      - name: ./test.sh
+        run: |
+          mkdir -p "$RUNNER_TEMP/wuffada"
+          TMPDIR="$RUNNER_TEMP/wuffada" ./test.sh

@@ -1,0 +1,52 @@
+version = 1
+SPDX-PackageName = "wuffada"
+SPDX-PackageSupplier = "Aldo Nicolas Bruno <ovenpasta@pizzahack.eu>"
+SPDX-PackageDownloadLocation = "https://github.com/ovenpasta/wuffada"
+
+#  Later blocks narrow earlier ones. Verify against the files themselves
+#  after editing: reuse checks that a declaration exists, not that it is
+#  true.
+
+#  ---- wuffada's own sources, tests, tools and documents ----
+
+[[annotations]]
+path = ["ada/**", "cmd/**", "internal/**", "examples/**", "docs/**", "*.md", "*.sh", "*.toml", "go.mod", "go.sum", ".gitignore", "LICENSE", ".github/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Aldo Nicolas Bruno"
+SPDX-License-Identifier = "Apache-2.0 OR MIT"
+
+#  ---- Derived from Wuffs (https://github.com/google/wuffs), which is
+#  itself Apache-2.0 OR MIT ----
+
+#  Generator output: translations of Wuffs' standard library (wuffs/std).
+[[annotations]]
+path = "ada/gen/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["The Wuffs Authors", "2026 Aldo Nicolas Bruno"]
+SPDX-License-Identifier = "Apache-2.0 OR MIT"
+
+#  The proved libraries: ports of Wuffs' hand-written C base library
+#  (wuffs/internal/cgen/base). The pixel rows are machine-translated from it.
+[[annotations]]
+path = ["ada/src/base/**", "ada/src/pixel/**", "ada/src/ycck/**", "ada/src/token/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["The Wuffs Authors", "2026 Aldo Nicolas Bruno"]
+SPDX-License-Identifier = "Apache-2.0 OR MIT"
+
+#  The generator follows Wuffs' C back-end (wuffs/internal/cgen); its
+#  liveness analysis is a port of it.
+[[annotations]]
+path = "internal/adagen/*.go"
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["The Wuffs Authors", "2026 Aldo Nicolas Bruno"]
+SPDX-License-Identifier = "Apache-2.0 OR MIT"
+
+#  ---- Test data ----
+
+#  Synthetic images, written by the scripts next to them (make.py) with
+#  Pillow and libwebp as encoders; and fixed fuzz inputs.
+[[annotations]]
+path = ["ada/tests/jpegcorpus/*.jpg", "ada/tests/jpegcorpus/*.jpeg", "ada/tests/webpcorpus/*.webp", "ada/tests_ycck/fuzz/fuzz_cases.txt"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Aldo Nicolas Bruno"
+SPDX-License-Identifier = "Apache-2.0 OR MIT"

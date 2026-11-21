@@ -1,0 +1,43 @@
+name: Release
+
+#  On a tag vX.Y.Z: checks that the generated Ada is the generator's output
+#  for the pinned Wuffs, then publishes wuffs_ada-X.Y.Z.tar.gz (the Ada
+#  library with its generated sources, as an Alire crate) as a release.
+
+on:
+  push:
+    tags: [ "v*" ]
+
+env:
+  WUFFS_COMMIT: a87f0bb85b9406d29f48a1c03b6f42c4585145f6
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: alire-project/setup-alire@v6
+      - name: Wuffs at the pinned commit
+        run: |
+          git clone https://github.com/google/wuffs
+          git -C wuffs checkout "$WUFFS_COMMIT"
+      - name: Generated sources are up to date
+        run: |
+          ./gen.sh
+          git diff --exit-code -- ada/gen ada/tests
+      - name: Archive
+        run: ./release.sh "${GITHUB_REF_NAME#v}" dist
+      - name: The archive builds on its own
+        run: |
+          mkdir /tmp/check && tar -C /tmp/check -xzf dist/wuffs_ada-*.tar.gz
+          cd /tmp/check/wuffs_ada-* && alr --non-interactive build
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/wuffs_ada-*.tar.gz --title "wuffs_ada ${GITHUB_REF_NAME#v}" --generate-notes

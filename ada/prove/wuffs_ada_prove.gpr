@@ -1,0 +1,6 @@
+--  Part of wuffada (wuffs-ada: Wuffs to Ada).
+--  SPDX-License-Identifier: Apache-2.0 OR MIT
+
+--  Empty: see alire.toml in this directory.
+abstract project Wuffs_Ada_Prove is
+end Wuffs_Ada_Prove;

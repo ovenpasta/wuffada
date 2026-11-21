@@ -1,0 +1,14 @@
+wuffada is distributed under the terms of both the MIT license and the
+Apache License (Version 2.0), at your option:
+
+    SPDX-License-Identifier: Apache-2.0 OR MIT
+
+See LICENSES/Apache-2.0.txt and LICENSES/MIT.txt for the texts, and
+REUSE.toml for the per-file inventory.
+
+Large parts of wuffada are derived from Wuffs
+(https://github.com/google/wuffs), which is distributed under the same two
+licenses: the generated decoders (ada/gen) are translations of Wuffs'
+standard library, the proved base libraries (ada/src) are ports of Wuffs'
+C base library, and the generator (internal/adagen) follows Wuffs' C
+back-end. Those parts are also copyright The Wuffs Authors.

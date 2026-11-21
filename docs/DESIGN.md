@@ -136,7 +136,10 @@ by hand with GNAT 16.
 The library allocates nothing and uses a small, bounded stack.
 
 * `ada/gnat.adc`: `No_Recursion`, `No_Secondary_Stack`, `No_Allocators`,
-  `No_Implicit_Heap_Allocations`.
+  `No_Implicit_Heap_Allocations`, as `Restriction_Warnings`: with `-gnatwe` a
+  violation in this project is a compile error, but the restrictions are not
+  partition-wide, so a program that uses the library may allocate, recurse
+  and use the secondary stack.
 * Every frame is limited to 8 KiB: `-Werror=stack-usage=8192` and `-gnatwe`
   (`wuffs_common.gpr`) make an oversized frame or any warning a build error. `-fstack-usage` `.su` files are reviewed.
 * Decoder records are `limited`, can be hundreds of KiB, and are placed by the
