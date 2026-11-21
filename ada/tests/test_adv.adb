@@ -10,7 +10,11 @@
 --  requires the two traces to be identical.  Keep the two files in step.
 --
 --  This program itself only checks that nothing raises and that every run
---  ends; the comparison with C is the test.
+--  ends; the comparison with C is the test.  The n functions (not
+--  coroutines: nullable pixel buffers, pixel blends, ranges) have a section
+--  of their own, also traced, and then checks of what a hostile caller can
+--  pass to a public function that takes a nullable pixel buffer (n2), which
+--  have no counterpart in C.
 
 with Ada.Text_IO;
 with Adv_Support;
@@ -18,6 +22,8 @@ with Interfaces;
 with Test_Support;
 with Wuffs.Base;
 with Wuffs.Base.IO;
+with Wuffs.Base.Pixel_Buffers;
+with Wuffs.Base.Pixel_Formats;
 with Wuffs.Std.Advtest;
 
 procedure Test_Adv is
@@ -62,6 +68,10 @@ procedure Test_Adv is
    procedure Run (F : Positive; Seed : Wuffs.U32; S : Schedule);
 
    procedure Interleave;
+
+   procedure Run_N;
+
+   procedure Hostile_N;
 
    --  The numbering of statuses that adv.c uses too.
    function Status_Number (S : Wuffs.Status) return Wuffs.U64 is
@@ -298,6 +308,194 @@ procedure Test_Adv is
       Report (5, Wuffs.U64 (A.Get_Sum (AS.Thing)), 0);
    end Interleave;
 
+   package PB renames Wuffs.Base.Pixel_Buffers;
+   package PF renames Wuffs.Base.Pixel_Formats;
+
+   function Fnv_Bytes (Data : Wuffs.Bytes) return Wuffs.U64;
+
+   procedure Make_PB (Buf : out PB.Pixel_Buffer; K : Natural);
+
+   function Fnv_Bytes (Data : Wuffs.Bytes) return Wuffs.U64 is
+      H : Wuffs.U64 := 16#CBF2_9CE4_8422_2325#;
+   begin
+      for B of Data loop
+         H := (H xor Wuffs.U64 (B)) * 16#100_0000_01B3#;
+      end loop;
+      return H;
+   end Fnv_Bytes;
+
+   --  Pixel buffer K (as adv.c's make_pb): 0, BGRA (not premultiplied) 4 by
+   --  3; 1, indexed 5 by 2; 2, a null pixel buffer.
+   procedure Make_PB (Buf : out PB.Pixel_Buffer; K : Natural) is
+      Cfg : PF.Pixel_Config;
+      St  : Wuffs.Status;
+      W   : constant Wuffs.U32 := (if K = 1 then 5 else 4);
+      H   : constant Wuffs.U32 := (if K = 1 then 2 else 3);
+      Bpp : constant Wuffs.Index := (if K = 1 then 1 else 4);
+   begin
+      for I in AS.N_Pix'Range loop
+         AS.N_Pix (I) := Wuffs.U8 ((Wuffs.U64 (I - AS.N_Pix'First) * 5 + 2) mod 256);
+      end loop;
+      for I in AS.N_Pal'Range loop
+         AS.N_Pal (I) := Wuffs.U8 ((Wuffs.U64 (I - AS.N_Pal'First) * 3 + 1) mod 256);
+      end loop;
+      Buf := PB.Null_Pixel_Buffer;
+      if K = 2 then
+         return;
+      end if;
+      PF.Set
+        (C => Cfg, Pixfmt_Repr => (if K = 1 then 16#8304_0008# else 16#8100_8888#),
+         Pixsub_Repr => 0, Width => W, Height => H);
+      PB.Set_Interleaved
+        (PB             => Buf,
+         Pixcfg         => Cfg,
+         Primary        =>
+           (Offset => 0, Width => Wuffs.Index (W) * Bpp, Height => Wuffs.Index (H),
+            Stride => Wuffs.Index (W) * Bpp),
+         Pixels_Length  => AS.N_Pix'Length,
+         Palette_Length => AS.N_Pal'Length,
+         Result         => St);
+      Test_Support.Check (Wuffs.Is_Ok (St), "n: Set_Interleaved", K);
+   end Make_PB;
+
+   procedure Run_N is
+      Buf    : PB.Pixel_Buffer;
+      Blends : constant array (1 .. 4) of Wuffs.U8 := [0, 1, 2, 255];
+      type Range_Pair is array (1 .. 2) of Wuffs.U64;
+      Ranges : constant array (0 .. 5) of Range_Pair :=
+        [[0, 0], [1, 0], [5, 9], [Wuffs.U64'Last, Wuffs.U64'Last], [10, 5], [3, Wuffs.U64'Last]];
+   begin
+      for K in 0 .. 2 loop
+         for Sel in Wuffs.U32 range 0 .. 7 loop
+            for F in 1 .. 2 loop
+               Make_PB (Buf, K);
+               A.Initialize (AS.Thing);
+               if F = 1 then
+                  A.N1 (AS.Thing, A_Dst => Buf, A_Dst_Pixels => AS.N_Pix,
+                        A_Dst_Palette => AS.N_Pal, A_Sel => Sel);
+               else
+                  A.N2 (AS.Thing, A_Dst => Buf, A_Dst_Null => (Sel and 4) /= 0,
+                        A_Dst_Pixels => AS.N_Pix, A_Dst_Palette => AS.N_Pal, A_Sel => Sel);
+               end if;
+               Ada.Text_IO.Put ("= n");
+               Put_Number (Wuffs.U64 (F));
+               Ada.Text_IO.Put (" pb");
+               Put_Number (Wuffs.U64 (K));
+               Ada.Text_IO.Put (" sel");
+               Put_Number (Wuffs.U64 (Sel));
+               Ada.Text_IO.Put (" r=");
+               Put_Hex_64 (A.Get_Nres (AS.Thing));
+               Ada.Text_IO.Put (" pix=");
+               Put_Hex_64 (Fnv_Bytes (AS.N_Pix));
+               Ada.Text_IO.Put (" pal=");
+               Put_Hex_64 (Fnv_Bytes (AS.N_Pal));
+               Ada.Text_IO.New_Line;
+            end loop;
+         end loop;
+      end loop;
+      A.Initialize (AS.Thing);
+      for B of Blends loop
+         for X of Blends loop
+            Ada.Text_IO.Put ("= n3 b");
+            Put_Number (Wuffs.U64 (B));
+            Ada.Text_IO.Put (" x");
+            Put_Number (Wuffs.U64 (X));
+            Ada.Text_IO.Put (" r=");
+            Test_Support.Put_Hex (A.N3 (AS.Thing, A_B => PF.Pixel_Blend (B), A_X => X));
+            Ada.Text_IO.New_Line;
+         end loop;
+      end loop;
+      for I in Ranges'Range loop
+         Ada.Text_IO.Put ("= n4 ");
+         Put_Number (Wuffs.U64 (I));
+         Ada.Text_IO.Put (" r=");
+         Put_Hex_64 (A.N4 (AS.Thing, A_Lo => Ranges (I) (1), A_Hi => Ranges (I) (2)));
+         Ada.Text_IO.New_Line;
+      end loop;
+   end Run_N;
+
+   --  n2's nullable pixel buffer from a hostile caller.  When it is null,
+   --  nothing about its descriptor or arrays matters: not even arrays inside
+   --  the object, or a descriptor that fits nothing (C would not look at
+   --  them either).  When it is not, everything is checked, and a call that
+   --  fails a check disables the object.
+   procedure Hostile_N is
+      Self : Wuffs.Bytes (0 .. AS.Thing'Size / 8 - 1)
+      with Import, Address => AS.Thing'Address;
+      Buf  : PB.Pixel_Buffer;
+      Bad  : PB.Pixel_Buffer;
+      Two  : aliased Wuffs.U8 := 2;
+      Bad_Boolean : Boolean
+      with Import, Address => Two'Address;
+
+      procedure Rejected (What : String);
+
+      --  After a rejected call: nothing was written, and the object is
+      --  disabled (an impure call with good arguments does nothing).
+      procedure Rejected (What : String) is
+      begin
+         Test_Support.Check (A.Get_Nres (AS.Thing) = 0, What, -1, ": a result");
+         Test_Support.Check
+           (Fnv_Bytes (AS.N_Pix) = 16#FD2D_C22A_96EE_8125#
+            and then Fnv_Bytes (AS.N_Pal) = 16#D42C_A662_B5A0_FB25#,
+            What, -1, ": memory was written");
+         Make_PB (Buf, 0);
+         A.N2 (AS.Thing, A_Dst => Buf, A_Dst_Null => False, A_Dst_Pixels => AS.N_Pix,
+               A_Dst_Palette => AS.N_Pal, A_Sel => 0);
+         Test_Support.Check (A.Get_Nres (AS.Thing) = 0, What, -1, ": not disabled");
+      end Rejected;
+   begin
+      --  Null, with arrays inside the object and a descriptor that fits
+      --  nothing: accepted, and the arrays are not touched.
+      Make_PB (Bad, 1);
+      Bad.Planes (0).Offset := 1000;
+      A.Initialize (AS.Thing);
+      A.N2 (AS.Thing, A_Dst => Bad, A_Dst_Null => True, A_Dst_Pixels => Self (8 .. 71),
+            A_Dst_Palette => Self (Self'Last - 15 .. Self'Last), A_Sel => 1);
+      Test_Support.Check (A.Get_Nres (AS.Thing) = 16#DEB4#, "n2, null, arrays in the object");
+      Make_PB (Buf, 0);
+      A.N2 (AS.Thing, A_Dst => Buf, A_Dst_Null => False, A_Dst_Pixels => AS.N_Pix,
+            A_Dst_Palette => AS.N_Pal, A_Sel => 0);
+      Test_Support.Check
+        (A.Get_Nres (AS.Thing) = 16#0120_0066#, "n2, null, arrays in the object: disabled");
+
+      --  Not null: an invalid descriptor, overlapping arrays, arrays in the
+      --  object.  (Make_PB (Buf, 0) leaves the arrays as Rejected expects.)
+      A.Initialize (AS.Thing);
+      Make_PB (Buf, 0);
+      A.N2 (AS.Thing, A_Dst => Bad, A_Dst_Null => False, A_Dst_Pixels => AS.N_Pix,
+            A_Dst_Palette => AS.N_Pal, A_Sel => 1);
+      Rejected ("n2, a descriptor that does not fit");
+      A.Initialize (AS.Thing);
+      Make_PB (Buf, 0);
+      A.N2 (AS.Thing, A_Dst => Buf, A_Dst_Null => False, A_Dst_Pixels => AS.N_Pal (2 .. 65),
+            A_Dst_Palette => AS.N_Pal, A_Sel => 1);
+      Rejected ("n2, pixels inside the palette");
+      A.Initialize (AS.Thing);
+      Make_PB (Buf, 0);
+      A.N2 (AS.Thing, A_Dst => Buf, A_Dst_Null => False, A_Dst_Pixels => Self (8 .. 71),
+            A_Dst_Palette => AS.N_Pal, A_Sel => 1);
+      Rejected ("n2, pixels in the object");
+      A.Initialize (AS.Thing);
+      Make_PB (Buf, 0);
+      A.N2 (AS.Thing, A_Dst => Buf, A_Dst_Null => False, A_Dst_Pixels => AS.N_Pix,
+            A_Dst_Palette => Self (Self'Last - 15 .. Self'Last), A_Sel => 1);
+      Rejected ("n2, palette in the object");
+      A.Initialize (AS.Thing);
+      Make_PB (Buf, 0);
+      A.N1 (AS.Thing, A_Dst => Bad, A_Dst_Pixels => AS.N_Pix, A_Dst_Palette => AS.N_Pal,
+            A_Sel => 1);
+      Rejected ("n1, a descriptor that does not fit");
+      if not Test_Support.Checks_Enabled then
+         --  (With validity checks on, the call could not even be made.)
+         A.Initialize (AS.Thing);
+         Make_PB (Buf, 0);
+         A.N2 (AS.Thing, A_Dst => Buf, A_Dst_Null => Bad_Boolean, A_Dst_Pixels => AS.N_Pix,
+               A_Dst_Palette => AS.N_Pal, A_Sel => 1);
+         Rejected ("n2, an invalid Boolean");
+      end if;
+   end Hostile_N;
+
 begin
    for F in 1 .. Num_Funcs loop
       for Seed in Wuffs.U32 range 0 .. Num_Seeds - 1 loop
@@ -307,5 +505,7 @@ begin
       end loop;
    end loop;
    Interleave;
+   Run_N;
+   Hostile_N;
    Test_Support.Finish ("test_adv");
 end Test_Adv;

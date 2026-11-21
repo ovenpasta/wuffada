@@ -19,4 +19,8 @@ package Adv_Support is
 
    Thing : Wuffs.Std.Advtest.Thing;
 
+   --  For the n functions: a pixel buffer's two arrays.
+   N_Pix : Wuffs.Bytes (7 .. 70);
+   N_Pal : Wuffs.Bytes (2 .. 1025);
+
 end Adv_Support;

@@ -23,7 +23,9 @@
 # LIMITATION: by default the image corpus is REDUCED, to every run that has
 # reference pixels and every ninth of the others, so "SURVIVED" here does
 # not mean that ./test.sh, which runs all of it, misses the fault. Set
-# MUTATION_FULL=1 to use the whole corpus (slower).
+# MUTATION_FULL=1 to use the whole corpus (slower). MUTATION_FORMATS (say
+# 'webp|vp8') keeps only those formats' image runs, for mutants that only
+# they can notice. Needs libwebp, as test.sh does.
 set -eu
 [ $# -eq 1 ] || [ $# -eq 2 ] || { echo "usage: $0 SCRATCH_DIR [NAMES]" >&2; exit 2; }
 only="${2:-.}"
@@ -40,9 +42,16 @@ mkdir "$copy"
 ln -s "$root/wuffs" "$copy/wuffs"
 cd "$copy"
 
-mkdir "$scratch/corpus"
-go run ./ada/tests/imgcorpus -data wuffs/test/data -out "$scratch/corpus" -chaos "$scratch/chaos.manifest" \
-    2> /dev/null > "$scratch/full.manifest"
+mkdir "$scratch/corpus" "$scratch/webpref"
+"${CC:-cc}" -std=c99 -O2 -Wall -o "$scratch/webpref.bin" ada/tests/crosscheck/webpref.c -lwebp
+find wuffs/test/data ada/tests/webpcorpus -name '*.webp' | LC_ALL=C sort |
+    "$scratch/webpref.bin" "$scratch/webpref" > "$scratch/webpref/list.out"
+go run ./ada/tests/imgcorpus -data wuffs/test/data -out "$scratch/corpus" -chaos "$scratch/chaos.all" \
+    -webpref "$scratch/webpref" 2> /dev/null > "$scratch/full.all"
+# MUTATION_FORMATS (an extended regular expression), if set, keeps only the
+# image runs (and chaos runs) of the formats that it matches.
+awk -v f="^(${MUTATION_FORMATS:-.*})\$" '$1 ~ f' "$scratch/full.all" > "$scratch/full.manifest"
+awk -v f="^(${MUTATION_FORMATS:-.*})\$" '$1 ~ f' "$scratch/chaos.all" > "$scratch/chaos.manifest"
 if [ "${MUTATION_FULL:-}" = 1 ]; then
     cp "$scratch/full.manifest" "$scratch/manifest"
 else
@@ -80,7 +89,7 @@ check() {
     fi
     killers=""
     if ! go test ./internal/adagen \
-        -run 'TestRejects|TestCheckCalls|TestEntryChecks|TestBulk|TestRowPointer|TestSwizzleYCCK|TestStatusField|TestChoosyRefined' \
+        -run 'TestRejects|TestCheckCalls|TestEntryChecks|TestBulk|TestRowPointer|TestSwizzleYCCK|TestStatusField|TestChoosyRefined|TestPixelBlend|TestRangeAccessors|TestNullablePixelBuffer' \
         >> "$log" 2>&1; then
         killers="$killers go-test"
     fi

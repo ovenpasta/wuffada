@@ -12,8 +12,10 @@ then run ./gen.sh) or "gen" (a fault in the generated Ada: run ./gen.sh, then
 apply it). PROFILE is the build profile that the mutant is tested with.
 Mutants 01 to 25 are the implementer's of milestone 3, R01 to R20 came from
 the independent review of it, N01 to N08 cover the review's fixes, M01 to
-M12 are for milestone 4a, and J01 to J15 for the JPEG milestone (run those in
-both profiles: MUTATION_PROFILE).
+M12 are for milestone 4a, J01 to J15 for the JPEG milestone, and W01 to W16
+for the vp8/webp milestone (run those in both profiles: MUTATION_PROFILE; and
+MUTATION_FORMATS='webp|vp8' restricts the image corpus to those formats, see
+mutation.sh).
 """
 
 import glob
@@ -369,6 +371,56 @@ MUTANTS = {
     "J14-jpeg-scalar-idct-constant": ("gen", "checked", idct_constant),
     "J15-jpeg-swizzle-immediately-status-ignored": ("gen", "checked", lambda: rep(
         GEN + "jpeg.adb", "G_Status := Self.F_Swizzle_Immediately_Status;", "G_Status := Wuffs.Ok_Status;")),
+    # The vp8/webp milestone: nullable pixel buffers at an entry and in calls,
+    # the new built-ins, the shell's swizzle_ycck, generated vp8/webp code.
+    "W01-gen-entry-nullable-pixbuf-checked-when-null": ("src", "checked", lambda: rep(
+        G + "lower.go", "\t\treturn bin(\"and then\", eUn{\"not\", eVar{arg.null}}, e)",
+        "\t\treturn bin(\"and then\", raw(\"True\"), e)")),
+    "W02-gen-entry-nullable-pixbuf-descriptor-not-checked": ("src", "checked", lambda: rep(
+        G + "lower.go", "\t\tif arg.typ.kind == kNptrPixBuf {\n\t\t\town = append(own, sharesSelf(arg.pixels), sharesSelf(arg.palette))\n\t\t}",
+        "\t\tif arg.typ.kind == kNptrPixBuf {\n\t\t\town = append(own[1:], sharesSelf(arg.pixels), sharesSelf(arg.palette))\n\t\t}")),
+    "W03-gen-entry-nullable-pixbuf-arrays-in-self-accepted": ("src", "checked", lambda: rep(
+        G + "lower.go", "\t\t\town = append(own, sharesSelf(arg.pixels), sharesSelf(arg.palette))",
+        "\t\t\town = append(own)")),
+    "W04-gen-ptr-to-nptr-passes-null": ("src", "checked", lambda: rep(
+        G + "lower_call.go",
+        "values = append(values, eVar{v.parg.v}, raw(\"False\"), eVar{v.parg.pixels}, eVar{v.parg.palette})",
+        "values = append(values, eVar{v.parg.v}, raw(\"True\"), eVar{v.parg.pixels}, eVar{v.parg.palette})")),
+    "W05-gen-nullptr-pixbuf-passes-not-null": ("src", "checked", lambda: rep(
+        G + "lower_call.go",
+        "values = append(values, raw(buffersPkg+\".Null_Pixel_Buffer\"), raw(\"True\"), arrs[0], arrs[1])",
+        "values = append(values, raw(buffersPkg+\".Null_Pixel_Buffer\"), raw(\"False\"), arrs[0], arrs[1])")),
+    "W06-gen-demake-pixel-blend-zero": ("src", "checked", lambda: rep(
+        G + "lower_call.go", "return val{e: call(formatsPkg+\".Demake_Pixel_Blend\", vs[0].e), typ: typU8}, nil",
+        "return val{e: call(\"Wuffs.U8\", bin(\"and\", call(formatsPkg+\".Demake_Pixel_Blend\", vs[0].e), raw(\"0\"))), typ: typU8}, nil")),
+    "W07-gen-make-pixel-blend-src": ("src", "checked", lambda: rep(
+        G + "lower_call.go", "return val{e: call(formatsPkg+\".Make_Pixel_Blend\", vs[0].e), typ: typPixelBlend}, nil",
+        "return val{e: call(formatsPkg+\".Make_Pixel_Blend\", bin(\"and\", vs[0].e, raw(\"0\"))), typ: typPixelBlend}, nil")),
+    "W08-gen-range-is-empty-inverted": ("src", "checked", lambda: rep(
+        G + "lower_call.go", "\t\treturn val{e: call(rangesPkg+\".\"+mangle(name), rv.e), typ: ret}, nil",
+        "\t\tif name == \"is_empty\" {\n\t\t\treturn val{e: eUn{\"not\", call(rangesPkg+\".Is_Empty\", rv.e)}, typ: ret}, nil\n\t\t}\n"
+        "\t\treturn val{e: call(rangesPkg+\".\"+mangle(name), rv.e), typ: ret}, nil")),
+    "W09-gen-range-min-max-swapped": ("src", "checked", lambda: rep(
+        G + "lower_call.go", "\t\treturn val{e: call(rangesPkg+\".\"+mangle(name), rv.e), typ: ret}, nil",
+        "\t\tswapped := map[string]string{\"get_min_incl\": \"Get_Max_Incl\", \"get_max_incl\": \"Get_Min_Incl\", "
+        "\"is_empty\": \"Is_Empty\"}[name]\n\t\treturn val{e: call(rangesPkg+\".\"+swapped, rv.e), typ: ret}, nil")),
+    "W10-shell-ycck-alpha-plane-overlap-accepted": ("src", "checked", lambda: rep(
+        RT, "         or else Share_An_Element (W, Src2)\n         or else Share_An_Element (W, Src3));",
+        "         or else Share_An_Element (W, Src2));")),
+    "W11-vp8-box-upsampling": ("gen", "checked", lambda: rep(
+        GEN + "vp8.adb", "YCC_Upsampling => Wuffs.U8'(2),", "YCC_Upsampling => Wuffs.U8'(1),")),
+    "W12-vp8-filter-sharpness-shift": ("gen", "checked", lambda: rep(
+        GEN + "vp8.adb", "V_Ilevel := Interfaces.Shift_Right (V_Ilevel, 1);",
+        "V_Ilevel := Interfaces.Shift_Right (V_Ilevel, 2);")),
+    "W13-webp-color-cache-hash": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "16#1E35_A7BD#", "16#1E35_A7BF#")),
+    "W14-webp-distance-map-entry": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "16#38#, 16#05#, 16#37#", "16#38#, 16#06#, 16#37#")),
+    "W15-webp-entry-checks-only-the-first-512-bytes": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Size_In_Bits => Self'Size", "Size_In_Bits => 8 * 512", count=8)),
+    "W16-webp-subtract-green-skips-blue": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Wuffs.Runtime.Set (S => V_P, I => 0, V => Wuffs.Runtime.Get (V_P, 0) + V_G);",
+        "null;")),
 }
 
 

@@ -92,6 +92,25 @@ func (l *lowerer) call(n *a.Expr) (val, error) {
 		}
 		return val{e: callNamed(intsPkg+".Get_U64", "B", rv.e, "I", vs[0].e), typ: typU64}, nil
 
+	case recvTyp.Decorator() == 0 && recvTyp.QID() == t.QID{t.IDBase, t.IDRangeIIU64}:
+		// The accessors of Wuffs.Base.Ranges (C: the same-named inline
+		// functions of wuffs_base__range_ii_u64).
+		ret := map[string]*adaType{"is_empty": typBool, "get_min_incl": typU64, "get_max_incl": typU64}[name]
+		if ret == nil || len(args) != 0 {
+			break
+		}
+		rv, err := l.expr(recv)
+		if err != nil {
+			return val{}, err
+		}
+		if rv.typ != typRangeIIU64 {
+			break
+		}
+		if ret.kind == kNum {
+			l.g.useType[64] = true
+		}
+		return val{e: call(rangesPkg+"."+mangle(name), rv.e), typ: ret}, nil
+
 	case recvTyp.Decorator() == 0 && recvTyp.QID() == t.QID{t.IDBase, t.IDPixelFormat}:
 		return l.pixelFormatMethod(n, recv, name, args)
 
@@ -832,6 +851,27 @@ func (l *lowerer) utilityMethod(n *a.Expr, name string, args []*a.Node) (val, er
 		}
 		return val{e: callNamed(formatsPkg+".Make_Pixel_Format", "Repr", vs[0].e), typ: typPixelFormat}, nil
 
+	case "make_pixel_blend":
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if err := l.numArg(n, vs[0], 8); err != nil {
+			return val{}, err
+		}
+		return val{e: call(formatsPkg+".Make_Pixel_Blend", vs[0].e), typ: typPixelBlend}, nil
+
+	case "demake_pixel_blend":
+		vs, err := l.argValues(n, args, 1)
+		if err != nil {
+			return val{}, err
+		}
+		if vs[0].typ != typPixelBlend {
+			return val{}, fmt.Errorf("%q: the argument is not a pixel_blend", n.Str(l.g.tm))
+		}
+		l.g.useType[8] = true
+		return val{e: call(formatsPkg+".Demake_Pixel_Blend", vs[0].e), typ: typU8}, nil
+
 	case "make_rect_ie_u32":
 		vs, err := l.argValues(n, args, 4)
 		if err != nil {
@@ -1120,6 +1160,38 @@ func (l *lowerer) userCall(n *a.Expr, recv *a.Expr, method t.ID, args []*a.Node)
 			v.parg.pixels.writes++
 			v.parg.palette.writes++
 			continue
+		case kNptrPixBuf:
+			// The descriptor, the null flag and the two arrays. For a
+			// literal nullptr: the null descriptor, True and two empty
+			// arrays (each its own object, as both are "in out"), none of
+			// which the callee looks at. A (non-null) pixel buffer
+			// argument passes False.
+			names = append(names, want.v.name, want.null.name, want.pixels.name, want.palette.name)
+			switch {
+			case v.isNull:
+				l.nTemps++
+				arrs := []expr(nil)
+				for _, what := range []string{"Pixels", "Palette"} {
+					dummy := l.newLocal(fmt.Sprintf("%sNull_%s_%d", prefixGen, what, l.nTemps), typBytesVar, nil)
+					dummy.decl = "Wuffs.Bytes (1 .. 0)"
+					dummy.quiet = true
+					dummy.writes++
+					arrs = append(arrs, eVar{dummy})
+				}
+				values = append(values, raw(buffersPkg+".Null_Pixel_Buffer"), raw("True"), arrs[0], arrs[1])
+			case v.parg != nil && v.typ.kind == kPixBuf:
+				values = append(values, eVar{v.parg.v}, raw("False"), eVar{v.parg.pixels}, eVar{v.parg.palette})
+				v.parg.pixels.writes++
+				v.parg.palette.writes++
+			case v.parg != nil && v.typ.kind == kNptrPixBuf:
+				values = append(values, eVar{v.parg.v}, eVar{v.parg.null}, eVar{v.parg.pixels}, eVar{v.parg.palette})
+				v.parg.pixels.writes++
+				v.parg.palette.writes++
+			default:
+				return val{}, errNotYet("argument %q: a pixel buffer other than a pixel buffer argument or nullptr",
+					arg.Str(l.g.tm))
+			}
+			continue
 		default:
 			return val{}, fmt.Errorf("internal error: unexpected parameter type")
 		}
@@ -1237,7 +1309,13 @@ func (l *lowerer) pointerMethod(n *a.Expr, recv *a.Expr, name string, args []*a.
 			"M", expr(eOut{obj}), "Flavor", vs[0].e, "W", vs[1].e, "X", vs[2].e, "Y", vs[3].e, "Z", vs[4].e)})
 		return val{}, nil
 
-	case arg.typ.kind == kPixBuf:
+	case arg.typ.kind == kPixBuf || arg.typ.kind == kNptrPixBuf:
+		if arg.typ.kind == kNptrPixBuf {
+			// The Wuffs compiler has proved that the pointer is not null
+			// here (a method call on an nptr needs that): say so, as the
+			// descriptor and the arrays mean nothing otherwise.
+			l.pre = append(l.pre, sPragma{"Assert", []expr{eUn{"not", eVar{arg.null}}}, true})
+		}
 		switch name {
 		case "palette_or_else":
 			// The palette if there is one, else the fallback: a handle.

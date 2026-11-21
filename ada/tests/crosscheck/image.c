@@ -3,7 +3,7 @@
 
 // The C side of the image decoder cross-check: it runs upstream's C decoders
 // (wuffs/release/c/wuffs-unsupported-snapshot.c) for netpbm, bmp, gif, png,
-// wbmp, nie, targa, jpeg and the others over the same manifest, with the same calls, the same source buffer
+// wbmp, nie, targa, jpeg, vp8, webp and the others over the same manifest, with the same calls, the same source buffer
 // handling and the same pixel buffers as ada/tests/test_image.adb, and
 // prints the same trace lines. See run_image.sh, which builds and runs this.
 // Keep it in step with test_image.adb.
@@ -39,6 +39,8 @@
 #define WUFFS_CONFIG__MODULE__THUMBHASH
 #define WUFFS_CONFIG__MODULE__HANDSUM
 #define WUFFS_CONFIG__MODULE__JPEG
+#define WUFFS_CONFIG__MODULE__VP8
+#define WUFFS_CONFIG__MODULE__WEBP
 #define WUFFS_CONFIG__MODULE__ZLIB
 #include "wuffs-unsupported-snapshot.c"
 
@@ -68,6 +70,8 @@ static wuffs_etc2__decoder g_etc2;
 static wuffs_thumbhash__decoder g_thumbhash;
 static wuffs_handsum__decoder g_handsum;
 static wuffs_jpeg__decoder g_jpeg;
+static wuffs_vp8__decoder g_vp8;
+static wuffs_webp__decoder g_webp;
 
 // ---- The status table.
 
@@ -560,6 +564,12 @@ static void initialize(const char* format) {
     st = wuffs_jpeg__decoder__initialize(&g_jpeg, sizeof g_jpeg, WUFFS_VERSION,
                                          0);
     g_dec = wuffs_jpeg__decoder__upcast_as__wuffs_base__image_decoder(&g_jpeg);
+  } else if (!strcmp(format, "vp8")) {
+    st = wuffs_vp8__decoder__initialize(&g_vp8, sizeof g_vp8, WUFFS_VERSION, 0);
+    g_dec = wuffs_vp8__decoder__upcast_as__wuffs_base__image_decoder(&g_vp8);
+  } else if (!strcmp(format, "webp")) {
+    st = wuffs_webp__decoder__initialize(&g_webp, sizeof g_webp, WUFFS_VERSION, 0);
+    g_dec = wuffs_webp__decoder__upcast_as__wuffs_base__image_decoder(&g_webp);
   } else if (!strcmp(format, "handsum")) {
     st = wuffs_handsum__decoder__initialize(&g_handsum, sizeof g_handsum, WUFFS_VERSION,
                                        0);
@@ -607,6 +617,9 @@ static void do_case(int id, char* line) {
       g_run.small_pix = 1;
     } else if (!strcmp(f, "w")) {
       g_run.small_work = 1;
+    } else if (f[0] == 'v' && strchr(f, ':') && g_run.num_quirks < MAX_QUIRKS) {
+      g_run.quirks[g_run.num_quirks] = (uint32_t)strtoull(f + 1, NULL, 10);
+      g_run.values[g_run.num_quirks++] = strtoull(strchr(f, ':') + 1, NULL, 10);
     } else if ((f[0] == 'q' || f[0] == 'Q') && g_run.num_quirks < MAX_QUIRKS) {
       g_run.values[g_run.num_quirks] = (f[0] == 'Q') ? 0x8000000000000000ull : 1;
       g_run.quirks[g_run.num_quirks++] = (uint32_t)strtoull(f + 1, NULL, 10);

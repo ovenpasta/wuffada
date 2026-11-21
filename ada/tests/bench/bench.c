@@ -21,6 +21,8 @@
 #define WUFFS_CONFIG__MODULE__GZIP
 #define WUFFS_CONFIG__MODULE__PNG
 #define WUFFS_CONFIG__MODULE__JPEG
+#define WUFFS_CONFIG__MODULE__VP8
+#define WUFFS_CONFIG__MODULE__WEBP
 #define WUFFS_CONFIG__MODULE__ZLIB
 #include "wuffs-unsupported-snapshot.c"
 
@@ -39,6 +41,7 @@ static wuffs_gzip__decoder g_gzip;
 static wuffs_png__decoder g_png;
 static wuffs_jpeg__decoder g_jpeg;
 static wuffs_gif__decoder g_gif;
+static wuffs_webp__decoder g_webp;
 
 static uint64_t fnv(uint64_t h, const uint8_t* p, size_t n) {
   for (size_t i = 0; i < n; i++) {
@@ -128,6 +131,11 @@ static void once(const char* kind) {
       g_failed = 1;
     }
     decode_image(wuffs_jpeg__decoder__upcast_as__wuffs_base__image_decoder(&g_jpeg));
+  } else if (!strcmp(kind, "webp")) {
+    if (wuffs_webp__decoder__initialize(&g_webp, sizeof g_webp, WUFFS_VERSION, 0).repr) {
+      g_failed = 1;
+    }
+    decode_image(wuffs_webp__decoder__upcast_as__wuffs_base__image_decoder(&g_webp));
   }
 }
 
@@ -159,7 +167,8 @@ int main(void) {
     uint64_t check = 0xCBF29CE484222325ull;
     if (!strcmp(kind, "gzip")) {
       check = fnv(check, g_pix, (size_t)g_result);
-    } else if (!strcmp(kind, "png") || !strcmp(kind, "gif") || !strcmp(kind, "jpeg")) {
+    } else if (!strcmp(kind, "png") || !strcmp(kind, "gif") || !strcmp(kind, "jpeg") ||
+               !strcmp(kind, "webp")) {
       check = fnv(check, g_pix, (size_t)(g_result / 1000)) + g_result % 1000;
     } else {
       check = g_result;

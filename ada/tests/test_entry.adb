@@ -18,6 +18,8 @@ with Decode_Support;
 with Image_Support;
 with Test_Support;
 with Tiny_Jpeg;
+with Tiny_Webp;
+with System;
 with Wuffs.Base.IO;
 with Wuffs.Base.Pixel_Buffers;
 with Wuffs.Base.Pixel_Formats;
@@ -36,6 +38,8 @@ with Wuffs.Std.Png;
 with Wuffs.Std.Targa;
 with Wuffs.Std.Wbmp;
 with Wuffs.Std.Zlib;
+with Wuffs.Std.Vp8;
+with Wuffs.Std.Webp.Probe;
 
 procedure Test_Entry is
 
@@ -69,10 +73,13 @@ procedure Test_Entry is
    D : constant := 6500;  --  Destination, 256 bytes.
    Copy : constant := 7000;  --  A copy of the start of the object.
 
+   --  (Webp and Webp_L are the same decoder, with a lossy image with an
+   --  ALPH chunk and with a lossless image.)
    type Kind is
-     (Adler32, Crc32, Lzw, Deflate, Zlib, Gzip, Netpbm, Bmp, Gif, Png, Wbmp, Nie, Targa, Jpeg);
+     (Adler32, Crc32, Lzw, Deflate, Zlib, Gzip, Netpbm, Bmp, Gif, Png, Wbmp, Nie, Targa, Jpeg, Vp8,
+      Webp, Webp_L);
 
-   subtype Decoder_Kind is Kind range Netpbm .. Jpeg;
+   subtype Decoder_Kind is Kind range Netpbm .. Webp_L;
 
    subtype Hasher is Wuffs.Runtime.Hasher_U32'Class;
    subtype Transformer is Wuffs.Runtime.IO_Transformer'Class;
@@ -133,8 +140,8 @@ procedure Test_Entry is
    procedure Check_Decoder (Dec : in out Decoder; K : Kind; Size : Long_Long_Integer);
 
    --  Puts a small image at Arena (S ..) and returns its length: a 2 by 2
-   --  PPM, a 2 by 2 24-bit BMP, a 2 by 2 GIF or a 2 by 2 JPEG (4:2:0, 349
-   --  bytes).
+   --  PPM, a 2 by 2 24-bit BMP, a 2 by 2 GIF, a 2 by 2 JPEG (4:2:0, 349
+   --  bytes), or a 2 by 2 WebP or VP8 (see Tiny_Webp).
    procedure Make_Image (K : Decoder_Kind; Length : out Wuffs.Index);
 
    --  Suspends decode_frame of the small image and resumes it with
@@ -142,6 +149,11 @@ procedure Test_Entry is
    procedure Check_Resume (Dec : in out Decoder; K : Decoder_Kind; Size : Long_Long_Integer);
 
    procedure Check_Null_Pointers (Dec : in out Decoder; K : Decoder_Kind);
+
+   --  Arrays that lie in the std/vp8 decoder inside the std/webp decoder
+   --  (not at either end of the webp decoder): rejected, and neither
+   --  decoder is changed.
+   procedure Check_Webp_Sub_Decoder;
 
    --  Suspends tell_me_more (of the GIF decoder, in the middle of an ICC
    --  profile) and resumes it with other arguments.
@@ -164,6 +176,16 @@ procedure Test_Entry is
          when Nie => Wuffs.Std.Nie.Initialize (IMS.Nie_Decoder);
          when Targa => Wuffs.Std.Targa.Initialize (IMS.Targa_Decoder);
          when Jpeg => Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
+         when Vp8 =>
+            --  With base.QUIRK_SOURCE_LENGTH, which std/vp8 needs, for the
+            --  length of Tiny_Webp.VP8.
+            Wuffs.Std.Vp8.Initialize (IMS.Vp8_Decoder);
+            Check
+              (Wuffs.Is_Ok
+                 (IMS.Vp8_Decoder.Set_Quirk
+                    (A_Key => 3, A_Value => Wuffs.U64 (Tiny_Webp.VP8'Length) * 2 + 1)),
+               "vp8: set_quirk");
+         when Webp | Webp_L => Wuffs.Std.Webp.Initialize (IMS.Webp_Decoder);
       end case;
    end Initialize;
 
@@ -620,6 +642,18 @@ procedure Test_Entry is
             for B of Tiny_Jpeg.Data loop
                Put (B);
             end loop;
+         when Vp8 =>
+            for B of Tiny_Webp.VP8 loop
+               Put (B);
+            end loop;
+         when Webp =>
+            for B of Tiny_Webp.Lossy_Alpha loop
+               Put (B);
+            end loop;
+         when Webp_L =>
+            for B of Tiny_Webp.Lossless loop
+               Put (B);
+            end loop;
          when others =>
             for C of PPM_Header loop
                Put (Character'Pos (C));
@@ -642,11 +676,16 @@ procedure Test_Entry is
       St     : Wuffs.Status;
       Bad    : PB.Pixel_Buffer;
 
-      procedure Suspend;
+      procedure Suspend (Keep_Work : Boolean := False);
 
       --  Decodes the image configuration and starts decode_frame with all
-      --  but the last 3 bytes of the file: it asks for more.
-      procedure Suspend is
+      --  but the last 3 bytes of the file: it asks for more.  Unless
+      --  Keep_Work, the work buffer is then overwritten, which is not how a
+      --  caller may continue a suspended decode_frame (std/vp8 and std/webp
+      --  keep state there), but only those calls that are rejected anyway,
+      --  or are expected to cope (and not to touch memory they may not),
+      --  follow.
+      procedure Suspend (Keep_Work : Boolean := False) is
       begin
          Arena := [others => Fill];
          Make_Image (K, Length);
@@ -672,7 +711,9 @@ procedure Test_Entry is
          --  What the frame has written so far does not matter below.
          Arena (P .. P + 15) := [others => Fill];
          Arena (L .. L + 1023) := [others => Fill];
-         Arena (W .. W + 1023) := [others => Fill];
+         if not Keep_Work then
+            Arena (W .. W + 1023) := [others => Fill];
+         end if;
          --  The file's bytes are in Arena too: keep them out of the check.
          Arena (Copy .. Copy + Wuffs.Index'Min (Object'Length, 1024) - 1) :=
            Object (0 .. Wuffs.Index'Min (Object'Length, 1024) - 1);
@@ -721,12 +762,13 @@ procedure Test_Entry is
       end Resume_With_Work;
    begin
       --  The control: resumed with the rest of the input, it finishes.
-      Suspend;
+      Suspend (Keep_Work => True);
       Make_Image (K, Length);
       St :=
         Frame
           (Dec, PB_2x2, Arena (P .. P + 15), Arena (L .. L + 1023), Arena (S .. S + Length - 1), SM,
            Arena (W .. W + 1023));
+      Arena (W .. W + 1023) := [others => Fill];
       Check (Wuffs.Is_Ok (St), "decode_frame of the small image, resumed", Kind'Pos (K));
       Check
         (Arena (P + 3) = 16#FF# or else Arena (P + 7) = 16#FF# or else Arena (P + 11) = 16#FF#
@@ -928,6 +970,93 @@ procedure Test_Entry is
       Initialize (K);
    end Check_Null_Pointers;
 
+   procedure Check_Webp_Sub_Decoder is
+      Dec    : Wuffs.Std.Webp.Decoder renames IMS.Webp_Decoder;
+      Object : Wuffs.Bytes (0 .. IMS.Webp_Decoder'Size / 8 - 1)
+      with Import, Address => IMS.Webp_Decoder'Address;
+      Sub_Address : constant System.Address := Wuffs.Std.Webp.Probe.Vp8_Address (Dec);
+      Sub : Wuffs.Bytes (0 .. Wuffs.Index (Wuffs.Std.Webp.Probe.Vp8_Size (Dec) / 8) - 1)
+      with Import, Address => Sub_Address;
+      Length : Wuffs.Index;
+      IC     : PF.Image_Config;
+      SM     : IO.Buffer_Meta;
+      St     : Wuffs.Status;
+
+      --  The sub-decoder, all of it, is unchanged since Start.
+      function Sub_Unchanged return Boolean
+      is (for all I in Sub'Range => IMS.Sub_Copy (I) = Sub (I));
+
+      procedure Start;
+
+      --  A webp decoder that has decoded the image configuration of
+      --  Lossy_Alpha (and so set its std/vp8 decoder's quirks).
+      procedure Start is
+      begin
+         Arena := [others => Fill];
+         Initialize (Webp);
+         Make_Image (Webp, Length);
+         SM := (Wi => Length, Ri => 0, Pos => 0, Closed => True);
+         St :=
+           Dec.Decode_Image_Config
+             (A_Dst => IC, A_Dst_Null => False, A_Src => Arena (S .. S + Length - 1),
+              A_Src_Meta => SM);
+         Check (Wuffs.Is_Ok (St), "webp: decode_image_config of the small image");
+         Arena := [others => Fill];
+         Make_Image (Webp, Length);
+         IMS.Sub_Copy (Sub'Range) := Sub;
+      end Start;
+
+      procedure Check_Rejected (St : Wuffs.Status; What : String);
+
+      procedure Check_Rejected (St : Wuffs.Status; What : String) is
+      begin
+         Check (St = Bad_Argument, What, -1, ": not rejected");
+         Check (Sub_Unchanged, What, -1, ": the std/vp8 decoder was changed");
+         Check
+           (Dec.Set_Quirk (A_Key => 1, A_Value => 1) = Disabled, What, -1, ": not disabled");
+      end Check_Rejected;
+
+      Mid : constant Wuffs.Index := Sub'Length / 2;
+   begin
+      Check
+        (Sub'Length + 2048 < Object'Length and then Sub'Length <= IMS.Sub_Copy'Length
+         and then System."/=" (Sub (0)'Address, Object (0)'Address),
+         "the std/vp8 decoder is not inside the std/webp decoder as this test assumes");
+      Start;
+      Check_Rejected
+        (Frame
+           (Dec, PB_2x2, Sub (Mid .. Mid + 15), Arena (L .. L + 1023), Arena (S .. S + Length - 1),
+            SM, Arena (W .. W + 1023)),
+         "webp: pixels in its std/vp8 decoder");
+      Start;
+      Check_Rejected
+        (Frame
+           (Dec, PB_2x2, Arena (P .. P + 15), Arena (L .. L + 1023), Arena (S .. S + Length - 1),
+            SM, Sub (Sub'First .. Sub'Last)),
+         "webp: workbuf is its std/vp8 decoder");
+      Start;
+      Check_Rejected
+        (Frame
+           (Dec, PB_2x2, Arena (P .. P + 15), Sub (Mid .. Mid + 1023), Arena (S .. S + Length - 1),
+            SM, Arena (W .. W + 1023)),
+         "webp: palette in its std/vp8 decoder");
+      Start;
+      Sub (Mid .. Mid + Length - 1) := Arena (S .. S + Length - 1);
+      IMS.Sub_Copy (Sub'Range) := Sub;
+      Check_Rejected
+        (Frame
+           (Dec, PB_2x2, Arena (P .. P + 15), Arena (L .. L + 1023), Sub (Mid .. Mid + Length - 1),
+            SM, Arena (W .. W + 1023)),
+         "webp: src in its std/vp8 decoder");
+      Start;
+      Check_Rejected
+        (Frame
+           (Dec, PB_2x2, Arena (P .. P + 15), Arena (L .. L + 1023), Arena (S .. S + Length - 1),
+            SM, Sub (Sub'Last - 7 .. Sub'Last)),
+         "webp: workbuf at the end of its std/vp8 decoder");
+      Initialize (Webp);
+   end Check_Webp_Sub_Decoder;
+
    procedure Check_Tell_Me_More is
       --  A GIF header (1 by 1, no colour table) and the start of an
       --  application extension, "ICCRGBG1012", with a 3 byte sub-block.
@@ -1102,16 +1231,26 @@ begin
    Check_Decoder (IMS.Nie_Decoder, Nie, IMS.Nie_Decoder'Size);
    Check_Decoder (IMS.Targa_Decoder, Targa, IMS.Targa_Decoder'Size);
    Check_Decoder (IMS.Jpeg_Decoder, Jpeg, IMS.Jpeg_Decoder'Size);
+   Check_Decoder (IMS.Vp8_Decoder, Vp8, IMS.Vp8_Decoder'Size);
+   Check_Decoder (IMS.Webp_Decoder, Webp, IMS.Webp_Decoder'Size);
 
    Check_Resume (IMS.Netpbm_Decoder, Netpbm, IMS.Netpbm_Decoder'Size);
    Check_Resume (IMS.Bmp_Decoder, Bmp, IMS.Bmp_Decoder'Size);
    Check_Resume (IMS.Gif_Decoder, Gif, IMS.Gif_Decoder'Size);
    Check_Resume (IMS.Jpeg_Decoder, Jpeg, IMS.Jpeg_Decoder'Size);
+   Check_Resume (IMS.Vp8_Decoder, Vp8, IMS.Vp8_Decoder'Size);
+   Check_Resume (IMS.Webp_Decoder, Webp, IMS.Webp_Decoder'Size);
+   Check_Resume (IMS.Webp_Decoder, Webp_L, IMS.Webp_Decoder'Size);
 
    Check_Null_Pointers (IMS.Netpbm_Decoder, Netpbm);
    Check_Null_Pointers (IMS.Bmp_Decoder, Bmp);
    Check_Null_Pointers (IMS.Gif_Decoder, Gif);
    Check_Null_Pointers (IMS.Jpeg_Decoder, Jpeg);
+   Check_Null_Pointers (IMS.Vp8_Decoder, Vp8);
+   Check_Null_Pointers (IMS.Webp_Decoder, Webp);
+   Check_Null_Pointers (IMS.Webp_Decoder, Webp_L);
+
+   Check_Webp_Sub_Decoder;
 
    Check_Tell_Me_More;
 

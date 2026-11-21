@@ -93,6 +93,17 @@ type file struct {
 	// for lower quality: a progressive one, or a sequential one in several
 	// scans.
 	jpegWholeWorkbuf bool
+
+	// For a WebP or VP8 file with reference pixels: the comparison's
+	// category, tolerance and mean limit (see webp.go).
+	refCat  string
+	refTol  int
+	refMean int
+
+	// rawAlpha means a WebP file with an uncompressed ALPH chunk: only a
+	// run with the whole file in the source buffer is compared with the
+	// references (see addWebP).
+	rawAlpha bool
 }
 
 var (
@@ -771,6 +782,9 @@ func makeNetpbms() {
 
 func emit(f *file, pixfmt uint32, blend int, sched string, flags string, script string, expected bool) {
 	e := "-"
+	if f.rawAlpha && sched != "W" {
+		expected = false
+	}
 	if expected && f.expected != "" {
 		e = f.expected
 		if f.jpegCat != "" {
@@ -783,6 +797,14 @@ func emit(f *file, pixfmt uint32, blend int, sched string, flags string, script 
 				flags = jf
 			} else {
 				flags += "," + jf
+			}
+		}
+		if f.refCat != "" {
+			rf := fmt.Sprintf("t%d,a%d,k%s", f.refTol, f.refMean, f.refCat)
+			if flags == "-" {
+				flags = rf
+			} else {
+				flags += "," + rf
 			}
 		}
 	}
@@ -812,12 +834,15 @@ func positions(size int, n int) []int {
 func main() {
 	dataDir := flag.String("data", "wuffs/test/data", "upstream's test data")
 	jpegDir := flag.String("jpegs", "ada/tests/jpegcorpus", "the checked-in JPEG files")
+	webpDir := flag.String("webps", "ada/tests/webpcorpus", "the checked-in WebP files")
+	webpRefDir := flag.String("webpref", "", "the directory of libwebp's reference pixels (see webp.go)")
 	flag.StringVar(&outDir, "out", "", "the directory to write files to")
 	chaosName := flag.String("chaos", "", "a file to write the manifest of chaos runs to")
 	flag.Parse()
 	if outDir == "" {
 		log.Fatal("imgcorpus: -out is required")
 	}
+	loadLibwebpRefs(*webpRefDir)
 
 	formats := map[string]string{
 		".bmp": "bmp", ".gif": "gif", ".png": "png", ".pbm": "netpbm", ".pgm": "netpbm", ".ppm": "netpbm",
@@ -825,6 +850,7 @@ func main() {
 		".wbmp": "wbmp", ".nie": "nie", ".tga": "targa",
 		".qoi": "qoi", ".pkm": "etc2", ".th": "thumbhash", ".handsum": "handsum",
 		".jpeg": "jpeg", ".jpg": "jpeg",
+		".webp": "webp",
 	}
 	paths := []string(nil)
 	filepath.WalkDir(*dataDir, func(path string, d fs.DirEntry, err error) error {
@@ -843,6 +869,10 @@ func main() {
 			continue
 		}
 		f := &file{format: formats[strings.ToLower(filepath.Ext(path))], path: path, data: data, upstream: true}
+		if f.format == "webp" {
+			addWebP(f)
+			continue
+		}
 		if f.format == "jpeg" {
 			setJPEGReference(f, fmt.Sprintf("upstream-%d", len(files)))
 		} else if ref := goReference(f.format, data); ref != nil {
@@ -856,7 +886,15 @@ func main() {
 	makeBMPs()
 	makeNetpbms()
 	nEncoded, nCheckedIn := makeJPEGs(*jpegDir)
+	nWebP := addWebPs(*webpDir)
 	whole := append([]*file(nil), files...)
+	webps := []*file(nil)
+	for _, f := range whole {
+		if f.format == "webp" {
+			webps = append(webps, f)
+		}
+	}
+	vp8s := vp8Payloads(webps)
 
 	// The chaos runs (see test_image.adb): Ada only, so in a manifest of
 	// their own. Many small pieces of source, so that there are many
@@ -880,6 +918,17 @@ func main() {
 				}
 				fmt.Fprintf(chaos, "%s %08X %d %s %s %s - %s\n", f.format, pixfmts[(i+j)%len(pixfmts)], j%2,
 					sched, flags, []string{"I*R*", "I*", "F*", "IFF*"}[j%4], f.path)
+			}
+		}
+		for i, f := range vp8s {
+			if len(f.data) > 20000 {
+				continue
+			}
+			for j := 0; j < 4; j++ {
+				seed++
+				fmt.Fprintf(chaos, "vp8 %08X %d %s x%d,%s %s - %s\n", pixfmts[(i+j)%len(pixfmts)], j%2,
+					[]string{"C7", "K61", "C1", "C31"}[j], seed, sourceLengthFlag(len(f.data)),
+					[]string{"I*R*", "I*", "F*", "IFF*"}[j], f.path)
 			}
 		}
 		if err := os.WriteFile(*chaosName, chaos.Bytes(), 0o644); err != nil {
@@ -953,8 +1002,9 @@ func main() {
 			}
 		}
 
-		// Truncated and corrupted copies of some of the small files.
-		if len(f.data) > 6000 || (!f.upstream && i%7 != 0) || (f.upstream && damaged >= 40 && i%3 != 0) {
+		// Truncated and corrupted copies of some of the small files (WebP:
+		// see emitWebPDamage).
+		if f.format == "webp" || len(f.data) > 6000 || (!f.upstream && i%7 != 0) || (f.upstream && damaged >= 40 && i%3 != 0) {
 			continue
 		}
 		if f.format == "jpeg" {
@@ -997,6 +1047,11 @@ func main() {
 			}
 		}
 	}
-	fmt.Fprintf(os.Stderr, "imgcorpus: %d upstream images, %d generated images (%d JPEGs encoded here, %d checked-in JPEGs), %d of them damaged in turn\n",
-		nUpstream, len(whole)-nUpstream, nEncoded, nCheckedIn, damaged)
+	for i, f := range vp8s {
+		emitVP8(f, i)
+	}
+	emitWebPRefs()
+	nWebPDamaged := emitWebPDamage(webps, vp8s)
+	fmt.Fprintf(os.Stderr, "imgcorpus: %d upstream images, %d generated images (%d JPEGs encoded here, %d checked-in JPEGs, %d checked-in WebPs), %d of them damaged in turn; %d raw VP8 streams; %d damaged WebP and VP8 copies\n",
+		nUpstream, len(whole)-nUpstream, nEncoded, nCheckedIn, nWebP, damaged, len(vp8s), nWebPDamaged)
 }

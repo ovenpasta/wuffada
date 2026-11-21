@@ -86,7 +86,9 @@ type argInfo struct {
 	null *variable
 
 	// pixels and palette are the second and third parameters of a pixel
-	// buffer (kPixBuf): the two arrays. v is then the descriptor.
+	// buffer (kPixBuf): the two arrays. v is then the descriptor. A nullable
+	// pixel buffer (kNptrPixBuf) has all three and null (which comes before
+	// the arrays).
 	pixels, palette *variable
 }
 
@@ -477,8 +479,11 @@ func (g *gen) analyzeFunc(fi *funcInfo, pkgPrefix string) error {
 		case kNptr:
 			arg.v = &variable{kind: varParam, name: name, typ: typ, decl: typ.name, mode: "in out"}
 			arg.null = &variable{kind: varParam, name: name + "_Null", typ: typBool, decl: typBool.name}
-		case kPixBuf:
+		case kPixBuf, kNptrPixBuf:
 			arg.v = &variable{kind: varParam, name: name, typ: typ, decl: typ.name}
+			if typ.kind == kNptrPixBuf {
+				arg.null = &variable{kind: varParam, name: name + "_Null", typ: typBool, decl: typBool.name}
+			}
 			arg.pixels = &variable{kind: varParam, name: name + "_Pixels", typ: typBytesVar,
 				decl: typBytesVar.name, mode: "in out"}
 			arg.palette = &variable{kind: varParam, name: name + "_Palette", typ: typBytesVar,

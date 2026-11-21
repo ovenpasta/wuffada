@@ -257,7 +257,7 @@ func (l *lowerer) declareArgs() error {
 			l.ios[id] = io
 			l.ioList = append(l.ioList, io)
 			continue
-		case kNptr, kPixBuf:
+		case kNptr, kPixBuf, kNptrPixBuf:
 			if assigned[id] {
 				return errNotYet("assigning to args.%s", id.Str(l.g.tm))
 			}
@@ -603,13 +603,20 @@ func (l *lowerer) prologue() ([]stmt, error) {
 			}
 		}
 	}
+	sharesSelf := func(v *variable) expr {
+		return callNamed("Wuffs.Runtime.Shares_Storage",
+			"A", expr(eVar{v}),
+			"Address", expr(eAttr{eVar{l.f.self}, "Address"}),
+			"Size_In_Bits", expr(eAttr{eVar{l.f.self}, "Size"}))
+	}
 	for _, arg := range l.fi.args {
+		if arg.typ.kind == kNptrPixBuf {
+			// Its arrays are checked below, if it is not null.
+			continue
+		}
 		for _, v := range arg.vars() {
 			if v.typ.kind == kBytes || v.typ.kind == kBytesVar {
-				conds = append(conds, callNamed("Wuffs.Runtime.Shares_Storage",
-					"A", expr(eVar{v}),
-					"Address", expr(eAttr{eVar{l.f.self}, "Address"}),
-					"Size_In_Bits", expr(eAttr{eVar{l.f.self}, "Size"})))
+				conds = append(conds, sharesSelf(v))
 			}
 		}
 	}
@@ -627,19 +634,50 @@ func (l *lowerer) prologue() ([]stmt, error) {
 			arrays = append(arrays, arg.v)
 		}
 	}
-	for _, arg := range l.fi.args {
-		if arg.typ.kind != kPixBuf {
+	// A nullable pixel buffer (kNptrPixBuf) is checked like that only if
+	// it is not null: if it is, nothing reads its descriptor or arrays (as
+	// C does not dereference a NULL pointer), so there is nothing to check
+	// about them, and its null flag was checked above. Two pixel buffers'
+	// arrays must be apart from each other's too (when neither is null).
+	notNull := func(arg *argInfo, e expr) expr {
+		if arg.null == nil {
+			return e
+		}
+		return bin("and then", eUn{"not", eVar{arg.null}}, e)
+	}
+	for i, arg := range l.fi.args {
+		if arg.typ.kind != kPixBuf && arg.typ.kind != kNptrPixBuf {
 			continue
 		}
 		pixels, palette := eVar{arg.pixels}, eVar{arg.palette}
-		conds = append(conds,
+		own := []expr{
 			eUn{"not", callNamed("Wuffs.Runtime.Valid_Pixel_Buffer",
 				"PB", expr(eVar{arg.v}), "Pixels", expr(pixels), "Palette", expr(palette))},
-			callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(pixels), "B", expr(palette)))
+			callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(pixels), "B", expr(palette)),
+		}
+		if arg.typ.kind == kNptrPixBuf {
+			own = append(own, sharesSelf(arg.pixels), sharesSelf(arg.palette))
+		}
 		for _, written := range []eVar{pixels, palette} {
 			for _, other := range arrays {
-				conds = append(conds,
+				own = append(own,
 					callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(written), "B", expr(eVar{other})))
+			}
+		}
+		if arg.typ.kind == kPixBuf {
+			conds = append(conds, own...)
+		} else {
+			conds = append(conds, notNull(arg, bin("or else", own...)))
+		}
+		for _, prev := range l.fi.args[:i] {
+			if prev.typ.kind != kPixBuf && prev.typ.kind != kNptrPixBuf {
+				continue
+			}
+			for _, x := range []*variable{arg.pixels, arg.palette} {
+				for _, y := range []*variable{prev.pixels, prev.palette} {
+					conds = append(conds, notNull(arg, notNull(prev,
+						callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(eVar{x}), "B", expr(eVar{y})))))
+				}
 			}
 		}
 	}

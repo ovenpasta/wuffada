@@ -1,7 +1,8 @@
 --  Part of wuffada (wuffs-ada: Wuffs to Ada).
 --  SPDX-License-Identifier: Apache-2.0 OR MIT
 
---  Runs the generated image decoders (netpbm, bmp, gif, png, wbmp, nie, targa, jpeg, ...) over a
+--  Runs the generated image decoders (netpbm, bmp, gif, png, wbmp, nie, targa,
+--  jpeg, vp8, webp, ...) over a
 --  manifest of test cases (from ada/tests/imgcorpus) and prints a trace of
 --  what they did, which test.sh compares, line for line, with the trace of
 --  upstream's C decoders (ada/tests/crosscheck/image.c: keep the two in
@@ -22,7 +23,9 @@
 --  metadata), p (a pixel buffer for half the width and height), w (a work
 --  buffer that is too short), l (pixel rows at an offset and with a gap
 --  between them: Ada only), qN (set quirk N to 1), QN (set quirk N to
---  16#8000_0000_0000_0000#: for base.QUIRK_QUALITY, lower quality), tN and
+--  16#8000_0000_0000_0000#: for base.QUIRK_QUALITY, lower quality), vK:V
+--  (set quirk K to V, both decimal: for vp8's QUIRK_SOURCE_LENGTH and the
+--  like), tN and
 --  kNAME (compare with the reference pixels with a tolerance of N per
 --  channel, not exactly, and count the comparison in category NAME: for
 --  JPEG, whose decoders legitimately differ in rounding and upsampling), aN
@@ -65,6 +68,8 @@ with Wuffs.Std.Etc2;
 with Wuffs.Std.Thumbhash;
 with Wuffs.Std.Handsum;
 with Wuffs.Std.Jpeg;
+with Wuffs.Std.Vp8;
+with Wuffs.Std.Webp;
 
 procedure Test_Image is
 
@@ -1128,6 +1133,21 @@ procedure Test_Image is
                      Run.Category := Num_Categories;
                   end if;
                end;
+            when 'v' =>
+               --  vK:V sets quirk K to V (both decimal).
+               declare
+                  Colon : Natural := I + 1;
+               begin
+                  while Colon < J and then Line (Colon) /= ':' loop
+                     Colon := Colon + 1;
+                  end loop;
+                  if Run.Num_Quirks < Max_Quirks and then Colon < J then
+                     Run.Num_Quirks := Run.Num_Quirks + 1;
+                     Run.Quirks (Run.Num_Quirks) :=
+                       Wuffs.U32 (Number (Line (I + 1 .. Colon - 1), 10));
+                     Run.Values (Run.Num_Quirks) := Number (Line (Colon + 1 .. J - 1), 10);
+                  end if;
+               end;
             when 'q' | 'Q' =>
                if Run.Num_Quirks < Max_Quirks then
                   Run.Num_Quirks := Run.Num_Quirks + 1;
@@ -1191,6 +1211,12 @@ procedure Test_Image is
       elsif Line (F1 .. L1) = "jpeg" then
          Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
          Run_Decoder (IMS.Jpeg_Decoder, Line (F6 .. L6));
+      elsif Line (F1 .. L1) = "vp8" then
+         Wuffs.Std.Vp8.Initialize (IMS.Vp8_Decoder);
+         Run_Decoder (IMS.Vp8_Decoder, Line (F6 .. L6));
+      elsif Line (F1 .. L1) = "webp" then
+         Wuffs.Std.Webp.Initialize (IMS.Webp_Decoder);
+         Run_Decoder (IMS.Webp_Decoder, Line (F6 .. L6));
       else
          Test_Support.Check (False, "unknown format ", -1, Line (F1 .. L1));
       end if;

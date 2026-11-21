@@ -1,11 +1,14 @@
 #!/bin/sh
 # Regenerates the Ada code, builds it in both profiles and runs every test.
 # Exits non-zero on the first failure. Needs Go, a C compiler (cc, for the
-# cross-check against upstream's C back-end), Alire (alr) with the project's
-# GNAT toolchain, and the Wuffs checkout at ./wuffs.
+# cross-check against upstream's C back-end), libwebp's headers and library
+# (for ada/tests/crosscheck/webpref.c, the second reference decoder for
+# WebP), Alire (alr) with the project's GNAT toolchain, and the Wuffs
+# checkout at ./wuffs.
 #
-# Everything temporary (about 150 MB: the test corpora and traces) goes to
-# one directory under ${TMPDIR:-/tmp}, which is removed at the end.
+# Everything temporary (at most about 800 MB: the test corpora and traces;
+# 768 MB measured with WUFFS_ASAN=1) goes to one directory under
+# ${TMPDIR:-/tmp}, which is removed at the end.
 #
 # With WUFFS_ASAN=1 in the environment, it also builds the image tests a
 # third time, for the release profile with -fsanitize=address (in the
@@ -21,8 +24,8 @@ tmp="$(mktemp -d)" || die "cannot make a temporary directory"
 trap 'rm -rf "$tmp"' EXIT
 # Fail now, and clearly, rather than half way with a truncated file.
 avail_kb="$(df -Pk "$tmp" | awk 'NR == 2 { print $4 }')"
-[ "${avail_kb:-0}" -ge 524288 ] ||
-    die "less than 512 MB free in $tmp (${avail_kb:-?} KB): set TMPDIR to a directory with more room"
+[ "${avail_kb:-0}" -ge 1048576 ] ||
+    die "less than 1 GB free in $tmp (${avail_kb:-?} KB): set TMPDIR to a directory with more room"
 
 say "Go: build, vet, gofmt"
 go build ./...
@@ -112,21 +115,33 @@ echo "$(wc -l < "$tmp/decode.c32.trace" | tr -d ' ') runs traced from C"
 cmp -s "$tmp/decode.c.trace" "$tmp/decode.c32.trace" ||
     echo "(the 32-bit trace differs from the 64-bit one, as expected where the fast paths consume input differently)"
 
-say "Corpus for the image decoders (Go's image/png and image/gif as the independent implementation)"
+say "WebP reference pixels from libwebp (ada/tests/crosscheck/webpref.c)"
+mkdir "$tmp/webpref"
+"${CC:-cc}" -std=c99 -O2 -Wall -o "$tmp/webpref.bin" ada/tests/crosscheck/webpref.c -lwebp ||
+    die "cannot build webpref.c: libwebp's headers and library are needed"
+find wuffs/test/data ada/tests/webpcorpus -name '*.webp' | LC_ALL=C sort > "$tmp/webp.list"
+"$tmp/webpref.bin" "$tmp/webpref" < "$tmp/webp.list" > "$tmp/webpref/list.out" || die "webpref failed"
+echo "$(grep -c ' ok$' "$tmp/webpref/list.out") of $(wc -l < "$tmp/webp.list" | tr -d ' ') WebP files decoded by libwebp"
+
+say "Corpus for the image decoders (Go's image/png, image/gif, image/jpeg and x/image/webp, and libwebp, as the independent implementations)"
 mkdir "$tmp/imgcorpus"
 go run ./ada/tests/imgcorpus -data wuffs/test/data -out "$tmp/imgcorpus" -chaos "$tmp/chaos.manifest" \
-    > "$tmp/image.manifest" || die "imgcorpus failed"
+    -webpref "$tmp/webpref" > "$tmp/image.manifest" || die "imgcorpus failed"
 nchaos="$(wc -l < "$tmp/chaos.manifest" | tr -d ' ')"
 [ "$nchaos" -ge 3000 ] || die "only $nchaos chaos runs"
 nimgcases="$(wc -l < "$tmp/image.manifest" | tr -d ' ')"
 nimgrefs="$(grep -c -v ' - [^ ]*$' "$tmp/image.manifest" || true)"
 njpeg="$(grep -c '^jpeg ' "$tmp/image.manifest" || true)"
 njpegrefs="$(grep '^jpeg ' "$tmp/image.manifest" | grep -c -v ' - [^ ]*$' || true)"
-echo "$nimgcases runs, $nimgrefs of them with reference pixels; JPEG: $njpeg runs, $njpegrefs with reference pixels"
+nwebp="$(grep -c -E '^(webp|vp8) ' "$tmp/image.manifest" || true)"
+nwebprefs="$(grep -E '^(webp|vp8) ' "$tmp/image.manifest" | grep -c -v ' - [^ ]*$' || true)"
+echo "$nimgcases runs, $nimgrefs of them with reference pixels; JPEG: $njpeg runs, $njpegrefs with reference pixels; WebP and VP8: $nwebp runs, $nwebprefs with reference pixels"
 [ "$nimgcases" -ge 30000 ] || die "only $nimgcases image test runs"
 [ "$nimgrefs" -ge 800 ] || die "only $nimgrefs image test runs with reference pixels"
 [ "$njpeg" -ge 30000 ] || die "only $njpeg JPEG test runs"
 [ "$njpegrefs" -ge 1000 ] || die "only $njpegrefs JPEG test runs with reference pixels"
+[ "$nwebp" -ge 40000 ] || die "only $nwebp WebP and VP8 test runs"
+[ "$nwebprefs" -ge 900 ] || die "only $nwebprefs WebP and VP8 test runs with reference pixels"
 
 say "Cross-check: upstream's C image decoders over the corpus"
 ada/tests/crosscheck/run_image.sh < "$tmp/image.manifest" > "$tmp/image.c.trace"
@@ -262,7 +277,9 @@ for profile in checked release; do
     fi
     for f in bricks-color.png bricks-dither.png hibiscus.primitive.png hippopotamus.interlaced.png \
         animated-red-blue.gif hippopotamus.interlaced.gif bricks-color.jpeg bricks-gray.jpeg \
-        peacock.progressive.jpeg peacock.s1x1-444.jpeg harvesters.jpeg; do
+        peacock.progressive.jpeg peacock.s1x1-444.jpeg harvesters.jpeg \
+        bricks-color.lossless.webp bricks-color.lossy.webp hippopotamus.masked-with-muybridge.lossy.webp \
+        harvesters.lossless.webp hibiscus.regular.lossy.webp; do
         (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "wuffs/test/data/$f" "$tmp/example.pnm") ||
             die "decode_image $f ($profile)"
         go run ./ada/tests/pnmcheck "wuffs/test/data/$f" "$tmp/example.pnm" || die "decode_image $f: wrong pixels ($profile)"
@@ -278,6 +295,8 @@ for profile in checked release; do
     head -c 2000 wuffs/test/data/bricks-color.jpeg > "$tmp/truncated.jpeg"
     printf '\377\330\377\303\000\013' > "$tmp/lossless.jpeg"
     printf 'BMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' > "$tmp/bad.bmp"
+    head -c 2000 wuffs/test/data/bricks-color.lossy.webp > "$tmp/truncated-lossy.webp"
+    head -c 300 wuffs/test/data/hat.lossless.webp > "$tmp/truncated-lossless.webp"
     expect_failure() {
         if (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "$1" "$tmp/example.pnm") 2> "$tmp/example.err"; then
             die "decode_image $1 did not fail ($profile)"
@@ -290,7 +309,11 @@ for profile in checked release; do
     expect_failure "$tmp/bad.bmp" "decode_image_config: bmp: bad header"
     expect_failure "$tmp/truncated.jpeg" "decode_frame: jpeg: truncated input"
     expect_failure "$tmp/lossless.jpeg" "decode_image_config: jpeg: unsupported lossless coding"
-    expect_failure go.mod "the input is not a PNG, GIF, JPEG, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP file"
+    # A status of std/vp8, through std/webp.
+    expect_failure "$tmp/truncated-lossy.webp" "decode_frame: vp8: truncated input"
+    expect_failure ada/tests/webpcorpus/container-vp8-interframe.webp "decode_image_config: vp8: unsupported VP8 file"
+    expect_failure "$tmp/truncated-lossless.webp" "decode_frame: webp: truncated input"
+    expect_failure go.mod "the input is not a PNG, GIF, JPEG, WebP, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP file"
     # A file name longer than the program accepts (and so nowhere near the
     # run-time library's own limits).
     if (examples/bin/decode_image wuffs/test/data/hippopotamus.bmp \

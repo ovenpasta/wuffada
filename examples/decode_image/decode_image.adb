@@ -3,7 +3,7 @@
 
 --  decode_image INPUT OUTPUT
 --
---  Decodes the image file INPUT (PNG, GIF, JPEG, BMP, Netpbm, NIE, QOI,
+--  Decodes the image file INPUT (PNG, GIF, JPEG, WebP, BMP, Netpbm, NIE, QOI,
 --  ETC2/PKM or WBMP: the format is
 --  recognised from the file's first bytes, not from its name) with the
 --  decoders that wuffs-ada generated from Wuffs' standard library, and
@@ -33,7 +33,9 @@ with Wuffs.Std.Netpbm;
 with Wuffs.Std.Nie;
 with Wuffs.Std.Png;
 with Wuffs.Std.Qoi;
+with Wuffs.Std.Vp8;
 with Wuffs.Std.Wbmp;
+with Wuffs.Std.Webp;
 with Wuffs.Std.Zlib;
 
 procedure Decode_Image is
@@ -54,7 +56,7 @@ procedure Decode_Image is
    RGB            : constant := 16#A000_0888#;
    RGBA_Nonpremul : constant := 16#A100_8888#;
 
-   type Format is (Unknown, Netpbm, Bmp, Gif, Png, Jpeg, Nie, Qoi, Etc2, Wbmp);
+   type Format is (Unknown, Netpbm, Bmp, Gif, Png, Jpeg, Webp, Nie, Qoi, Etc2, Wbmp);
 
    subtype Decoder is Wuffs.Runtime.Image_Decoder'Class;
 
@@ -106,10 +108,16 @@ procedure Decode_Image is
       if Length = 0 then
          Wuffs.Std.Jpeg.Get_Message (S, Text, Length);
       end if;
-      --  The packages that the PNG and GIF decoders use, whose statuses they
-      --  pass on.
+      if Length = 0 then
+         Wuffs.Std.Webp.Get_Message (S, Text, Length);
+      end if;
+      --  The packages that the PNG, GIF and WebP decoders use, whose statuses
+      --  they pass on.
       if Length = 0 then
          Wuffs.Std.Zlib.Get_Message (S, Text, Length);
+      end if;
+      if Length = 0 then
+         Wuffs.Std.Vp8.Get_Message (S, Text, Length);
       end if;
       if Length = 0 then
          Wuffs.Std.Nie.Get_Message (S, Text, Length);
@@ -179,6 +187,13 @@ procedure Decode_Image is
       elsif Length >= 3 and then S (1) = 16#FF# and then S (2) = 16#D8# and then S (3) = 16#FF# then
          --  SOI and the start of the next marker.
          return Jpeg;
+      elsif Length >= 12 and then S (1) = Character'Pos ('R') and then S (2) = Character'Pos ('I')
+        and then S (3) = Character'Pos ('F') and then S (4) = Character'Pos ('F')
+        and then S (9) = Character'Pos ('W') and then S (10) = Character'Pos ('E')
+        and then S (11) = Character'Pos ('B') and then S (12) = Character'Pos ('P')
+      then
+         --  "RIFF", the length, "WEBP".
+         return Webp;
       elsif Length >= 3 and then S (1) = Character'Pos ('G') and then S (2) = Character'Pos ('I')
         and then S (3) = Character'Pos ('F')
       then
@@ -410,6 +425,9 @@ begin
       when Jpeg =>
          Wuffs.Std.Jpeg.Initialize (Buffers.Jpeg_Decoder);
          Convert (Buffers.Jpeg_Decoder, Length, Output_Name (1 .. Output_Last));
+      when Webp =>
+         Wuffs.Std.Webp.Initialize (Buffers.Webp_Decoder);
+         Convert (Buffers.Webp_Decoder, Length, Output_Name (1 .. Output_Last));
       when Nie =>
          Wuffs.Std.Nie.Initialize (Buffers.Nie_Decoder);
          Convert (Buffers.Nie_Decoder, Length, Output_Name (1 .. Output_Last));
@@ -423,7 +441,9 @@ begin
          Wuffs.Std.Wbmp.Initialize (Buffers.Wbmp_Decoder);
          Convert (Buffers.Wbmp_Decoder, Length, Output_Name (1 .. Output_Last));
       when Unknown =>
-         Fail ("the input is not a PNG, GIF, JPEG, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP file");
+         Fail
+           ("the input is not a PNG, GIF, JPEG, WebP, BMP, Netpbm, NIE, QOI, ETC2 (PKM) or WBMP"
+            & " file");
    end case;
 exception
    when Failed =>

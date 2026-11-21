@@ -31,6 +31,8 @@ with Wuffs.Std.Wbmp.Probe;
 with Wuffs.Std.Nie.Probe;
 with Wuffs.Std.Targa.Probe;
 with Wuffs.Std.Qoi.Probe;
+with Wuffs.Std.Vp8.Probe;
+with Wuffs.Std.Webp.Probe;
 
 procedure Test_Hostile is
 
@@ -53,10 +55,10 @@ procedure Test_Hostile is
    BGR  : constant := 16#8000_0888#;
    RGB  : constant := 16#A000_0888#;
 
-   type Kind is (Netpbm, Bmp, Gif, Png, Jpeg, Wbmp, Nie, Targa, Qoi);
+   type Kind is (Netpbm, Bmp, Gif, Png, Jpeg, Vp8, Webp, Wbmp, Nie, Targa, Qoi);
 
    --  The decoders whose status messages Check_Messages looks at.
-   subtype Message_Kind is Kind range Netpbm .. Jpeg;
+   subtype Message_Kind is Kind range Netpbm .. Webp;
 
    subtype Decoder is Wuffs.Runtime.Image_Decoder'Class;
 
@@ -115,6 +117,8 @@ procedure Test_Hostile is
          when Gif => Wuffs.Std.Gif.Initialize (IMS.Gif_Decoder);
          when Png => Wuffs.Std.Png.Initialize (IMS.Png_Decoder);
          when Jpeg => Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
+         when Vp8 => Wuffs.Std.Vp8.Initialize (IMS.Vp8_Decoder);
+         when Webp => Wuffs.Std.Webp.Initialize (IMS.Webp_Decoder);
          when Wbmp => Wuffs.Std.Wbmp.Initialize (IMS.Wbmp_Decoder);
          when Nie => Wuffs.Std.Nie.Initialize (IMS.Nie_Decoder);
          when Targa => Wuffs.Std.Targa.Initialize (IMS.Targa_Decoder);
@@ -129,6 +133,8 @@ procedure Test_Hostile is
          when Gif => Wuffs.Std.Gif.Probe.Swizzler_Is_Default (IMS.Gif_Decoder),
          when Png => Wuffs.Std.Png.Probe.Swizzler_Is_Default (IMS.Png_Decoder),
          when Jpeg => Wuffs.Std.Jpeg.Probe.Swizzler_Is_Default (IMS.Jpeg_Decoder),
+         when Vp8 => Wuffs.Std.Vp8.Probe.Swizzler_Is_Default (IMS.Vp8_Decoder),
+         when Webp => Wuffs.Std.Webp.Probe.Swizzler_Is_Default (IMS.Webp_Decoder),
          when Wbmp => Wuffs.Std.Wbmp.Probe.Swizzler_Is_Default (IMS.Wbmp_Decoder),
          when Nie => Wuffs.Std.Nie.Probe.Swizzler_Is_Default (IMS.Nie_Decoder),
          when Targa => Wuffs.Std.Targa.Probe.Swizzler_Is_Default (IMS.Targa_Decoder),
@@ -714,12 +720,16 @@ procedure Test_Hostile is
       function Swizzle
         (Pix_At, Pal_At, DPal_At, S0, S1, S2, Scr_At : Wuffs.Index;
          Scr_Length : Wuffs.Index := 2048;
-         Buf        : PB.Pixel_Buffer := Good_PB) return Wuffs.Status;
+         Buf        : PB.Pixel_Buffer := Good_PB;
+         S3         : Wuffs.Index := 0;
+         S3_Length  : Wuffs.Index := 0) return Wuffs.Status;
 
       function Swizzle
         (Pix_At, Pal_At, DPal_At, S0, S1, S2, Scr_At : Wuffs.Index;
          Scr_Length : Wuffs.Index := 2048;
-         Buf        : PB.Pixel_Buffer := Good_PB) return Wuffs.Status
+         Buf        : PB.Pixel_Buffer := Good_PB;
+         S3         : Wuffs.Index := 0;
+         S3_Length  : Wuffs.Index := 0) return Wuffs.Status
       is
          St : Wuffs.Status;
       begin
@@ -735,7 +745,8 @@ procedure Test_Hostile is
             Src0              => Arena (S0 .. S0 + 15),
             Src1              => Arena (S1 .. S1 + 15),
             Src2              => Arena (S2 .. S2 + 15),
-            Src3              => Arena (S2 .. S2 - 1),
+            Src3              =>
+              (if S3_Length = 0 then Arena (S2 .. S2 - 1) else Arena (S3 .. S3 + S3_Length - 1)),
             Width0            => 4,
             Width1            => 4,
             Width2            => 4,
@@ -820,6 +831,23 @@ procedure Test_Hostile is
       --  Adjacent: no shared element.
       Accepted (Swizzle (Pix, Pix + 64, Pix + 64, Pix - 16, Pix - 32, Pix - 48, Pix + 1088),
                 "adjacent arrays");
+
+      --  Plane 3 (std/vp8's alpha plane: the work buffer's first bytes,
+      --  right before plane 0): read only, like the others.  (Its width and
+      --  height are 0 here, so the proved code does not read it; the
+      --  aliasing checks are made on the whole array.)
+      Accepted
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, S3 => Src - 16, S3_Length => 16),
+         "plane 3 before plane 0");
+      Accepted
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, S3 => Src + 8, S3_Length => 16),
+         "plane 3 over plane 0");
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, S3 => Pix + 63, S3_Length => 16),
+         "pixels/plane 3");
+      Rejected
+        (Swizzle (Pix, Pal, DPal, Src, Src + 32, Src + 64, Scr, S3 => Scr - 15, S3_Length => 16),
+         "scratch/plane 3");
 
       --  The pixels and each array that is read, and the scratch buffer.
       Rejected (Swizzle (Pix, Pix + 63, DPal, Src, Src + 32, Src + 64, Scr), "pixels/palette");
@@ -1005,6 +1033,12 @@ procedure Test_Hostile is
                when Jpeg =>
                   L := Wuffs.Std.Jpeg.Message_Length (S);
                   Wuffs.Std.Jpeg.Get_Message (S, Buffer, Length);
+               when Vp8 =>
+                  L := Wuffs.Std.Vp8.Message_Length (S);
+                  Wuffs.Std.Vp8.Get_Message (S, Buffer, Length);
+               when Webp =>
+                  L := Wuffs.Std.Webp.Message_Length (S);
+                  Wuffs.Std.Webp.Get_Message (S, Buffer, Length);
             end case;
             if Other = K then
                Check
@@ -1036,6 +1070,17 @@ procedure Test_Hostile is
       Expect
         (Wuffs.Std.Jpeg.Error_Unsupported_Precision_12_Bits, Jpeg,
          "jpeg: unsupported precision (12 bits)");
+      Expect (Wuffs.Std.Vp8.Error_Bad_QUIRK_SOURCE_LENGTH, Vp8, "vp8: bad QUIRK_SOURCE_LENGTH");
+      Expect (Wuffs.Std.Vp8.Error_Unsupported_VP8_File, Vp8, "vp8: unsupported VP8 file");
+      Expect
+        (Wuffs.Std.Webp.Error_Bad_ALPH_VP8L_Combination, Webp, "webp: bad ALPH+VP8L combination");
+      Expect
+        (Wuffs.Std.Webp.Error_Bad_Huffman_Code_Over_Subscribed, Webp,
+         "webp: bad Huffman code (over-subscribed)");
+      Expect (Wuffs.Std.Webp.Error_Truncated_Input, Webp, "webp: truncated input");
+      Expect
+        (Wuffs.Std.Webp.Error_Unsupported_Number_Of_Huffman_Groups, Webp,
+         "webp: unsupported number of Huffman groups");
       --  A buffer that is too short gets the start of the message.
       Wuffs.Std.Png.Get_Message (Wuffs.Std.Png.Error_Bad_Checksum, Short, Length);
       Check (Length = 5 and then Short = "png: ", "message in a short buffer");
@@ -1129,6 +1174,8 @@ begin
               when Gif => IMS.Gif_Decoder'Address,
               when Png => IMS.Png_Decoder'Address,
               when Jpeg => IMS.Jpeg_Decoder'Address,
+              when Vp8 => IMS.Vp8_Decoder'Address,
+              when Webp => IMS.Webp_Decoder'Address,
               when Wbmp => IMS.Wbmp_Decoder'Address,
               when Nie => IMS.Nie_Decoder'Address,
               when Targa => IMS.Targa_Decoder'Address,
@@ -1140,6 +1187,8 @@ begin
               when Gif => IMS.Gif_Decoder'Size,
               when Png => IMS.Png_Decoder'Size,
               when Jpeg => IMS.Jpeg_Decoder'Size,
+              when Vp8 => IMS.Vp8_Decoder'Size,
+              when Webp => IMS.Webp_Decoder'Size,
               when Wbmp => IMS.Wbmp_Decoder'Size,
               when Nie => IMS.Nie_Decoder'Size,
               when Targa => IMS.Targa_Decoder'Size,
@@ -1166,6 +1215,8 @@ begin
    Check_Overlaps (IMS.Nie_Decoder, Nie, IMS.Nie_Decoder'Size);
    Check_Overlaps (IMS.Targa_Decoder, Targa, IMS.Targa_Decoder'Size);
    Check_Overlaps (IMS.Qoi_Decoder, Qoi, IMS.Qoi_Decoder'Size);
+   Check_Overlaps (IMS.Vp8_Decoder, Vp8, IMS.Vp8_Decoder'Size);
+   Check_Overlaps (IMS.Webp_Decoder, Webp, IMS.Webp_Decoder'Size);
    Check_Descriptors (IMS.Netpbm_Decoder, Netpbm);
    Check_Descriptors (IMS.Bmp_Decoder, Bmp);
    Check_Descriptors (IMS.Gif_Decoder, Gif);
@@ -1175,6 +1226,8 @@ begin
    Check_Descriptors (IMS.Nie_Decoder, Nie);
    Check_Descriptors (IMS.Targa_Decoder, Targa);
    Check_Descriptors (IMS.Qoi_Decoder, Qoi);
+   Check_Descriptors (IMS.Vp8_Decoder, Vp8);
+   Check_Descriptors (IMS.Webp_Decoder, Webp);
    Check_Metas (IMS.Netpbm_Decoder, Netpbm);
    Check_Metas (IMS.Bmp_Decoder, Bmp);
    Check_Metas (IMS.Gif_Decoder, Gif);
@@ -1184,6 +1237,8 @@ begin
    Check_Metas (IMS.Nie_Decoder, Nie);
    Check_Metas (IMS.Targa_Decoder, Targa);
    Check_Metas (IMS.Qoi_Decoder, Qoi);
+   Check_Metas (IMS.Vp8_Decoder, Vp8);
+   Check_Metas (IMS.Webp_Decoder, Webp);
    Check_Messages;
    Check_Tiny_Image;
 
@@ -1199,5 +1254,7 @@ begin
    Put_Size ("Wuffs.Std.Etc2.Decoder", IMS.Etc2_Decoder'Size);
    Put_Size ("Wuffs.Std.Thumbhash.Decoder", IMS.Thumbhash_Decoder'Size);
    Put_Size ("Wuffs.Std.Handsum.Decoder", IMS.Handsum_Decoder'Size);
+   Put_Size ("Wuffs.Std.Vp8.Decoder", IMS.Vp8_Decoder'Size);
+   Put_Size ("Wuffs.Std.Webp.Decoder", IMS.Webp_Decoder'Size);
    Test_Support.Finish ("test_hostile");
 end Test_Hostile;

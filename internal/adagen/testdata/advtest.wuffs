@@ -16,7 +16,12 @@
 // against. The w functions cover writable slices of a field passed next to
 // the receiver and element writes through a slice argument; the x functions
 // (x1 .. x11) are from a second review. The z functions (milestone jpeg)
-// cover the bulk methods (z1) and pointers to rows of a field (z2).
+// cover the bulk methods (z1) and pointers to rows of a field (z2). The n
+// functions (milestone vp8/webp) are not coroutines: they cover nullable
+// pixel buffers ("nptr base.pixel_buffer": n1 passes a pixel buffer or
+// nullptr to one, n2 takes one at a public entry), make_pixel_blend and
+// demake_pixel_blend (n3) and the accessors of range_ii_u64 (n4). Their
+// drivers are separate sections of test_adv.adb and adv.c.
 //
 // Every public coroutine has the same signature, so that the drivers can
 // treat them alike.
@@ -35,6 +40,7 @@ pub struct thing? (
         u32s : array[3] base.u32,
         u64s : array[2] base.u64,
         buf2 : array[24] base.u8,
+        nres : base.u64,
 )
 
 pub func thing.get_sum() base.u32 {
@@ -43,6 +49,10 @@ pub func thing.get_sum() base.u32 {
 
 pub func thing.get_st() base.u32 {
     return this.st
+}
+
+pub func thing.get_nres() base.u64 {
+    return this.nres
 }
 
 pub func thing.t1?(dst: base.io_writer, src: base.io_reader, workbuf: slice base.u8) {
@@ -1079,4 +1089,82 @@ pub func thing.z2?(dst: base.io_writer, src: base.io_reader, workbuf: slice base
     p = this.rows[j][..] as ptr array[4] base.u16
     this.st ~mod+= p[(c >> 2) & 3] as base.u32
     args.dst.write_u8?(a: (this.sum & 0xFF) as base.u8)
+}
+
+// (n1 and n2 return nothing and leave their result in nres: upstream's
+// wuffs-c generates C that does not compile for a public function that
+// takes a ptr and returns anything, a status or a number.)
+pub func thing.n1!(dst: ptr base.pixel_buffer, sel: base.u32) {
+    var r : base.u64
+    var s : base.u64
+
+    if (args.sel & 1) == 0 {
+        r = this.nq!(dst: args.dst, k: args.sel)
+    } else {
+        r = this.nq!(dst: nullptr, k: args.sel)
+    }
+    s = this.nr!(dst: args.dst, k: args.sel >> 1)
+    this.nres = r ~mod+ s
+}
+
+pub func thing.n2!(dst: nptr base.pixel_buffer, sel: base.u32) {
+    var r : base.u64
+
+    r = this.nq!(dst: args.dst, k: args.sel)
+    this.nres = r ~mod+ 7
+}
+
+// nr passes its nullable pixel buffer on.
+pri func thing.nr!(dst: nptr base.pixel_buffer, k: base.u32) base.u64 {
+    var r : base.u64
+
+    r = this.nq!(dst: args.dst, k: args.k ~mod+ 1)
+    return r ~mod* 3
+}
+
+pri func thing.nq!(dst: nptr base.pixel_buffer, k: base.u32) base.u64 {
+    var pf  : base.pixel_format
+    var pal : slice base.u8
+    var tab : table base.u8
+    var row : slice base.u8
+    var r   : base.u64
+
+    if args.dst == nullptr {
+        return 0xDEAD
+    }
+    pf = args.dst.pixel_format()
+    r = pf.bits_per_pixel() as base.u64
+    pal = args.dst.palette_or_else(fallback: this.buf[..])
+    r = (r ~mod<< 16) | pal.length()
+    if pal.length() > 2 {
+        pal[2] = (args.k & 0xFF) as base.u8
+    }
+    tab = args.dst.plane(p: 0)
+    r ~mod+= tab.width() ~mod* 3
+    r ~mod+= tab.height() ~mod* 5
+    r ~mod+= tab.stride()
+    row = tab.row_u32(y: args.k & 3)
+    if row.length() > 0 {
+        row[0] = (args.k & 0xFF) as base.u8
+        r ~mod+= row.length() ~mod<< 20
+    }
+    return r
+}
+
+pub func thing.n3(b: base.pixel_blend, x: base.u8) base.u32 {
+    var c : base.pixel_blend
+
+    c = this.util.make_pixel_blend(repr: args.x)
+    return ((this.util.demake_pixel_blend(a: args.b) as base.u32) << 8) |
+            (this.util.demake_pixel_blend(a: c) as base.u32)
+}
+
+pub func thing.n4(lo: base.u64, hi: base.u64) base.u64 {
+    var r : base.range_ii_u64
+
+    r = this.util.make_range_ii_u64(min_incl: args.lo, max_incl: args.hi)
+    if r.is_empty() {
+        return 1
+    }
+    return r.get_min_incl() ~mod+ (r.get_max_incl() ~mod* 3)
 }

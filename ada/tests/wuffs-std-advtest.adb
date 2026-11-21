@@ -5,6 +5,7 @@
 
 with Interfaces;
 with Wuffs.Base.Endian;
+with Wuffs.Base.Ranges;
 with Wuffs.Base.Slices;
 with Wuffs.Runtime;
 
@@ -66,134 +67,135 @@ package body Wuffs.Std.Advtest is
       for G_I0 in Self.F_Buf2'Range loop
          Self.F_Buf2 (G_I0) := 0;
       end loop;
-      Self.G_Scratch_3_T1 := 0;
-      Self.G_P_3_T1 := 0;
-      Self.G_S_3_T1_C := 0;
-      Self.G_S_3_T1_N := 0;
-      Self.G_S_3_T1_I := 0;
-      Self.G_S_3_T1_Acc := 0;
-      Self.G_Scratch_4_T2 := 0;
-      Self.G_P_4_T2 := 0;
-      Self.G_S_4_T2_C := 0;
-      Self.G_S_4_T2_J := 0;
-      Self.G_S_4_T2_K := 0;
-      Self.G_Scratch_5_Inner := 0;
-      Self.G_P_5_Inner := 0;
-      Self.G_S_5_Inner_A := 0;
-      Self.G_S_5_Inner_B := 0;
-      Self.G_S_5_Inner_I := 0;
-      Self.G_Scratch_6_T3 := 0;
-      Self.G_P_6_T3 := 0;
-      Self.G_S_6_T3_C := 0;
-      Self.G_S_6_T3_N := 0;
-      Self.G_S_6_T3_R := 0;
-      Self.G_P_7_Eat := 0;
-      Self.G_Scratch_8_T4 := 0;
-      Self.G_P_8_T4 := 0;
-      Self.G_Scratch_9_T5 := 0;
-      Self.G_P_9_T5 := 0;
-      for G_I0 in Self.G_S_9_T5_Arr'Range loop
-         Self.G_S_9_T5_Arr (G_I0) := 0;
+      Self.F_Nres := 0;
+      Self.G_Scratch_4_T1 := 0;
+      Self.G_P_4_T1 := 0;
+      Self.G_S_4_T1_C := 0;
+      Self.G_S_4_T1_N := 0;
+      Self.G_S_4_T1_I := 0;
+      Self.G_S_4_T1_Acc := 0;
+      Self.G_Scratch_5_T2 := 0;
+      Self.G_P_5_T2 := 0;
+      Self.G_S_5_T2_C := 0;
+      Self.G_S_5_T2_J := 0;
+      Self.G_S_5_T2_K := 0;
+      Self.G_Scratch_6_Inner := 0;
+      Self.G_P_6_Inner := 0;
+      Self.G_S_6_Inner_A := 0;
+      Self.G_S_6_Inner_B := 0;
+      Self.G_S_6_Inner_I := 0;
+      Self.G_Scratch_7_T3 := 0;
+      Self.G_P_7_T3 := 0;
+      Self.G_S_7_T3_C := 0;
+      Self.G_S_7_T3_N := 0;
+      Self.G_S_7_T3_R := 0;
+      Self.G_P_8_Eat := 0;
+      Self.G_Scratch_9_T4 := 0;
+      Self.G_P_9_T4 := 0;
+      Self.G_Scratch_10_T5 := 0;
+      Self.G_P_10_T5 := 0;
+      for G_I0 in Self.G_S_10_T5_Arr'Range loop
+         Self.G_S_10_T5_Arr (G_I0) := 0;
       end loop;
-      Self.G_S_9_T5_I := 0;
-      Self.G_P_10_T6 := 0;
-      Self.G_Scratch_10_T6 := 0;
-      Self.G_S_10_T6_I := 0;
-      Self.G_Scratch_11_T7 := 0;
-      Self.G_P_11_T7 := 0;
-      Self.G_S_11_T7_N := 0;
-      Self.G_S_11_T7_I := 0;
-      Self.G_Scratch_13_T8 := 0;
-      Self.G_P_13_T8 := 0;
-      Self.G_S_13_T8_C := 0;
-      Self.G_Scratch_14_T9 := 0;
-      Self.G_P_14_T9 := 0;
-      Self.G_Scratch_15_U1 := 0;
-      Self.G_P_15_U1 := 0;
-      Self.G_S_15_U1_C := 0;
-      Self.G_S_15_U1_I := 0;
-      Self.G_S_15_U1_N := 0;
-      Self.G_Scratch_17_U2 := 0;
-      Self.G_P_17_U2 := 0;
-      Self.G_P_18_Eat2 := 0;
-      Self.G_Scratch_19_U3 := 0;
-      Self.G_P_19_U3 := 0;
-      Self.G_S_19_U3_C := 0;
-      Self.G_Scratch_21_U4 := 0;
-      Self.G_P_21_U4 := 0;
-      Self.G_S_21_U4_R := 0;
-      Self.G_Scratch_22_U5 := 0;
-      Self.G_P_22_U5 := 0;
-      Self.G_Scratch_23_V1 := 0;
-      Self.G_P_23_V1 := 0;
-      Self.G_S_23_V1_M := 0;
-      Self.G_S_23_V1_X := 0;
-      Self.G_S_23_V1_Y := 0;
-      Self.G_P_26_Eat3 := 0;
-      Self.G_Scratch_27_W1 := 0;
-      Self.G_P_27_W1 := 0;
-      Self.G_S_27_W1_C := 0;
-      Self.G_S_27_W1_I := 0;
-      Self.G_Scratch_28_X1 := 0;
-      Self.G_P_28_X1 := 0;
-      Self.G_S_28_X1_C := 0;
-      Self.G_S_28_X1_I := 0;
-      Self.G_S_28_X1_J := 0;
-      Self.G_S_28_X1_K := 0;
-      Self.G_Scratch_29_Cal := 0;
-      Self.G_P_29_Cal := 0;
-      Self.G_S_29_Cal_A := 0;
-      Self.G_S_29_Cal_I := 0;
-      Self.G_Scratch_30_X2 := 0;
-      Self.G_P_30_X2 := 0;
-      Self.G_S_30_X2_N := 0;
-      Self.G_Scratch_31_X3 := 0;
-      Self.G_P_31_X3 := 0;
-      Self.G_S_31_X3_C := 0;
-      Self.G_S_31_X3_X := 0;
-      Self.G_S_31_X3_I := 0;
-      Self.G_Scratch_32_Wr := 0;
-      Self.G_P_32_Wr := 0;
-      Self.G_S_32_Wr_I := 0;
-      Self.G_P_33_X4 := 0;
-      Self.G_S_33_X4_M := 0;
-      Self.G_S_33_X4_M2 := 0;
-      Self.G_S_33_X4_C := 0;
-      Self.G_Scratch_34_X5 := 0;
-      Self.G_P_34_X5 := 0;
-      Self.G_S_34_X5_N := 0;
-      Self.G_S_34_X5_M := 0;
-      Self.G_S_34_X5_I := 0;
-      Self.G_P_35_Fail := 0;
-      Self.G_Scratch_36_X6 := 0;
-      Self.G_P_36_X6 := 0;
-      Self.G_S_36_X6_R := 0;
-      Self.G_Scratch_37_X7 := 0;
-      Self.G_P_37_X7 := 0;
-      Self.G_Scratch_39_X8 := 0;
-      Self.G_P_39_X8 := 0;
-      Self.G_S_39_X8_I := 0;
-      Self.G_Scratch_40_X9 := 0;
-      Self.G_P_40_X9 := 0;
-      Self.G_S_40_X9_C := 0;
-      Self.G_S_40_X9_I := 0;
-      Self.G_Scratch_41_X10 := 0;
-      Self.G_P_41_X10 := 0;
-      Self.G_S_41_X10_Flag := False;
-      Self.G_S_41_X10_Status := Wuffs.Ok_Status;
-      Self.G_S_41_X10_H := 0;
-      Self.G_P_42_Noter := 0;
-      Self.G_Scratch_43_X11 := 0;
-      Self.G_P_43_X11 := 0;
-      Self.G_Scratch_44_Y1 := 0;
-      Self.G_P_44_Y1 := 0;
-      Self.G_S_44_Y1_I := 0;
-      Self.G_S_44_Y1_K := 0;
-      Self.G_Scratch_45_Z1 := 0;
-      Self.G_P_45_Z1 := 0;
-      Self.G_S_45_Z1_I := 0;
-      Self.G_Scratch_46_Z2 := 0;
-      Self.G_P_46_Z2 := 0;
+      Self.G_S_10_T5_I := 0;
+      Self.G_P_11_T6 := 0;
+      Self.G_Scratch_11_T6 := 0;
+      Self.G_S_11_T6_I := 0;
+      Self.G_Scratch_12_T7 := 0;
+      Self.G_P_12_T7 := 0;
+      Self.G_S_12_T7_N := 0;
+      Self.G_S_12_T7_I := 0;
+      Self.G_Scratch_14_T8 := 0;
+      Self.G_P_14_T8 := 0;
+      Self.G_S_14_T8_C := 0;
+      Self.G_Scratch_15_T9 := 0;
+      Self.G_P_15_T9 := 0;
+      Self.G_Scratch_16_U1 := 0;
+      Self.G_P_16_U1 := 0;
+      Self.G_S_16_U1_C := 0;
+      Self.G_S_16_U1_I := 0;
+      Self.G_S_16_U1_N := 0;
+      Self.G_Scratch_18_U2 := 0;
+      Self.G_P_18_U2 := 0;
+      Self.G_P_19_Eat2 := 0;
+      Self.G_Scratch_20_U3 := 0;
+      Self.G_P_20_U3 := 0;
+      Self.G_S_20_U3_C := 0;
+      Self.G_Scratch_22_U4 := 0;
+      Self.G_P_22_U4 := 0;
+      Self.G_S_22_U4_R := 0;
+      Self.G_Scratch_23_U5 := 0;
+      Self.G_P_23_U5 := 0;
+      Self.G_Scratch_24_V1 := 0;
+      Self.G_P_24_V1 := 0;
+      Self.G_S_24_V1_M := 0;
+      Self.G_S_24_V1_X := 0;
+      Self.G_S_24_V1_Y := 0;
+      Self.G_P_27_Eat3 := 0;
+      Self.G_Scratch_28_W1 := 0;
+      Self.G_P_28_W1 := 0;
+      Self.G_S_28_W1_C := 0;
+      Self.G_S_28_W1_I := 0;
+      Self.G_Scratch_29_X1 := 0;
+      Self.G_P_29_X1 := 0;
+      Self.G_S_29_X1_C := 0;
+      Self.G_S_29_X1_I := 0;
+      Self.G_S_29_X1_J := 0;
+      Self.G_S_29_X1_K := 0;
+      Self.G_Scratch_30_Cal := 0;
+      Self.G_P_30_Cal := 0;
+      Self.G_S_30_Cal_A := 0;
+      Self.G_S_30_Cal_I := 0;
+      Self.G_Scratch_31_X2 := 0;
+      Self.G_P_31_X2 := 0;
+      Self.G_S_31_X2_N := 0;
+      Self.G_Scratch_32_X3 := 0;
+      Self.G_P_32_X3 := 0;
+      Self.G_S_32_X3_C := 0;
+      Self.G_S_32_X3_X := 0;
+      Self.G_S_32_X3_I := 0;
+      Self.G_Scratch_33_Wr := 0;
+      Self.G_P_33_Wr := 0;
+      Self.G_S_33_Wr_I := 0;
+      Self.G_P_34_X4 := 0;
+      Self.G_S_34_X4_M := 0;
+      Self.G_S_34_X4_M2 := 0;
+      Self.G_S_34_X4_C := 0;
+      Self.G_Scratch_35_X5 := 0;
+      Self.G_P_35_X5 := 0;
+      Self.G_S_35_X5_N := 0;
+      Self.G_S_35_X5_M := 0;
+      Self.G_S_35_X5_I := 0;
+      Self.G_P_36_Fail := 0;
+      Self.G_Scratch_37_X6 := 0;
+      Self.G_P_37_X6 := 0;
+      Self.G_S_37_X6_R := 0;
+      Self.G_Scratch_38_X7 := 0;
+      Self.G_P_38_X7 := 0;
+      Self.G_Scratch_40_X8 := 0;
+      Self.G_P_40_X8 := 0;
+      Self.G_S_40_X8_I := 0;
+      Self.G_Scratch_41_X9 := 0;
+      Self.G_P_41_X9 := 0;
+      Self.G_S_41_X9_C := 0;
+      Self.G_S_41_X9_I := 0;
+      Self.G_Scratch_42_X10 := 0;
+      Self.G_P_42_X10 := 0;
+      Self.G_S_42_X10_Flag := False;
+      Self.G_S_42_X10_Status := Wuffs.Ok_Status;
+      Self.G_S_42_X10_H := 0;
+      Self.G_P_43_Noter := 0;
+      Self.G_Scratch_44_X11 := 0;
+      Self.G_P_44_X11 := 0;
+      Self.G_Scratch_45_Y1 := 0;
+      Self.G_P_45_Y1 := 0;
+      Self.G_S_45_Y1_I := 0;
+      Self.G_S_45_Y1_K := 0;
+      Self.G_Scratch_46_Z1 := 0;
+      Self.G_P_46_Z1 := 0;
+      Self.G_S_46_Z1_I := 0;
+      Self.G_Scratch_47_Z2 := 0;
+      Self.G_P_47_Z2 := 0;
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
@@ -216,6 +218,16 @@ package body Wuffs.Std.Advtest is
       end if;
       return Self.F_St;
    end Get_St;
+
+   function Get_Nres (Self : Thing) return Wuffs.U64 is
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized
+           and then Self.Magic /= Wuffs.Runtime.Magic_Disabled
+      then
+         return 0;
+      end if;
+      return Self.F_Nres;
+   end Get_Nres;
 
    function T1
      (Self : in out Thing;
@@ -289,12 +301,12 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_3_T1;
+      G_Susp := Self.G_P_4_T1;
       if G_Susp /= 0 then
-         V_C := Self.G_S_3_T1_C;
-         V_N := Self.G_S_3_T1_N;
-         V_I := Self.G_S_3_T1_I;
-         V_Acc := Self.G_S_3_T1_Acc;
+         V_C := Self.G_S_4_T1_C;
+         V_N := Self.G_S_4_T1_N;
+         V_I := Self.G_S_4_T1_I;
+         V_Acc := Self.G_S_4_T1_Acc;
       end if;
       case G_Susp is
          when 0 =>
@@ -350,7 +362,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 2);
       goto G_Fi_3;
       <<G_Else_4>>
-      Self.G_Scratch_3_T1 := 0;
+      Self.G_Scratch_4_T1 := 0;
       G_Susp := 2;
       <<G_Resume_2>>
       loop
@@ -360,7 +372,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_3_T1,
+                                     Scratch => Self.G_Scratch_4_T1,
                                      Last_Shift => 8,
                                      Done => G_T3,
                                      Value => G_T4);
@@ -370,7 +382,7 @@ package body Wuffs.Std.Advtest is
       <<G_Fi_3>>
       V_X := Wuffs.U32 (G_T2);
       V_Acc := V_Acc + V_X * (V_I + 1);
-      Self.G_Scratch_3_T1 := Wuffs.U64 (Wuffs.U8 (V_Acc and 16#FF#));
+      Self.G_Scratch_4_T1 := Wuffs.U64 (Wuffs.U8 (V_Acc and 16#FF#));
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -379,7 +391,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_3_T1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_4_T1 and 16#FF#));
       V_Acc := V_Acc + V_N;
       V_I := V_I + 1;
       goto G_Head_1;
@@ -391,7 +403,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
       goto G_Fi_5;
       <<G_Else_6>>
-      Self.G_Scratch_3_T1 := 0;
+      Self.G_Scratch_4_T1 := 0;
       G_Susp := 4;
       <<G_Resume_4>>
       loop
@@ -401,7 +413,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_3_T1,
+                                     Scratch => Self.G_Scratch_4_T1,
                                      Last_Shift => 24,
                                      Done => G_T6,
                                      Value => G_T7);
@@ -418,7 +430,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 8);
       goto G_Fi_7;
       <<G_Else_8>>
-      Self.G_Scratch_3_T1 := 0;
+      Self.G_Scratch_4_T1 := 0;
       G_Susp := 5;
       <<G_Resume_5>>
       loop
@@ -428,7 +440,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_3_T1,
+                                     Scratch => Self.G_Scratch_4_T1,
                                      Last_Shift => 56,
                                      Done => G_T9,
                                      Value => G_T10);
@@ -446,7 +458,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
       goto G_Fi_9;
       <<G_Else_10>>
-      Self.G_Scratch_3_T1 := 0;
+      Self.G_Scratch_4_T1 := 0;
       G_Susp := 6;
       <<G_Resume_6>>
       loop
@@ -456,7 +468,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_3_T1,
+                                     Scratch => Self.G_Scratch_4_T1,
                                      Last_Shift => 16,
                                      Done => G_T12,
                                      Value => G_T13);
@@ -473,7 +485,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 5);
       goto G_Fi_11;
       <<G_Else_12>>
-      Self.G_Scratch_3_T1 := 0;
+      Self.G_Scratch_4_T1 := 0;
       G_Susp := 7;
       <<G_Resume_7>>
       loop
@@ -483,7 +495,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_3_T1,
+                                     Scratch => Self.G_Scratch_4_T1,
                                      Last_Shift => 32,
                                      Done => G_T15,
                                      Value => G_T16);
@@ -500,7 +512,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 2);
       goto G_Fi_13;
       <<G_Else_14>>
-      Self.G_Scratch_3_T1 := 0;
+      Self.G_Scratch_4_T1 := 0;
       G_Susp := 8;
       <<G_Resume_8>>
       loop
@@ -510,7 +522,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_3_T1,
+                                     Scratch => Self.G_Scratch_4_T1,
                                      Last_Shift => 8,
                                      Done => G_T18,
                                      Value => G_T19);
@@ -519,18 +531,18 @@ package body Wuffs.Std.Advtest is
       G_T17 := Wuffs.U16 (G_T19);
       <<G_Fi_13>>
       V_X := Wuffs.U32 (G_T17);
-      Self.G_Scratch_3_T1 := Wuffs.U64 (V_X and 15);
+      Self.G_Scratch_4_T1 := Wuffs.U64 (V_X and 15);
       G_Susp := 9;
       <<G_Resume_9>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_3_T1, Done => G_T20);
+      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_4_T1, Done => G_T20);
       if not G_T20 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
       end if;
-      Self.G_Scratch_3_T1 := Wuffs.U64 (V_C and 3);
+      Self.G_Scratch_4_T1 := Wuffs.U64 (V_C and 3);
       G_Susp := 10;
       <<G_Resume_10>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_3_T1, Done => G_T21);
+      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_4_T1, Done => G_T21);
       if not G_T21 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -547,7 +559,7 @@ package body Wuffs.Std.Advtest is
       goto G_Suspend;
       <<G_Resume_12>>
       Self.F_Sum := Self.F_Sum + V_Acc + V_I + V_N;
-      Self.G_Scratch_3_T1 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
+      Self.G_Scratch_4_T1 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
       G_Susp := 13;
       <<G_Resume_13>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -556,8 +568,8 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_3_T1 and 16#FF#));
-      Self.G_Scratch_3_T1 := Wuffs.U64 (V_C);
+                                   V => Wuffs.U8 (Self.G_Scratch_4_T1 and 16#FF#));
+      Self.G_Scratch_4_T1 := Wuffs.U64 (V_C);
       G_Susp := 14;
       <<G_Resume_14>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -566,16 +578,16 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_3_T1 and 16#FF#));
-      Self.G_P_3_T1 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_4_T1 and 16#FF#));
+      Self.G_P_4_T1 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_3_T1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_4_T1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 1 else 0);
-      Self.G_S_3_T1_C := V_C;
-      Self.G_S_3_T1_N := V_N;
-      Self.G_S_3_T1_I := V_I;
-      Self.G_S_3_T1_Acc := V_Acc;
+      Self.G_S_4_T1_C := V_C;
+      Self.G_S_4_T1_N := V_N;
+      Self.G_S_4_T1_I := V_I;
+      Self.G_S_4_T1_Acc := V_Acc;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -637,11 +649,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_4_T2;
+      G_Susp := Self.G_P_5_T2;
       if G_Susp /= 0 then
-         V_C := Self.G_S_4_T2_C;
-         V_J := Self.G_S_4_T2_J;
-         V_K := Self.G_S_4_T2_K;
+         V_C := Self.G_S_5_T2_C;
+         V_J := Self.G_S_5_T2_J;
+         V_K := Self.G_S_5_T2_K;
       end if;
       case G_Susp is
          when 0 =>
@@ -721,7 +733,7 @@ package body Wuffs.Std.Advtest is
       if V_D /= 3 then
          goto G_Else_8;
       end if;
-      Self.G_Scratch_4_T2 := 16#33#;
+      Self.G_Scratch_5_T2 := 16#33#;
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -730,7 +742,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_4_T2 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_5_T2 and 16#FF#));
       goto G_Done_2;
       <<G_Else_8>>
       if V_D /= 4 then
@@ -758,7 +770,7 @@ package body Wuffs.Std.Advtest is
       elsif (V_D and 4) = 0 then
          goto G_Continue_1_Outer;
       end if;
-      Self.G_Scratch_4_T2 := Wuffs.U64 (V_D);
+      Self.G_Scratch_5_T2 := Wuffs.U64 (V_D);
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -767,14 +779,14 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_4_T2 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_5_T2 and 16#FF#));
       goto G_Head_11;
       <<G_Done_12>>
       goto G_Fi_5;
       <<G_Else_10>>
       null;
       <<G_Fi_5>>
-      Self.G_Scratch_4_T2 := Wuffs.U64 (V_D + V_C);
+      Self.G_Scratch_5_T2 := Wuffs.U64 (V_D + V_C);
       G_Susp := 6;
       <<G_Resume_6>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -783,12 +795,12 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_4_T2 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_5_T2 and 16#FF#));
       V_K := V_K + 7;
       <<G_Continue_3_Mid>>
       goto G_Head_3;
       <<G_Done_4>>
-      Self.G_Scratch_4_T2 := Wuffs.U64 (V_C);
+      Self.G_Scratch_5_T2 := Wuffs.U64 (V_C);
       G_Susp := 7;
       <<G_Resume_7>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -797,13 +809,13 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_4_T2 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_5_T2 and 16#FF#));
       V_K := V_K + V_J;
       <<G_Continue_1_Outer>>
       goto G_Head_1;
       <<G_Done_2>>
       Self.F_Sum := V_K;
-      Self.G_Scratch_4_T2 := Wuffs.U64 (Wuffs.U8 (V_K and 16#FF#));
+      Self.G_Scratch_5_T2 := Wuffs.U64 (Wuffs.U8 (V_K and 16#FF#));
       G_Susp := 8;
       <<G_Resume_8>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -812,15 +824,15 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_4_T2 and 16#FF#));
-      Self.G_P_4_T2 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_5_T2 and 16#FF#));
+      Self.G_P_5_T2 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_4_T2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_5_T2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 2 else 0);
-      Self.G_S_4_T2_C := V_C;
-      Self.G_S_4_T2_J := V_J;
-      Self.G_S_4_T2_K := V_K;
+      Self.G_S_5_T2_C := V_C;
+      Self.G_S_5_T2_J := V_J;
+      Self.G_S_5_T2_K := V_K;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -853,11 +865,11 @@ package body Wuffs.Std.Advtest is
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_5_Inner;
+      G_Susp := Self.G_P_6_Inner;
       if G_Susp /= 0 then
-         V_A := Self.G_S_5_Inner_A;
-         V_B := Self.G_S_5_Inner_B;
-         V_I := Self.G_S_5_Inner_I;
+         V_A := Self.G_S_6_Inner_A;
+         V_B := Self.G_S_6_Inner_B;
+         V_I := Self.G_S_6_Inner_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -890,7 +902,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 2);
       goto G_Fi_3;
       <<G_Else_4>>
-      Self.G_Scratch_5_Inner := 0;
+      Self.G_Scratch_6_Inner := 0;
       G_Susp := 2;
       <<G_Resume_2>>
       loop
@@ -900,7 +912,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_5_Inner,
+                                     Scratch => Self.G_Scratch_6_Inner,
                                      Last_Shift => 8,
                                      Done => G_T3,
                                      Value => G_T4);
@@ -913,7 +925,7 @@ package body Wuffs.Std.Advtest is
          G_Status := Error_Inner_Failed;
          goto G_Exit;
       end if;
-      Self.G_Scratch_5_Inner := Wuffs.U64 (Wuffs.U8 (V_B and 16#FF#) + V_A);
+      Self.G_Scratch_6_Inner := Wuffs.U64 (Wuffs.U8 (V_B and 16#FF#) + V_A);
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -922,18 +934,18 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_5_Inner and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_6_Inner and 16#FF#));
       V_I := V_I + 1;
       goto G_Head_1;
       <<G_Done_2>>
       Self.F_Sum := Self.F_Sum + V_B + Wuffs.U32 (V_A);
-      Self.G_P_5_Inner := 0;
+      Self.G_P_6_Inner := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_5_Inner := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
-      Self.G_S_5_Inner_A := V_A;
-      Self.G_S_5_Inner_B := V_B;
-      Self.G_S_5_Inner_I := V_I;
+      Self.G_P_6_Inner := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_S_6_Inner_A := V_A;
+      Self.G_S_6_Inner_B := V_B;
+      Self.G_S_6_Inner_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -990,11 +1002,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_6_T3;
+      G_Susp := Self.G_P_7_T3;
       if G_Susp /= 0 then
-         V_C := Self.G_S_6_T3_C;
-         V_N := Self.G_S_6_T3_N;
-         V_R := Self.G_S_6_T3_R;
+         V_C := Self.G_S_7_T3_C;
+         V_N := Self.G_S_7_T3_N;
+         V_R := Self.G_S_7_T3_R;
       end if;
       case G_Susp is
          when 0 =>
@@ -1025,7 +1037,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
       V_N := Wuffs.U32 (V_C and 3);
-      Self.G_Scratch_6_T3 := Wuffs.U64 (V_C);
+      Self.G_Scratch_7_T3 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1034,7 +1046,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_6_T3 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_7_T3 and 16#FF#));
       G_Susp := 3;
       <<G_Resume_3>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -1059,7 +1071,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T2);
       V_C := G_T2;
-      Self.G_Scratch_6_T3 := Wuffs.U64 (V_C + Wuffs.U8 (V_N and 16#FF#));
+      Self.G_Scratch_7_T3 := Wuffs.U64 (V_C + Wuffs.U8 (V_N and 16#FF#));
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1068,7 +1080,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_6_T3 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_7_T3 and 16#FF#));
       Self.F_Sum := Self.F_Sum + V_N;
       V_R := V_R + 1;
       goto G_Head_1;
@@ -1077,14 +1089,14 @@ package body Wuffs.Std.Advtest is
          G_Status := Error_Bad_Thing;
          goto G_Exit;
       end if;
-      Self.G_P_6_T3 := 0;
+      Self.G_P_7_T3 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_6_T3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_7_T3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 3 else 0);
-      Self.G_S_6_T3_C := V_C;
-      Self.G_S_6_T3_N := V_N;
-      Self.G_S_6_T3_R := V_R;
+      Self.G_S_7_T3_C := V_C;
+      Self.G_S_7_T3_N := V_N;
+      Self.G_S_7_T3_R := V_R;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -1109,7 +1121,7 @@ package body Wuffs.Std.Advtest is
       G_T2 : Wuffs.U8;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_7_Eat;
+      G_Susp := Self.G_P_8_Eat;
       case G_Susp is
          when 0 =>
             null;
@@ -1141,10 +1153,10 @@ package body Wuffs.Std.Advtest is
       if Wuffs.U64 (A_S'Length) > 0 then
          Self.F_Sum := Self.F_Sum + Wuffs.U32 (A_S (A_S'First + 0));
       end if;
-      Self.G_P_7_Eat := 0;
+      Self.G_P_8_Eat := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_7_Eat := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_8_Eat := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
@@ -1198,7 +1210,7 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_8_T4;
+      G_Susp := Self.G_P_9_T4;
       case G_Susp is
          when 0 =>
             null;
@@ -1238,7 +1250,7 @@ package body Wuffs.Std.Advtest is
       if not Wuffs.Is_Ok (G_Status) then
          goto G_Suspend;
       end if;
-      Self.G_Scratch_8_T4 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
+      Self.G_Scratch_9_T4 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1247,11 +1259,11 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_8_T4 and 16#FF#));
-      Self.G_P_8_T4 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_9_T4 and 16#FF#));
+      Self.G_P_9_T4 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_8_T4 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_9_T4 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 4 else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -1312,10 +1324,10 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_9_T5;
+      G_Susp := Self.G_P_10_T5;
       if G_Susp /= 0 then
-         V_Arr := Self.G_S_9_T5_Arr;
-         V_I := Self.G_S_9_T5_I;
+         V_Arr := Self.G_S_10_T5_Arr;
+         V_I := Self.G_S_10_T5_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -1357,7 +1369,7 @@ package body Wuffs.Std.Advtest is
       V_I := V_I + 1;
       goto G_Head_1;
       <<G_Done_2>>
-      Self.G_Scratch_9_T5 := Wuffs.U64 (V_Arr (0));
+      Self.G_Scratch_10_T5 := Wuffs.U64 (V_Arr (0));
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1366,8 +1378,8 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_9_T5 and 16#FF#));
-      Self.G_Scratch_9_T5 := Wuffs.U64 (V_Arr (1));
+                                   V => Wuffs.U8 (Self.G_Scratch_10_T5 and 16#FF#));
+      Self.G_Scratch_10_T5 := Wuffs.U64 (V_Arr (1));
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1376,8 +1388,8 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_9_T5 and 16#FF#));
-      Self.G_Scratch_9_T5 := Wuffs.U64 (V_Arr (2));
+                                   V => Wuffs.U8 (Self.G_Scratch_10_T5 and 16#FF#));
+      Self.G_Scratch_10_T5 := Wuffs.U64 (V_Arr (2));
       G_Susp := 4;
       <<G_Resume_4>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1386,8 +1398,8 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_9_T5 and 16#FF#));
-      Self.G_Scratch_9_T5 := Wuffs.U64 (V_Arr (3));
+                                   V => Wuffs.U8 (Self.G_Scratch_10_T5 and 16#FF#));
+      Self.G_Scratch_10_T5 := Wuffs.U64 (V_Arr (3));
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1396,14 +1408,14 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_9_T5 and 16#FF#));
-      Self.G_P_9_T5 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_10_T5 and 16#FF#));
+      Self.G_P_10_T5 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_9_T5 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_10_T5 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 5 else 0);
-      Self.G_S_9_T5_Arr := V_Arr;
-      Self.G_S_9_T5_I := V_I;
+      Self.G_S_10_T5_Arr := V_Arr;
+      Self.G_S_10_T5_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -1461,9 +1473,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_10_T6;
+      G_Susp := Self.G_P_11_T6;
       if G_Susp /= 0 then
-         V_I := Self.G_S_10_T6_I;
+         V_I := Self.G_S_11_T6_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -1477,7 +1489,7 @@ package body Wuffs.Std.Advtest is
          when others =>
             goto G_Suspend;
       end case;
-      if Self.G_P_10_T6 /= 0 then
+      if Self.G_P_11_T6 /= 0 then
          Self.F_St := Self.F_St + 1;
       end if;
       <<G_Head_1>>
@@ -1492,7 +1504,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      if Self.G_P_10_T6 /= 0 then
+      if Self.G_P_11_T6 /= 0 then
          Self.F_St := Self.F_St + 16;
       end if;
       if V_C = 16#FF# then
@@ -1503,7 +1515,7 @@ package body Wuffs.Std.Advtest is
       if (V_C and 1) = 1 then
          goto G_Continue_1;
       end if;
-      Self.G_Scratch_10_T6 := Wuffs.U64 (V_C);
+      Self.G_Scratch_11_T6 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1512,12 +1524,12 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_10_T6 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_11_T6 and 16#FF#));
       <<G_Continue_1>>
       goto G_Head_1;
       <<G_Done_2>>
       Self.F_Sum := Self.F_St;
-      Self.G_Scratch_10_T6 := Wuffs.U64 (Wuffs.U8 (Self.F_St and 16#FF#));
+      Self.G_Scratch_11_T6 := Wuffs.U64 (Wuffs.U8 (Self.F_St and 16#FF#));
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1526,13 +1538,13 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_10_T6 and 16#FF#));
-      Self.G_P_10_T6 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_11_T6 and 16#FF#));
+      Self.G_P_11_T6 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_10_T6 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_11_T6 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 6 else 0);
-      Self.G_S_10_T6_I := V_I;
+      Self.G_S_11_T6_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -1591,10 +1603,10 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_11_T7;
+      G_Susp := Self.G_P_12_T7;
       if G_Susp /= 0 then
-         V_N := Self.G_S_11_T7_N;
-         V_I := Self.G_S_11_T7_I;
+         V_N := Self.G_S_12_T7_N;
+         V_I := Self.G_S_12_T7_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -1623,7 +1635,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      Self.G_Scratch_11_T7 := Wuffs.U64 (V_C);
+      Self.G_Scratch_12_T7 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1632,7 +1644,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_11_T7 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_12_T7 and 16#FF#));
       V_I := V_I + 1;
       goto G_Head_1;
       <<G_Done_2>>
@@ -1640,13 +1652,13 @@ package body Wuffs.Std.Advtest is
       pragma Warnings ("C");
       pragma Assert (V_N = 5);
       pragma Warnings ("c");
-      Self.G_P_11_T7 := 0;
+      Self.G_P_12_T7 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_11_T7 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_12_T7 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 7 else 0);
-      Self.G_S_11_T7_N := V_N;
-      Self.G_S_11_T7_I := V_I;
+      Self.G_S_12_T7_N := V_N;
+      Self.G_S_12_T7_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -1732,9 +1744,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_13_T8;
+      G_Susp := Self.G_P_14_T8;
       if G_Susp /= 0 then
-         V_C := Self.G_S_13_T8_C;
+         V_C := Self.G_S_14_T8_C;
       end if;
       case G_Susp is
          when 0 =>
@@ -1776,7 +1788,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T2);
       V_C := G_T2;
-      Self.G_Scratch_13_T8 := Wuffs.U64 (V_C);
+      Self.G_Scratch_14_T8 := Wuffs.U64 (V_C);
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1785,7 +1797,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_13_T8 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_14_T8 and 16#FF#));
       Wuffs.Runtime.Writer_Limited_Copy_U32_From_Reader
         (Data => A_Dst,
          W => G_W_Dst,
@@ -1803,7 +1815,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T4);
       V_C := G_T4;
-      Self.G_Scratch_13_T8 := Wuffs.U64 (V_C);
+      Self.G_Scratch_14_T8 := Wuffs.U64 (V_C);
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1812,7 +1824,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_13_T8 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_14_T8 and 16#FF#));
       Wuffs.Base.IO.Limited_Copy_U32_From_History
         (Data => A_Dst,
          W => G_W_Dst,
@@ -1845,7 +1857,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T8);
       V_C := G_T8;
-      Self.G_Scratch_13_T8 := Wuffs.U64 (V_C);
+      Self.G_Scratch_14_T8 := Wuffs.U64 (V_C);
       G_Susp := 7;
       <<G_Resume_7>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1854,13 +1866,13 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_13_T8 and 16#FF#));
-      Self.G_P_13_T8 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_14_T8 and 16#FF#));
+      Self.G_P_14_T8 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_13_T8 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_14_T8 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 8 else 0);
-      Self.G_S_13_T8_C := V_C;
+      Self.G_S_14_T8_C := V_C;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -1918,7 +1930,7 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_14_T9;
+      G_Susp := Self.G_P_15_T9;
       case G_Susp is
          when 0 =>
             null;
@@ -1941,7 +1953,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      Self.G_Scratch_14_T9 := Wuffs.U64 (V_C);
+      Self.G_Scratch_15_T9 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1950,7 +1962,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_14_T9 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_15_T9 and 16#FF#));
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_R_Src) = 0 then
@@ -1959,7 +1971,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T2);
       V_C := G_T2;
-      Self.G_Scratch_14_T9 := Wuffs.U64 (V_C);
+      Self.G_Scratch_15_T9 := Wuffs.U64 (V_C);
       G_Susp := 4;
       <<G_Resume_4>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -1968,11 +1980,11 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_14_T9 and 16#FF#));
-      Self.G_P_14_T9 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_15_T9 and 16#FF#));
+      Self.G_P_15_T9 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_14_T9 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_15_T9 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 9 else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -2033,11 +2045,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_15_U1;
+      G_Susp := Self.G_P_16_U1;
       if G_Susp /= 0 then
-         V_C := Self.G_S_15_U1_C;
-         V_I := Self.G_S_15_U1_I;
-         V_N := Self.G_S_15_U1_N;
+         V_C := Self.G_S_16_U1_C;
+         V_I := Self.G_S_16_U1_I;
+         V_N := Self.G_S_16_U1_N;
       end if;
       case G_Susp is
          when 0 =>
@@ -2075,7 +2087,7 @@ package body Wuffs.Std.Advtest is
       if not (not V_Flag or else (V_C and 6) = 6) then
          goto G_Else_4;
       end if;
-      Self.G_Scratch_15_U1 := Wuffs.U64 (V_C);
+      Self.G_Scratch_16_U1 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2084,13 +2096,13 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_15_U1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_16_U1 and 16#FF#));
       goto G_Fi_3;
       <<G_Else_4>>
       if not (V_Flag and then V_C > 100 and then V_N = 0) then
          goto G_Else_5;
       end if;
-      Self.G_Scratch_15_U1 := Wuffs.U64 (V_C + 1);
+      Self.G_Scratch_16_U1 := Wuffs.U64 (V_C + 1);
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2099,14 +2111,14 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_15_U1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_16_U1 and 16#FF#));
       V_N := V_N + 3;
       goto G_Fi_3;
       <<G_Else_5>>
       if V_I < 10 then
          goto G_Else_6;
       end if;
-      Self.G_Scratch_15_U1 := 16#99#;
+      Self.G_Scratch_16_U1 := 16#99#;
       G_Susp := 4;
       <<G_Resume_4>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2115,7 +2127,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_15_U1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_16_U1 and 16#FF#));
       goto G_Fi_3;
       <<G_Else_6>>
       null;
@@ -2127,7 +2139,7 @@ package body Wuffs.Std.Advtest is
       if V_I < 10 then
          goto G_Else_8;
       end if;
-      Self.G_Scratch_15_U1 := 16#AA#;
+      Self.G_Scratch_16_U1 := 16#AA#;
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2136,7 +2148,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_15_U1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_16_U1 and 16#FF#));
       goto G_Fi_7;
       <<G_Else_8>>
       null;
@@ -2144,7 +2156,7 @@ package body Wuffs.Std.Advtest is
       if V_I > 0 then
          goto G_Else_10;
       end if;
-      Self.G_Scratch_15_U1 := 16#BB#;
+      Self.G_Scratch_16_U1 := 16#BB#;
       G_Susp := 6;
       <<G_Resume_6>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2153,7 +2165,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_15_U1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_16_U1 and 16#FF#));
       goto G_Fi_9;
       <<G_Else_10>>
       null;
@@ -2163,7 +2175,7 @@ package body Wuffs.Std.Advtest is
       if V_N = 0 then
          goto G_Done_12;
       end if;
-      Self.G_Scratch_15_U1 := Wuffs.U64 (Wuffs.U8 (V_N and 16#FF#));
+      Self.G_Scratch_16_U1 := Wuffs.U64 (Wuffs.U8 (V_N and 16#FF#));
       G_Susp := 7;
       <<G_Resume_7>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2172,19 +2184,19 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_15_U1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_16_U1 and 16#FF#));
       V_N := Interfaces.Shift_Right (V_N, 3);
       goto G_Head_11;
       <<G_Done_12>>
       Self.F_Sum := Self.F_Sum + V_I;
-      Self.G_P_15_U1 := 0;
+      Self.G_P_16_U1 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_15_U1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_16_U1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 10 else 0);
-      Self.G_S_15_U1_C := V_C;
-      Self.G_S_15_U1_I := V_I;
-      Self.G_S_15_U1_N := V_N;
+      Self.G_S_16_U1_C := V_C;
+      Self.G_S_16_U1_I := V_I;
+      Self.G_S_16_U1_N := V_N;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -2259,7 +2271,7 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_17_U2;
+      G_Susp := Self.G_P_18_U2;
       case G_Susp is
          when 0 =>
             null;
@@ -2307,7 +2319,7 @@ package body Wuffs.Std.Advtest is
                                                        .. Wuffs.Runtime.Last (V_S))'First);
          Self.F_Sum := Self.F_Sum + V_X;
       end if;
-      Self.G_Scratch_17_U2 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
+      Self.G_Scratch_18_U2 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2316,11 +2328,11 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_17_U2 and 16#FF#));
-      Self.G_P_17_U2 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_18_U2 and 16#FF#));
+      Self.G_P_18_U2 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_17_U2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_18_U2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 11 else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -2346,7 +2358,7 @@ package body Wuffs.Std.Advtest is
       G_T2 : Wuffs.U8;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_18_Eat2;
+      G_Susp := Self.G_P_19_Eat2;
       case G_Susp is
          when 0 =>
             null;
@@ -2378,10 +2390,10 @@ package body Wuffs.Std.Advtest is
       if Wuffs.U64 (A_S'Length) > 0 then
          Self.F_Sum := Self.F_Sum + Wuffs.U32 (A_S (A_S'First + 0));
       end if;
-      Self.G_P_18_Eat2 := 0;
+      Self.G_P_19_Eat2 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_18_Eat2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_19_Eat2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
@@ -2435,9 +2447,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_19_U3;
+      G_Susp := Self.G_P_20_U3;
       if G_Susp /= 0 then
-         V_C := Self.G_S_19_U3_C;
+         V_C := Self.G_S_20_U3_C;
       end if;
       case G_Susp is
          when 0 =>
@@ -2492,7 +2504,7 @@ package body Wuffs.Std.Advtest is
       if Wuffs.U64 (A_Workbuf'Length) >= 4 then
          V_C := A_Workbuf (A_Workbuf'First + 2);
       end if;
-      Self.G_Scratch_19_U3 := Wuffs.U64 (V_C);
+      Self.G_Scratch_20_U3 := Wuffs.U64 (V_C);
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2501,7 +2513,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_19_U3 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_20_U3 and 16#FF#));
       G_Susp := 4;
       <<G_Resume_4>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -2513,7 +2525,7 @@ package body Wuffs.Std.Advtest is
       if Wuffs.U64 (A_Workbuf'Length) >= 4 then
          V_C := A_Workbuf (A_Workbuf'First + 0);
       end if;
-      Self.G_Scratch_19_U3 := Wuffs.U64 (V_C);
+      Self.G_Scratch_20_U3 := Wuffs.U64 (V_C);
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2522,8 +2534,8 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_19_U3 and 16#FF#));
-      Self.G_Scratch_19_U3 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_20_U3 and 16#FF#));
+      Self.G_Scratch_20_U3 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
       G_Susp := 6;
       <<G_Resume_6>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2532,13 +2544,13 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_19_U3 and 16#FF#));
-      Self.G_P_19_U3 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_20_U3 and 16#FF#));
+      Self.G_P_20_U3 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_19_U3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_20_U3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 12 else 0);
-      Self.G_S_19_U3_C := V_C;
+      Self.G_S_20_U3_C := V_C;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -2617,9 +2629,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_21_U4;
+      G_Susp := Self.G_P_22_U4;
       if G_Susp /= 0 then
-         V_R := Self.G_S_21_U4_R;
+         V_R := Self.G_S_22_U4_R;
       end if;
       case G_Susp is
          when 0 =>
@@ -2643,7 +2655,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      Self.G_Scratch_21_U4 := Wuffs.U64 (V_C);
+      Self.G_Scratch_22_U4 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -2652,7 +2664,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_21_U4 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_22_U4 and 16#FF#));
       <<G_Head_1>>
       if V_R >= 3 then
          goto G_Done_2;
@@ -2718,12 +2730,12 @@ package body Wuffs.Std.Advtest is
       <<G_Done_2>>
       Self.F_Sum := Self.F_Sum + Self.F_St;
       <<G_Ok>>
-      Self.G_P_21_U4 := 0;
+      Self.G_P_22_U4 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_21_U4 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_22_U4 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 13 else 0);
-      Self.G_S_21_U4_R := V_R;
+      Self.G_S_22_U4_R := V_R;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -2806,7 +2818,7 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_22_U5;
+      G_Susp := Self.G_P_23_U5;
       case G_Susp is
          when 0 =>
             null;
@@ -2840,7 +2852,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 6);
       goto G_Fi_1;
       <<G_Else_2>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 1;
       <<G_Resume_1>>
       loop
@@ -2850,7 +2862,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 40,
                                      Done => G_T2,
                                      Value => G_T3);
@@ -2867,7 +2879,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 7);
       goto G_Fi_3;
       <<G_Else_4>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 2;
       <<G_Resume_2>>
       loop
@@ -2877,7 +2889,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 48,
                                      Done => G_T5,
                                      Value => G_T6);
@@ -2894,7 +2906,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 8);
       goto G_Fi_5;
       <<G_Else_6>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 3;
       <<G_Resume_3>>
       loop
@@ -2904,7 +2916,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 56,
                                      Done => G_T8,
                                      Value => G_T9);
@@ -2930,7 +2942,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 2);
       goto G_Fi_7;
       <<G_Else_8>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 5;
       <<G_Resume_5>>
       loop
@@ -2940,7 +2952,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 8,
                                      Done => G_T12,
                                      Value => G_T13);
@@ -2957,7 +2969,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
       goto G_Fi_9;
       <<G_Else_10>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 6;
       <<G_Resume_6>>
       loop
@@ -2967,7 +2979,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 16,
                                      Done => G_T15,
                                      Value => G_T16);
@@ -2984,7 +2996,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
       goto G_Fi_11;
       <<G_Else_12>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 7;
       <<G_Resume_7>>
       loop
@@ -2994,7 +3006,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 24,
                                      Done => G_T18,
                                      Value => G_T19);
@@ -3011,7 +3023,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 5);
       goto G_Fi_13;
       <<G_Else_14>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 8;
       <<G_Resume_8>>
       loop
@@ -3021,7 +3033,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 32,
                                      Done => G_T21,
                                      Value => G_T22);
@@ -3038,7 +3050,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 2);
       goto G_Fi_15;
       <<G_Else_16>>
-      Self.G_Scratch_22_U5 := 0;
+      Self.G_Scratch_23_U5 := 0;
       G_Susp := 9;
       <<G_Resume_9>>
       loop
@@ -3048,7 +3060,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_22_U5,
+                                     Scratch => Self.G_Scratch_23_U5,
                                      Last_Shift => 8,
                                      Done => G_T24,
                                      Value => G_T25);
@@ -3058,7 +3070,7 @@ package body Wuffs.Std.Advtest is
       <<G_Fi_15>>
       V_Z := G_T23;
       Self.F_Sum := Self.F_Sum + Wuffs.U32 (V_Z);
-      Self.G_Scratch_22_U5 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
+      Self.G_Scratch_23_U5 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
       G_Susp := 10;
       <<G_Resume_10>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3067,11 +3079,11 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_22_U5 and 16#FF#));
-      Self.G_P_22_U5 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_23_U5 and 16#FF#));
+      Self.G_P_23_U5 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_22_U5 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_23_U5 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 14 else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -3142,11 +3154,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_23_V1;
+      G_Susp := Self.G_P_24_V1;
       if G_Susp /= 0 then
-         V_M := Self.G_S_23_V1_M;
-         V_X := Self.G_S_23_V1_X;
-         V_Y := Self.G_S_23_V1_Y;
+         V_M := Self.G_S_24_V1_M;
+         V_X := Self.G_S_24_V1_X;
+         V_Y := Self.G_S_24_V1_Y;
       end if;
       case G_Susp is
          when 0 =>
@@ -3175,10 +3187,10 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
       V_M := Wuffs.Base.IO.Mark (G_R_Src);
-      Self.G_Scratch_23_V1 := Wuffs.U64 (Wuffs.U32 (V_C and 3));
+      Self.G_Scratch_24_V1 := Wuffs.U64 (Wuffs.U32 (V_C and 3));
       G_Susp := 2;
       <<G_Resume_2>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_23_V1, Done => G_T2);
+      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_24_V1, Done => G_T2);
       if not G_T2 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -3284,7 +3296,7 @@ package body Wuffs.Std.Advtest is
          N => G_T8);
       V_N := G_T8;
       Self.F_Sum := Self.F_Sum + V_N;
-      Self.G_Scratch_23_V1 := Wuffs.U64 (V_C);
+      Self.G_Scratch_24_V1 := Wuffs.U64 (V_C);
       G_Susp := 4;
       <<G_Resume_4>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3293,7 +3305,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_23_V1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_24_V1 and 16#FF#));
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_R_Src) = 0 then
@@ -3302,7 +3314,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T9);
       V_C := G_T9;
-      Self.G_Scratch_23_V1 := Wuffs.U64 (V_C);
+      Self.G_Scratch_24_V1 := Wuffs.U64 (V_C);
       G_Susp := 6;
       <<G_Resume_6>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3311,18 +3323,18 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_23_V1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_24_V1 and 16#FF#));
       Self.F_Sum := Self.F_Sum + Wuffs.U32 (Wuffs.Base.IO.Position (G_R_Src) and 16#FFFF#);
       Self.F_Sum := Self.F_Sum + Wuffs.U32 (Wuffs.Base.IO.Position (G_W_Dst) and 16#FFFF#);
       Self.F_Sum := Self.F_Sum + Wuffs.U32 (Wuffs.Base.IO.History_Length (G_W_Dst) and 16#FFFF#);
-      Self.G_P_23_V1 := 0;
+      Self.G_P_24_V1 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_23_V1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_24_V1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 15 else 0);
-      Self.G_S_23_V1_M := V_M;
-      Self.G_S_23_V1_X := V_X;
-      Self.G_S_23_V1_Y := V_Y;
+      Self.G_S_24_V1_M := V_M;
+      Self.G_S_24_V1_X := V_X;
+      Self.G_S_24_V1_Y := V_Y;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -3363,7 +3375,7 @@ package body Wuffs.Std.Advtest is
       G_T2 : Wuffs.U8;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_26_Eat3;
+      G_Susp := Self.G_P_27_Eat3;
       case G_Susp is
          when 0 =>
             null;
@@ -3398,10 +3410,10 @@ package body Wuffs.Std.Advtest is
       if Wuffs.U64 (A_S'Length) > 0 then
          Self.F_Sum := Self.F_Sum + Wuffs.U32 (A_S (A_S'First + 0));
       end if;
-      Self.G_P_26_Eat3 := 0;
+      Self.G_P_27_Eat3 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_26_Eat3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_27_Eat3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
@@ -3460,10 +3472,10 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_27_W1;
+      G_Susp := Self.G_P_28_W1;
       if G_Susp /= 0 then
-         V_C := Self.G_S_27_W1_C;
-         V_I := Self.G_S_27_W1_I;
+         V_C := Self.G_S_28_W1_C;
+         V_I := Self.G_S_28_W1_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -3567,7 +3579,7 @@ package body Wuffs.Std.Advtest is
       if V_I >= 16 then
          goto G_Done_2;
       end if;
-      Self.G_Scratch_27_W1 := Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_I)));
+      Self.G_Scratch_28_W1 := Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_I)));
       G_Susp := 6;
       <<G_Resume_6>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3576,17 +3588,17 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_27_W1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_28_W1 and 16#FF#));
       V_I := V_I + 1;
       goto G_Head_1;
       <<G_Done_2>>
-      Self.G_P_27_W1 := 0;
+      Self.G_P_28_W1 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_27_W1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_28_W1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 16 else 0);
-      Self.G_S_27_W1_C := V_C;
-      Self.G_S_27_W1_I := V_I;
+      Self.G_S_28_W1_C := V_C;
+      Self.G_S_28_W1_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -3647,12 +3659,12 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_28_X1;
+      G_Susp := Self.G_P_29_X1;
       if G_Susp /= 0 then
-         V_C := Self.G_S_28_X1_C;
-         V_I := Self.G_S_28_X1_I;
-         V_J := Self.G_S_28_X1_J;
-         V_K := Self.G_S_28_X1_K;
+         V_C := Self.G_S_29_X1_C;
+         V_I := Self.G_S_29_X1_I;
+         V_J := Self.G_S_29_X1_J;
+         V_K := Self.G_S_29_X1_K;
       end if;
       case G_Susp is
          when 0 =>
@@ -3709,7 +3721,7 @@ package body Wuffs.Std.Advtest is
       if (V_I and 2) /= 0 then
          goto G_Else_8;
       end if;
-      Self.G_Scratch_28_X1 := Wuffs.U64 (Wuffs.U8 (V_K and 16#FF#));
+      Self.G_Scratch_29_X1 := Wuffs.U64 (Wuffs.U8 (V_K and 16#FF#));
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3718,7 +3730,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_28_X1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_29_X1 and 16#FF#));
       if V_J = 2 then
          goto G_Continue_1_Outer;
       end if;
@@ -3733,7 +3745,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T2);
       V_C := G_T2;
-      Self.G_Scratch_28_X1 := Wuffs.U64 (V_C);
+      Self.G_Scratch_29_X1 := Wuffs.U64 (V_C);
       G_Susp := 4;
       <<G_Resume_4>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3742,7 +3754,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_28_X1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_29_X1 and 16#FF#));
       if (V_C and 4) = 4 then
          goto G_Done_2;
       end if;
@@ -3750,7 +3762,7 @@ package body Wuffs.Std.Advtest is
       V_K := V_K + 1;
       goto G_Head_3;
       <<G_Done_4>>
-      Self.G_Scratch_28_X1 := Wuffs.U64 (Wuffs.U8 (V_J and 16#FF#));
+      Self.G_Scratch_29_X1 := Wuffs.U64 (Wuffs.U8 (V_J and 16#FF#));
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3759,21 +3771,21 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_28_X1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_29_X1 and 16#FF#));
       <<G_Continue_1_Outer>>
       goto G_Head_1;
       <<G_Done_2>>
       Self.F_Sum :=
         Self.F_Sum + V_K + Interfaces.Shift_Left (V_I, 8) + Interfaces.Shift_Left (V_J, 16);
-      Self.G_P_28_X1 := 0;
+      Self.G_P_29_X1 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_28_X1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_29_X1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 17 else 0);
-      Self.G_S_28_X1_C := V_C;
-      Self.G_S_28_X1_I := V_I;
-      Self.G_S_28_X1_J := V_J;
-      Self.G_S_28_X1_K := V_K;
+      Self.G_S_29_X1_C := V_C;
+      Self.G_S_29_X1_I := V_I;
+      Self.G_S_29_X1_J := V_J;
+      Self.G_S_29_X1_K := V_K;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -3803,10 +3815,10 @@ package body Wuffs.Std.Advtest is
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_29_Cal;
+      G_Susp := Self.G_P_30_Cal;
       if G_Susp /= 0 then
-         V_A := Self.G_S_29_Cal_A;
-         V_I := Self.G_S_29_Cal_I;
+         V_A := Self.G_S_30_Cal_A;
+         V_I := Self.G_S_30_Cal_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -3835,7 +3847,7 @@ package body Wuffs.Std.Advtest is
       if V_I >= (A_Lim and 7) then
          goto G_Done_2;
       end if;
-      Self.G_Scratch_29_Cal := Wuffs.U64 (V_A + Wuffs.U8 (V_I and 16#FF#));
+      Self.G_Scratch_30_Cal := Wuffs.U64 (V_A + Wuffs.U8 (V_I and 16#FF#));
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3844,7 +3856,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_29_Cal and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_30_Cal and 16#FF#));
       V_I := V_I + 1;
       if Wuffs.U64 (A_S'Length) > 1 then
          V_A := V_A + A_S (A_S'First + 1);
@@ -3853,12 +3865,12 @@ package body Wuffs.Std.Advtest is
       goto G_Head_1;
       <<G_Done_2>>
       Self.F_Sum := Self.F_Sum + A_Lim + Wuffs.U32 (Wuffs.U64 (A_S'Length) and 16#FF#);
-      Self.G_P_29_Cal := 0;
+      Self.G_P_30_Cal := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_29_Cal := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
-      Self.G_S_29_Cal_A := V_A;
-      Self.G_S_29_Cal_I := V_I;
+      Self.G_P_30_Cal := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_S_30_Cal_A := V_A;
+      Self.G_S_30_Cal_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -3914,9 +3926,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_30_X2;
+      G_Susp := Self.G_P_31_X2;
       if G_Susp /= 0 then
-         V_N := Self.G_S_30_X2_N;
+         V_N := Self.G_S_31_X2_N;
       end if;
       case G_Susp is
          when 0 =>
@@ -3969,7 +3981,7 @@ package body Wuffs.Std.Advtest is
       if not Wuffs.Is_Ok (G_Status) then
          goto G_Suspend;
       end if;
-      Self.G_Scratch_30_X2 := Wuffs.U64 (Self.F_Buf (1));
+      Self.G_Scratch_31_X2 := Wuffs.U64 (Self.F_Buf (1));
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -3978,7 +3990,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_30_X2 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_31_X2 and 16#FF#));
       V_N := V_N + 3;
       if Wuffs.U64 (A_Workbuf'Length) < 6 then
          goto G_Else_2;
@@ -4027,7 +4039,7 @@ package body Wuffs.Std.Advtest is
       if not Wuffs.Is_Ok (G_Status) then
          goto G_Suspend;
       end if;
-      Self.G_Scratch_30_X2 := Wuffs.U64 (Self.F_Buf (2));
+      Self.G_Scratch_31_X2 := Wuffs.U64 (Self.F_Buf (2));
       G_Susp := 6;
       <<G_Resume_6>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4036,8 +4048,8 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_30_X2 and 16#FF#));
-      Self.G_Scratch_30_X2 := Wuffs.U64 (Self.F_Buf (3));
+                                   V => Wuffs.U8 (Self.G_Scratch_31_X2 and 16#FF#));
+      Self.G_Scratch_31_X2 := Wuffs.U64 (Self.F_Buf (3));
       G_Susp := 7;
       <<G_Resume_7>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4046,13 +4058,13 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_30_X2 and 16#FF#));
-      Self.G_P_30_X2 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_31_X2 and 16#FF#));
+      Self.G_P_31_X2 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_30_X2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_31_X2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 18 else 0);
-      Self.G_S_30_X2_N := V_N;
+      Self.G_S_31_X2_N := V_N;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -4115,11 +4127,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_31_X3;
+      G_Susp := Self.G_P_32_X3;
       if G_Susp /= 0 then
-         V_C := Self.G_S_31_X3_C;
-         V_X := Self.G_S_31_X3_X;
-         V_I := Self.G_S_31_X3_I;
+         V_C := Self.G_S_32_X3_C;
+         V_X := Self.G_S_32_X3_X;
+         V_I := Self.G_S_32_X3_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -4164,7 +4176,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      Self.G_Scratch_31_X3 := Wuffs.U64 (V_C);
+      Self.G_Scratch_32_X3 := Wuffs.U64 (V_C);
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4173,7 +4185,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_31_X3 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_32_X3 and 16#FF#));
       if Wuffs.Base.IO.Length (G_R_Src) < 4 then
          goto G_Else_4;
       end if;
@@ -4181,7 +4193,7 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
       goto G_Fi_3;
       <<G_Else_4>>
-      Self.G_Scratch_31_X3 := 0;
+      Self.G_Scratch_32_X3 := 0;
       G_Susp := 4;
       <<G_Resume_4>>
       loop
@@ -4191,7 +4203,7 @@ package body Wuffs.Std.Advtest is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_31_X3,
+                                     Scratch => Self.G_Scratch_32_X3,
                                      Last_Shift => 24,
                                      Done => G_T3,
                                      Value => G_T4);
@@ -4200,7 +4212,7 @@ package body Wuffs.Std.Advtest is
       G_T2 := Wuffs.U32 (G_T4);
       <<G_Fi_3>>
       V_X := G_T2;
-      Self.G_Scratch_31_X3 := Wuffs.U64 (Wuffs.U8 (V_X and 16#FF#));
+      Self.G_Scratch_32_X3 := Wuffs.U64 (Wuffs.U8 (V_X and 16#FF#));
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4209,7 +4221,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_31_X3 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_32_X3 and 16#FF#));
       if (V_C and 1) /= 1 then
          goto G_Else_6;
       end if;
@@ -4217,7 +4229,7 @@ package body Wuffs.Std.Advtest is
       G_Susp := 6;
       goto G_Suspend;
       <<G_Resume_6>>
-      Self.G_Scratch_31_X3 := 16#55#;
+      Self.G_Scratch_32_X3 := 16#55#;
       G_Susp := 7;
       <<G_Resume_7>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4226,7 +4238,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_31_X3 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_32_X3 and 16#FF#));
       goto G_Fi_5;
       <<G_Else_6>>
       if (V_C and 2) /= 2 then
@@ -4260,14 +4272,14 @@ package body Wuffs.Std.Advtest is
       <<G_Done_2>>
       Self.F_Sum := Self.F_Sum + V_X + V_I;
       <<G_Ok>>
-      Self.G_P_31_X3 := 0;
+      Self.G_P_32_X3 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_31_X3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_32_X3 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 19 else 0);
-      Self.G_S_31_X3_C := V_C;
-      Self.G_S_31_X3_X := V_X;
-      Self.G_S_31_X3_I := V_I;
+      Self.G_S_32_X3_C := V_C;
+      Self.G_S_32_X3_X := V_X;
+      Self.G_S_32_X3_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -4296,9 +4308,9 @@ package body Wuffs.Std.Advtest is
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_32_Wr;
+      G_Susp := Self.G_P_33_Wr;
       if G_Susp /= 0 then
-         V_I := Self.G_S_32_Wr_I;
+         V_I := Self.G_S_33_Wr_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -4322,7 +4334,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      Self.G_Scratch_32_Wr := Wuffs.U64 (V_C + 1);
+      Self.G_Scratch_33_Wr := Wuffs.U64 (V_C + 1);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4331,15 +4343,15 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_32_Wr and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_33_Wr and 16#FF#));
       V_I := V_I + 1;
       goto G_Head_1;
       <<G_Done_2>>
-      Self.G_P_32_Wr := 0;
+      Self.G_P_33_Wr := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_32_Wr := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
-      Self.G_S_32_Wr_I := V_I;
+      Self.G_P_33_Wr := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_S_33_Wr_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -4399,11 +4411,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_33_X4;
+      G_Susp := Self.G_P_34_X4;
       if G_Susp /= 0 then
-         V_M := Self.G_S_33_X4_M;
-         V_M2 := Self.G_S_33_X4_M2;
-         V_C := Self.G_S_33_X4_C;
+         V_M := Self.G_S_34_X4_M;
+         V_M2 := Self.G_S_34_X4_M2;
+         V_C := Self.G_S_34_X4_C;
       end if;
       case G_Susp is
          when 0 =>
@@ -4504,14 +4516,14 @@ package body Wuffs.Std.Advtest is
                                    J => Wuffs.Base.IO.Since_Offset (R => G_R_Src, Mark => V_M)
                                           + Wuffs.Base.IO.Since_Length (R => G_R_Src, Mark => V_M));
       Fold (Self, G_T5.Base (G_T5.First .. Wuffs.Runtime.Last (G_T5)));
-      Self.G_P_33_X4 := 0;
+      Self.G_P_34_X4 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_33_X4 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_34_X4 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 20 else 0);
-      Self.G_S_33_X4_M := V_M;
-      Self.G_S_33_X4_M2 := V_M2;
-      Self.G_S_33_X4_C := V_C;
+      Self.G_S_34_X4_M := V_M;
+      Self.G_S_34_X4_M2 := V_M2;
+      Self.G_S_34_X4_C := V_C;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -4572,11 +4584,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_34_X5;
+      G_Susp := Self.G_P_35_X5;
       if G_Susp /= 0 then
-         V_N := Self.G_S_34_X5_N;
-         V_M := Self.G_S_34_X5_M;
-         V_I := Self.G_S_34_X5_I;
+         V_N := Self.G_S_35_X5_N;
+         V_M := Self.G_S_35_X5_M;
+         V_I := Self.G_S_35_X5_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -4614,7 +4626,7 @@ package body Wuffs.Std.Advtest is
       if (V_C and 1) /= 1 then
          goto G_Else_4;
       end if;
-      Self.G_Scratch_34_X5 := Wuffs.U64 (V_C);
+      Self.G_Scratch_35_X5 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4623,7 +4635,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_34_X5 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_35_X5 and 16#FF#));
       pragma Warnings ("C");
       pragma Assert (V_M = 7);
       pragma Warnings ("c");
@@ -4660,14 +4672,14 @@ package body Wuffs.Std.Advtest is
       pragma Assert (V_M = 7);
       pragma Warnings ("c");
       Self.F_Sum := Self.F_Sum + V_N + V_M + V_I;
-      Self.G_P_34_X5 := 0;
+      Self.G_P_35_X5 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_34_X5 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_35_X5 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 21 else 0);
-      Self.G_S_34_X5_N := V_N;
-      Self.G_S_34_X5_M := V_M;
-      Self.G_S_34_X5_I := V_I;
+      Self.G_S_35_X5_N := V_N;
+      Self.G_S_35_X5_M := V_M;
+      Self.G_S_35_X5_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -4691,7 +4703,7 @@ package body Wuffs.Std.Advtest is
       G_T2 : Wuffs.U8;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_35_Fail;
+      G_Susp := Self.G_P_36_Fail;
       case G_Susp is
          when 0 =>
             null;
@@ -4720,10 +4732,10 @@ package body Wuffs.Std.Advtest is
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T2);
       V_C := G_T2;
       Self.F_Sum := Self.F_Sum + Wuffs.U32 (V_C);
-      Self.G_P_35_Fail := 0;
+      Self.G_P_36_Fail := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_35_Fail := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_36_Fail := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
@@ -4778,9 +4790,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_36_X6;
+      G_Susp := Self.G_P_37_X6;
       if G_Susp /= 0 then
-         V_R := Self.G_S_36_X6_R;
+         V_R := Self.G_S_37_X6_R;
       end if;
       case G_Susp is
          when 0 =>
@@ -4824,7 +4836,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      Self.G_Scratch_36_X6 := Wuffs.U64 (V_C);
+      Self.G_Scratch_37_X6 := Wuffs.U64 (V_C);
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -4833,19 +4845,19 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_36_X6 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_37_X6 and 16#FF#));
       V_R := V_R + 1;
       <<G_Continue_1>>
       goto G_Head_1;
       <<G_Done_2>>
       null;
       <<G_Ok>>
-      Self.G_P_36_X6 := 0;
+      Self.G_P_37_X6 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_36_X6 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_37_X6 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 22 else 0);
-      Self.G_S_36_X6_R := V_R;
+      Self.G_S_37_X6_R := V_R;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -4910,7 +4922,7 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_37_X7;
+      G_Susp := Self.G_P_38_X7;
       case G_Susp is
          when 0 =>
             null;
@@ -5016,7 +5028,7 @@ package body Wuffs.Std.Advtest is
                                             N => G_T8);
       V_N := G_T8;
       Self.F_Sum := Self.F_Sum + Wuffs.U32 (V_N and 16#FF#);
-      Self.G_Scratch_37_X7 := Wuffs.U64 (Self.F_Buf (0));
+      Self.G_Scratch_38_X7 := Wuffs.U64 (Self.F_Buf (0));
       G_Susp := 4;
       <<G_Resume_4>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -5025,11 +5037,11 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_37_X7 and 16#FF#));
-      Self.G_P_37_X7 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_38_X7 and 16#FF#));
+      Self.G_P_38_X7 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_37_X7 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_38_X7 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 23 else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -5098,9 +5110,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_39_X8;
+      G_Susp := Self.G_P_40_X8;
       if G_Susp /= 0 then
-         V_I := Self.G_S_39_X8_I;
+         V_I := Self.G_S_40_X8_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -5136,7 +5148,7 @@ package body Wuffs.Std.Advtest is
       Self.F_Buf (Wuffs.Index (V_C and 15)) := V_C + 1;
       goto G_Fi_3;
       <<G_Else_4>>
-      Self.G_Scratch_39_X8 := Wuffs.U64 (Wuffs.U8 (V_I and 16#FF#));
+      Self.G_Scratch_40_X8 := Wuffs.U64 (Wuffs.U8 (V_I and 16#FF#));
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -5145,8 +5157,8 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_39_X8 and 16#FF#));
-      if Self.G_P_39_X8 /= 0 then
+                                   V => Wuffs.U8 (Self.G_Scratch_40_X8 and 16#FF#));
+      if Self.G_P_40_X8 /= 0 then
          Self.F_St := Self.F_St + 1;
       end if;
       <<G_Fi_3>>
@@ -5167,12 +5179,12 @@ package body Wuffs.Std.Advtest is
       goto G_Head_1;
       <<G_Done_2>>
       Self.F_Sum := Self.F_Sum + Interfaces.Shift_Left (V_I, 8);
-      Self.G_P_39_X8 := 0;
+      Self.G_P_40_X8 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_39_X8 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_40_X8 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 24 else 0);
-      Self.G_S_39_X8_I := V_I;
+      Self.G_S_40_X8_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -5232,10 +5244,10 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_40_X9;
+      G_Susp := Self.G_P_41_X9;
       if G_Susp /= 0 then
-         V_C := Self.G_S_40_X9_C;
-         V_I := Self.G_S_40_X9_I;
+         V_C := Self.G_S_41_X9_C;
+         V_I := Self.G_S_41_X9_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -5307,15 +5319,15 @@ package body Wuffs.Std.Advtest is
       if not Wuffs.Is_Ok (G_Status) then
          goto G_Suspend;
       end if;
-      Self.G_Scratch_40_X9 := Wuffs.U64 (V_C and 3);
+      Self.G_Scratch_41_X9 := Wuffs.U64 (V_C and 3);
       G_Susp := 5;
       <<G_Resume_5>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_40_X9, Done => G_T3);
+      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_41_X9, Done => G_T3);
       if not G_T3 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
       end if;
-      Self.G_Scratch_40_X9 := Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_C and 15)));
+      Self.G_Scratch_41_X9 := Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_C and 15)));
       G_Susp := 6;
       <<G_Resume_6>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -5324,17 +5336,17 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_40_X9 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_41_X9 and 16#FF#));
       V_I := V_I + 1;
       goto G_Head_1;
       <<G_Done_2>>
-      Self.G_P_40_X9 := 0;
+      Self.G_P_41_X9 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_40_X9 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_41_X9 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 25 else 0);
-      Self.G_S_40_X9_C := V_C;
-      Self.G_S_40_X9_I := V_I;
+      Self.G_S_41_X9_C := V_C;
+      Self.G_S_41_X9_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -5395,11 +5407,11 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_41_X10;
+      G_Susp := Self.G_P_42_X10;
       if G_Susp /= 0 then
-         V_Flag := Self.G_S_41_X10_Flag;
-         V_Status := Self.G_S_41_X10_Status;
-         V_H := Self.G_S_41_X10_H;
+         V_Flag := Self.G_S_42_X10_Flag;
+         V_Status := Self.G_S_42_X10_Status;
+         V_H := Self.G_S_42_X10_H;
       end if;
       case G_Susp is
          when 0 =>
@@ -5434,7 +5446,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T2);
       V_C := G_T2;
-      Self.G_Scratch_41_X10 := Wuffs.U64 (V_C);
+      Self.G_Scratch_42_X10 := Wuffs.U64 (V_C);
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -5443,7 +5455,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_41_X10 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_42_X10 and 16#FF#));
       if V_Flag then
          Self.F_Sum := Self.F_Sum + 16#100#;
       end if;
@@ -5451,14 +5463,14 @@ package body Wuffs.Std.Advtest is
       if Wuffs.Is_Error (V_Status) then
          Self.F_Sum := Self.F_Sum + 16#1_0000#;
       end if;
-      Self.G_P_41_X10 := 0;
+      Self.G_P_42_X10 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_41_X10 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_42_X10 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 26 else 0);
-      Self.G_S_41_X10_Flag := V_Flag;
-      Self.G_S_41_X10_Status := V_Status;
-      Self.G_S_41_X10_H := V_H;
+      Self.G_S_42_X10_Flag := V_Flag;
+      Self.G_S_42_X10_Status := V_Status;
+      Self.G_S_42_X10_H := V_H;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -5481,7 +5493,7 @@ package body Wuffs.Std.Advtest is
       G_Susp : Wuffs.U32;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_42_Noter;
+      G_Susp := Self.G_P_43_Noter;
       case G_Susp is
          when 0 =>
             null;
@@ -5504,10 +5516,10 @@ package body Wuffs.Std.Advtest is
          goto G_Ok;
       end if;
       <<G_Ok>>
-      Self.G_P_42_Noter := 0;
+      Self.G_P_43_Noter := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_42_Noter := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_43_Noter := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
@@ -5561,7 +5573,7 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_43_X11;
+      G_Susp := Self.G_P_44_X11;
       case G_Susp is
          when 0 =>
             null;
@@ -5586,7 +5598,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T1);
       V_C := G_T1;
-      Self.G_Scratch_43_X11 := Wuffs.U64 (V_C);
+      Self.G_Scratch_44_X11 := Wuffs.U64 (V_C);
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -5595,7 +5607,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_43_X11 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_44_X11 and 16#FF#));
       G_Susp := 3;
       <<G_Resume_3>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -5612,7 +5624,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T2);
       V_C := G_T2;
-      Self.G_Scratch_43_X11 := Wuffs.U64 (V_C + 1);
+      Self.G_Scratch_44_X11 := Wuffs.U64 (V_C + 1);
       G_Susp := 5;
       <<G_Resume_5>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -5621,11 +5633,11 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_43_X11 and 16#FF#));
-      Self.G_P_43_X11 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_44_X11 and 16#FF#));
+      Self.G_P_44_X11 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_43_X11 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_44_X11 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 27 else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -5685,10 +5697,10 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_44_Y1;
+      G_Susp := Self.G_P_45_Y1;
       if G_Susp /= 0 then
-         V_I := Self.G_S_44_Y1_I;
-         V_K := Self.G_S_44_Y1_K;
+         V_I := Self.G_S_45_Y1_I;
+         V_K := Self.G_S_45_Y1_K;
       end if;
       case G_Susp is
          when 0 =>
@@ -5723,7 +5735,7 @@ package body Wuffs.Std.Advtest is
       if V_C > 0 then
          goto G_Else_4;
       end if;
-      Self.G_Scratch_44_Y1 := 1;
+      Self.G_Scratch_45_Y1 := 1;
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -5732,7 +5744,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_44_Y1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_45_Y1 and 16#FF#));
       goto G_Fi_3;
       <<G_Else_4>>
       null;
@@ -5741,13 +5753,13 @@ package body Wuffs.Std.Advtest is
       goto G_Head_1;
       <<G_Done_2>>
       Self.F_Sum := Self.F_Sum + V_K;
-      Self.G_P_44_Y1 := 0;
+      Self.G_P_45_Y1 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_44_Y1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_45_Y1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 28 else 0);
-      Self.G_S_44_Y1_I := V_I;
-      Self.G_S_44_Y1_K := V_K;
+      Self.G_S_45_Y1_I := V_I;
+      Self.G_S_45_Y1_K := V_K;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -5850,9 +5862,9 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_45_Z1;
+      G_Susp := Self.G_P_46_Z1;
       if G_Susp /= 0 then
-         V_I := Self.G_S_45_Z1_I;
+         V_I := Self.G_S_46_Z1_I;
       end if;
       case G_Susp is
          when 0 =>
@@ -6084,7 +6096,7 @@ package body Wuffs.Std.Advtest is
       if V_I >= 24 then
          goto G_Done_4;
       end if;
-      Self.G_Scratch_45_Z1 := Wuffs.U64 (Self.F_Buf2 (Wuffs.Index (V_I)));
+      Self.G_Scratch_46_Z1 := Wuffs.U64 (Self.F_Buf2 (Wuffs.Index (V_I)));
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -6093,7 +6105,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_45_Z1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_46_Z1 and 16#FF#));
       V_I := V_I + 1;
       goto G_Head_3;
       <<G_Done_4>>
@@ -6102,7 +6114,7 @@ package body Wuffs.Std.Advtest is
       if V_I >= 16 then
          goto G_Done_6;
       end if;
-      Self.G_Scratch_45_Z1 := Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_I)));
+      Self.G_Scratch_46_Z1 := Wuffs.U64 (Self.F_Buf (Wuffs.Index (V_I)));
       G_Susp := 3;
       <<G_Resume_3>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -6111,7 +6123,7 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_45_Z1 and 16#FF#));
+                                   V => Wuffs.U8 (Self.G_Scratch_46_Z1 and 16#FF#));
       V_I := V_I + 1;
       goto G_Head_5;
       <<G_Done_6>>
@@ -6133,12 +6145,12 @@ package body Wuffs.Std.Advtest is
                       xor Interfaces.Shift_Right (Self.F_U64s (1), 3)
                       xor Interfaces.Shift_Left (Self.F_U64s (1), 29))
                      and 16#FFFF_FFFF#);
-      Self.G_P_45_Z1 := 0;
+      Self.G_P_46_Z1 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_45_Z1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_46_Z1 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 29 else 0);
-      Self.G_S_45_Z1_I := V_I;
+      Self.G_S_46_Z1_I := V_I;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -6198,7 +6210,7 @@ package body Wuffs.Std.Advtest is
       Self.G_Active_Coroutine := 0;
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_46_Z2;
+      G_Susp := Self.G_P_47_Z2;
       case G_Susp is
          when 0 =>
             null;
@@ -6245,7 +6257,7 @@ package body Wuffs.Std.Advtest is
       Self.F_St :=
         Self.F_St
           + Wuffs.U32 (Self.F_Rows (V_P) (Wuffs.Index (Interfaces.Shift_Right (V_C, 2) and 3)));
-      Self.G_Scratch_46_Z2 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
+      Self.G_Scratch_47_Z2 := Wuffs.U64 (Wuffs.U8 (Self.F_Sum and 16#FF#));
       G_Susp := 2;
       <<G_Resume_2>>
       if Wuffs.Base.IO.Length (G_W_Dst) = 0 then
@@ -6254,11 +6266,11 @@ package body Wuffs.Std.Advtest is
       end if;
       Wuffs.Base.IO.Write_U8_Fast (Data => A_Dst,
                                    W => G_W_Dst,
-                                   V => Wuffs.U8 (Self.G_Scratch_46_Z2 and 16#FF#));
-      Self.G_P_46_Z2 := 0;
+                                   V => Wuffs.U8 (Self.G_Scratch_47_Z2 and 16#FF#));
+      Self.G_P_47_Z2 := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_46_Z2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_47_Z2 := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 30 else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
@@ -6268,5 +6280,235 @@ package body Wuffs.Std.Advtest is
       end if;
       return G_Status;
    end Z2;
+
+   procedure N1
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Sel : Wuffs.U32)
+   is
+      V_R : Wuffs.U64 := 0;
+      V_S : Wuffs.U64 := 0;
+      G_Null_Pixels_1 : Wuffs.Bytes (1 .. 0);
+      pragma Warnings (Off, G_Null_Pixels_1);
+      G_Null_Palette_1 : Wuffs.Bytes (1 .. 0);
+      pragma Warnings (Off, G_Null_Palette_1);
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return;
+      end if;
+      if Wuffs.Runtime.Shares_Storage (A => A_Dst_Pixels,
+                                       Address => Self'Address,
+                                       Size_In_Bits => Self'Size)
+           or else Wuffs.Runtime.Shares_Storage
+                     (A => A_Dst_Palette,
+                      Address => Self'Address,
+                      Size_In_Bits => Self'Size)
+           or else not Wuffs.Runtime.Valid_Pixel_Buffer
+                         (PB => A_Dst,
+                          Pixels => A_Dst_Pixels,
+                          Palette => A_Dst_Palette)
+           or else Wuffs.Runtime.Share_An_Element (A => A_Dst_Pixels, B => A_Dst_Palette)
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return;
+      end if;
+      if (A_Sel and 1) = 0 then
+         V_R :=
+           Nq (Self,
+               A_Dst => A_Dst,
+               A_Dst_Null => False,
+               A_Dst_Pixels => A_Dst_Pixels,
+               A_Dst_Palette => A_Dst_Palette,
+               A_K => A_Sel);
+      else
+         V_R :=
+           Nq (Self,
+               A_Dst => Wuffs.Base.Pixel_Buffers.Null_Pixel_Buffer,
+               A_Dst_Null => True,
+               A_Dst_Pixels => G_Null_Pixels_1,
+               A_Dst_Palette => G_Null_Palette_1,
+               A_K => A_Sel);
+      end if;
+      V_S :=
+        Nr (Self,
+            A_Dst => A_Dst,
+            A_Dst_Null => False,
+            A_Dst_Pixels => A_Dst_Pixels,
+            A_Dst_Palette => A_Dst_Palette,
+            A_K => Interfaces.Shift_Right (A_Sel, 1));
+      Self.F_Nres := V_R + V_S;
+   end N1;
+
+   procedure N2
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Null : Boolean;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Sel : Wuffs.U32)
+   is
+      V_R : Wuffs.U64 := 0;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
+         return;
+      end if;
+      if not A_Dst_Null'Valid
+           or else (not A_Dst_Null
+                      and then (not Wuffs.Runtime.Valid_Pixel_Buffer
+                                      (PB => A_Dst,
+                                       Pixels => A_Dst_Pixels,
+                                       Palette => A_Dst_Palette)
+                                  or else Wuffs.Runtime.Share_An_Element
+                                            (A => A_Dst_Pixels,
+                                             B => A_Dst_Palette)
+                                  or else Wuffs.Runtime.Shares_Storage
+                                            (A => A_Dst_Pixels,
+                                             Address => Self'Address,
+                                             Size_In_Bits => Self'Size)
+                                  or else Wuffs.Runtime.Shares_Storage
+                                            (A => A_Dst_Palette,
+                                             Address => Self'Address,
+                                             Size_In_Bits => Self'Size)))
+      then
+         Self.Magic := Wuffs.Runtime.Magic_Disabled;
+         return;
+      end if;
+      V_R :=
+        Nq (Self,
+            A_Dst => A_Dst,
+            A_Dst_Null => A_Dst_Null,
+            A_Dst_Pixels => A_Dst_Pixels,
+            A_Dst_Palette => A_Dst_Palette,
+            A_K => A_Sel);
+      Self.F_Nres := V_R + 7;
+   end N2;
+
+   function Nr
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Null : Boolean;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_K : Wuffs.U32)
+      return Wuffs.U64
+   is
+      V_R : Wuffs.U64 := 0;
+   begin
+      V_R :=
+        Nq (Self,
+            A_Dst => A_Dst,
+            A_Dst_Null => A_Dst_Null,
+            A_Dst_Pixels => A_Dst_Pixels,
+            A_Dst_Palette => A_Dst_Palette,
+            A_K => A_K + 1);
+      return V_R * 3;
+   end Nr;
+
+   function Nq
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Null : Boolean;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_K : Wuffs.U32)
+      return Wuffs.U64
+   is
+      V_Pf : Wuffs.Base.Pixel_Formats.Pixel_Format :=
+        Wuffs.Base.Pixel_Formats.Make_Pixel_Format (Repr => 0);
+      V_Pal : Wuffs.Runtime.Slice_U8;
+      V_Tab : Wuffs.Base.Pixel_Buffers.Table;
+      V_Row : Wuffs.Runtime.Slice_U8;
+      V_R : Wuffs.U64 := 0;
+      G_T1 : Wuffs.Runtime.Slice_U8;
+      G_T2 : Wuffs.Offset;
+      G_T3 : Wuffs.Index;
+   begin
+      if A_Dst_Null then
+         return 16#DEAD#;
+      end if;
+      pragma Warnings ("C");
+      pragma Assert (not A_Dst_Null);
+      pragma Warnings ("c");
+      V_Pf := Wuffs.Base.Pixel_Buffers.Get_Pixel_Format (A_Dst);
+      V_R := Wuffs.U64 (Wuffs.Base.Pixel_Formats.Bits_Per_Pixel (V_Pf));
+      pragma Warnings ("C");
+      pragma Assert (not A_Dst_Null);
+      pragma Warnings ("c");
+      if Wuffs.Runtime.Palette_Length (PB => A_Dst, Palette => A_Dst_Palette) /= 0 then
+         G_T1 :=
+           Wuffs.Runtime.Subslice_J ((Base => A_Dst_Palette'Unrestricted_Access,
+                                      First => A_Dst_Palette'First,
+                                      Length => A_Dst_Palette'Length),
+                                     Wuffs.Runtime.Palette_Length
+                                       (PB => A_Dst,
+                                        Palette => A_Dst_Palette));
+      else
+         G_T1 :=
+           (Base => Self.F_Buf'Unrestricted_Access,
+            First => Self.F_Buf'First,
+            Length => Self.F_Buf'Length);
+      end if;
+      V_Pal := G_T1;
+      V_R := Interfaces.Shift_Left (V_R, 16) or Wuffs.U64 (V_Pal.Length);
+      if Wuffs.U64 (V_Pal.Length) > 2 then
+         Wuffs.Runtime.Set (S => V_Pal, I => 2, V => Wuffs.U8 (A_K and 16#FF#));
+      end if;
+      pragma Warnings ("C");
+      pragma Assert (not A_Dst_Null);
+      pragma Warnings ("c");
+      V_Tab := Wuffs.Base.Pixel_Buffers.Plane (PB => A_Dst, P => 0);
+      V_R := V_R + Wuffs.U64 (V_Tab.Width) * 3;
+      V_R := V_R + Wuffs.U64 (V_Tab.Height) * 5;
+      V_R := V_R + Wuffs.U64 (V_Tab.Stride);
+      Wuffs.Base.Pixel_Buffers.Row_U32 (T => V_Tab,
+                                        Y => A_K and 3,
+                                        Length => A_Dst_Pixels'Length,
+                                        First => G_T2,
+                                        Count => G_T3);
+      V_Row :=
+        Wuffs.Runtime.Subslice_IJ (S => (Base => A_Dst_Pixels'Unrestricted_Access,
+                                         First => A_Dst_Pixels'First,
+                                         Length => A_Dst_Pixels'Length),
+                                   I => G_T2,
+                                   J => G_T2 + G_T3);
+      if Wuffs.U64 (V_Row.Length) > 0 then
+         Wuffs.Runtime.Set (S => V_Row, I => 0, V => Wuffs.U8 (A_K and 16#FF#));
+         V_R := V_R + Interfaces.Shift_Left (Wuffs.U64 (V_Row.Length), 20);
+      end if;
+      return V_R;
+   end Nq;
+
+   function N3
+     (Self : Thing; A_B : Wuffs.Base.Pixel_Formats.Pixel_Blend; A_X : Wuffs.U8) return Wuffs.U32
+   is
+      V_C : Wuffs.Base.Pixel_Formats.Pixel_Blend := 0;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized
+           and then Self.Magic /= Wuffs.Runtime.Magic_Disabled
+      then
+         return 0;
+      end if;
+      V_C := Wuffs.Base.Pixel_Formats.Make_Pixel_Blend (A_X);
+      return
+        Interfaces.Shift_Left (Wuffs.U32 (Wuffs.Base.Pixel_Formats.Demake_Pixel_Blend (A_B)), 8)
+          or Wuffs.U32 (Wuffs.Base.Pixel_Formats.Demake_Pixel_Blend (V_C));
+   end N3;
+
+   function N4 (Self : Thing; A_Lo : Wuffs.U64; A_Hi : Wuffs.U64) return Wuffs.U64 is
+      V_R : Wuffs.Base.Ranges.Range_II_U64 := Wuffs.Base.Ranges.Empty_Range_II_U64;
+   begin
+      if Self.Magic /= Wuffs.Runtime.Magic_Initialized
+           and then Self.Magic /= Wuffs.Runtime.Magic_Disabled
+      then
+         return 0;
+      end if;
+      V_R := Wuffs.Base.Ranges.Make_Range_II_U64 (Min_Incl => A_Lo, Max_Incl => A_Hi);
+      if Wuffs.Base.Ranges.Is_Empty (V_R) then
+         return 1;
+      end if;
+      return Wuffs.Base.Ranges.Get_Min_Incl (V_R) + Wuffs.Base.Ranges.Get_Max_Incl (V_R) * 3;
+   end N4;
 
 end Wuffs.Std.Advtest;

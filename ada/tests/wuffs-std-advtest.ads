@@ -4,6 +4,8 @@
 --    internal/adagen/testdata/advtest.wuffs
 
 with Wuffs.Base.IO;
+with Wuffs.Base.Pixel_Buffers;
+with Wuffs.Base.Pixel_Formats;
 
 package Wuffs.Std.Advtest with Preelaborate is
 
@@ -35,6 +37,9 @@ package Wuffs.Std.Advtest with Preelaborate is
 
    --  Wuffs: func thing.get_st
    function Get_St (Self : Thing) return Wuffs.U32;
+
+   --  Wuffs: func thing.get_nres
+   function Get_Nres (Self : Thing) return Wuffs.U64;
 
    --  Wuffs: func thing.t1
    function T1
@@ -336,6 +341,30 @@ package Wuffs.Std.Advtest with Preelaborate is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status;
 
+   --  Wuffs: func thing.n1
+   procedure N1
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Sel : Wuffs.U32);
+
+   --  Wuffs: func thing.n2
+   procedure N2
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Null : Boolean;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Sel : Wuffs.U32);
+
+   --  Wuffs: func thing.n3
+   function N3
+     (Self : Thing; A_B : Wuffs.Base.Pixel_Formats.Pixel_Blend; A_X : Wuffs.U8) return Wuffs.U32;
+
+   --  Wuffs: func thing.n4
+   function N4 (Self : Thing; A_Lo : Wuffs.U64; A_Hi : Wuffs.U64) return Wuffs.U64;
+
 private
 
    type G_Array_3_Of_Array_4_Of_U16 is array (Wuffs.Index range 0 .. 2) of Wuffs.U16_Array (0 .. 3);
@@ -365,132 +394,133 @@ private
       F_U32s : Wuffs.U32_Array (0 .. 2);
       F_U64s : Wuffs.U64_Array (0 .. 1);
       F_Buf2 : Wuffs.Bytes (0 .. 23);
-      G_Scratch_3_T1 : Wuffs.U64 := 0;
-      G_P_3_T1 : Wuffs.U32 := 0;
-      G_S_3_T1_C : Wuffs.U8 := 0;
-      G_S_3_T1_N : Wuffs.U32 := 0;
-      G_S_3_T1_I : Wuffs.U32 := 0;
-      G_S_3_T1_Acc : Wuffs.U32 := 0;
-      G_Scratch_4_T2 : Wuffs.U64 := 0;
-      G_P_4_T2 : Wuffs.U32 := 0;
-      G_S_4_T2_C : Wuffs.U8 := 0;
-      G_S_4_T2_J : Wuffs.U32 := 0;
-      G_S_4_T2_K : Wuffs.U32 := 0;
-      G_Scratch_5_Inner : Wuffs.U64 := 0;
-      G_P_5_Inner : Wuffs.U32 := 0;
-      G_S_5_Inner_A : Wuffs.U8 := 0;
-      G_S_5_Inner_B : Wuffs.U32 := 0;
-      G_S_5_Inner_I : Wuffs.U32 := 0;
-      G_Scratch_6_T3 : Wuffs.U64 := 0;
-      G_P_6_T3 : Wuffs.U32 := 0;
-      G_S_6_T3_C : Wuffs.U8 := 0;
-      G_S_6_T3_N : Wuffs.U32 := 0;
-      G_S_6_T3_R : Wuffs.U32 := 0;
-      G_P_7_Eat : Wuffs.U32 := 0;
-      G_Scratch_8_T4 : Wuffs.U64 := 0;
-      G_P_8_T4 : Wuffs.U32 := 0;
-      G_Scratch_9_T5 : Wuffs.U64 := 0;
-      G_P_9_T5 : Wuffs.U32 := 0;
-      G_S_9_T5_Arr : Wuffs.Bytes (0 .. 3);
-      G_S_9_T5_I : Wuffs.U32 := 0;
-      G_P_10_T6 : Wuffs.U32 := 0;
-      G_Scratch_10_T6 : Wuffs.U64 := 0;
-      G_S_10_T6_I : Wuffs.U32 := 0;
-      G_Scratch_11_T7 : Wuffs.U64 := 0;
-      G_P_11_T7 : Wuffs.U32 := 0;
-      G_S_11_T7_N : G_U32_Range_0_10 := 0;
-      G_S_11_T7_I : Wuffs.U32 := 0;
-      G_Scratch_13_T8 : Wuffs.U64 := 0;
-      G_P_13_T8 : Wuffs.U32 := 0;
-      G_S_13_T8_C : Wuffs.U8 := 0;
-      G_Scratch_14_T9 : Wuffs.U64 := 0;
-      G_P_14_T9 : Wuffs.U32 := 0;
-      G_Scratch_15_U1 : Wuffs.U64 := 0;
-      G_P_15_U1 : Wuffs.U32 := 0;
-      G_S_15_U1_C : Wuffs.U8 := 0;
-      G_S_15_U1_I : G_U32_Range_0_10 := 0;
-      G_S_15_U1_N : Wuffs.U32 := 0;
-      G_Scratch_17_U2 : Wuffs.U64 := 0;
-      G_P_17_U2 : Wuffs.U32 := 0;
-      G_P_18_Eat2 : Wuffs.U32 := 0;
-      G_Scratch_19_U3 : Wuffs.U64 := 0;
-      G_P_19_U3 : Wuffs.U32 := 0;
-      G_S_19_U3_C : Wuffs.U8 := 0;
-      G_Scratch_21_U4 : Wuffs.U64 := 0;
-      G_P_21_U4 : Wuffs.U32 := 0;
-      G_S_21_U4_R : Wuffs.U32 := 0;
-      G_Scratch_22_U5 : Wuffs.U64 := 0;
-      G_P_22_U5 : Wuffs.U32 := 0;
-      G_Scratch_23_V1 : Wuffs.U64 := 0;
-      G_P_23_V1 : Wuffs.U32 := 0;
-      G_S_23_V1_M : Wuffs.U64 := 0;
-      G_S_23_V1_X : Wuffs.U32 := 0;
-      G_S_23_V1_Y : Wuffs.U64 := 0;
-      G_P_26_Eat3 : Wuffs.U32 := 0;
-      G_Scratch_27_W1 : Wuffs.U64 := 0;
-      G_P_27_W1 : Wuffs.U32 := 0;
-      G_S_27_W1_C : Wuffs.U8 := 0;
-      G_S_27_W1_I : Wuffs.U32 := 0;
-      G_Scratch_28_X1 : Wuffs.U64 := 0;
-      G_P_28_X1 : Wuffs.U32 := 0;
-      G_S_28_X1_C : Wuffs.U8 := 0;
-      G_S_28_X1_I : Wuffs.U32 := 0;
-      G_S_28_X1_J : Wuffs.U32 := 0;
-      G_S_28_X1_K : Wuffs.U32 := 0;
-      G_Scratch_29_Cal : Wuffs.U64 := 0;
-      G_P_29_Cal : Wuffs.U32 := 0;
-      G_S_29_Cal_A : Wuffs.U8 := 0;
-      G_S_29_Cal_I : Wuffs.U32 := 0;
-      G_Scratch_30_X2 : Wuffs.U64 := 0;
-      G_P_30_X2 : Wuffs.U32 := 0;
-      G_S_30_X2_N : Wuffs.U32 := 0;
-      G_Scratch_31_X3 : Wuffs.U64 := 0;
-      G_P_31_X3 : Wuffs.U32 := 0;
-      G_S_31_X3_C : Wuffs.U8 := 0;
-      G_S_31_X3_X : Wuffs.U32 := 0;
-      G_S_31_X3_I : Wuffs.U32 := 0;
-      G_Scratch_32_Wr : Wuffs.U64 := 0;
-      G_P_32_Wr : Wuffs.U32 := 0;
-      G_S_32_Wr_I : Wuffs.U32 := 0;
-      G_P_33_X4 : Wuffs.U32 := 0;
-      G_S_33_X4_M : Wuffs.U64 := 0;
-      G_S_33_X4_M2 : Wuffs.U64 := 0;
-      G_S_33_X4_C : Wuffs.U8 := 0;
-      G_Scratch_34_X5 : Wuffs.U64 := 0;
-      G_P_34_X5 : Wuffs.U32 := 0;
-      G_S_34_X5_N : G_U32_Range_0_100 := 0;
-      G_S_34_X5_M : G_U32_Range_0_100 := 0;
-      G_S_34_X5_I : G_U32_Range_0_20 := 0;
-      G_P_35_Fail : Wuffs.U32 := 0;
-      G_Scratch_36_X6 : Wuffs.U64 := 0;
-      G_P_36_X6 : Wuffs.U32 := 0;
-      G_S_36_X6_R : Wuffs.U32 := 0;
-      G_Scratch_37_X7 : Wuffs.U64 := 0;
-      G_P_37_X7 : Wuffs.U32 := 0;
-      G_Scratch_39_X8 : Wuffs.U64 := 0;
-      G_P_39_X8 : Wuffs.U32 := 0;
-      G_S_39_X8_I : Wuffs.U32 := 0;
-      G_Scratch_40_X9 : Wuffs.U64 := 0;
-      G_P_40_X9 : Wuffs.U32 := 0;
-      G_S_40_X9_C : Wuffs.U8 := 0;
-      G_S_40_X9_I : Wuffs.U32 := 0;
-      G_Scratch_41_X10 : Wuffs.U64 := 0;
-      G_P_41_X10 : Wuffs.U32 := 0;
-      G_S_41_X10_Flag : Boolean := False;
-      G_S_41_X10_Status : Wuffs.Status := Wuffs.Ok_Status;
-      G_S_41_X10_H : Wuffs.U16 := 0;
-      G_P_42_Noter : Wuffs.U32 := 0;
-      G_Scratch_43_X11 : Wuffs.U64 := 0;
-      G_P_43_X11 : Wuffs.U32 := 0;
-      G_Scratch_44_Y1 : Wuffs.U64 := 0;
-      G_P_44_Y1 : Wuffs.U32 := 0;
-      G_S_44_Y1_I : G_U32_Range_0_10 := 0;
-      G_S_44_Y1_K : Wuffs.U32 := 0;
-      G_Scratch_45_Z1 : Wuffs.U64 := 0;
-      G_P_45_Z1 : Wuffs.U32 := 0;
-      G_S_45_Z1_I : Wuffs.U32 := 0;
-      G_Scratch_46_Z2 : Wuffs.U64 := 0;
-      G_P_46_Z2 : Wuffs.U32 := 0;
+      F_Nres : Wuffs.U64 := 0;
+      G_Scratch_4_T1 : Wuffs.U64 := 0;
+      G_P_4_T1 : Wuffs.U32 := 0;
+      G_S_4_T1_C : Wuffs.U8 := 0;
+      G_S_4_T1_N : Wuffs.U32 := 0;
+      G_S_4_T1_I : Wuffs.U32 := 0;
+      G_S_4_T1_Acc : Wuffs.U32 := 0;
+      G_Scratch_5_T2 : Wuffs.U64 := 0;
+      G_P_5_T2 : Wuffs.U32 := 0;
+      G_S_5_T2_C : Wuffs.U8 := 0;
+      G_S_5_T2_J : Wuffs.U32 := 0;
+      G_S_5_T2_K : Wuffs.U32 := 0;
+      G_Scratch_6_Inner : Wuffs.U64 := 0;
+      G_P_6_Inner : Wuffs.U32 := 0;
+      G_S_6_Inner_A : Wuffs.U8 := 0;
+      G_S_6_Inner_B : Wuffs.U32 := 0;
+      G_S_6_Inner_I : Wuffs.U32 := 0;
+      G_Scratch_7_T3 : Wuffs.U64 := 0;
+      G_P_7_T3 : Wuffs.U32 := 0;
+      G_S_7_T3_C : Wuffs.U8 := 0;
+      G_S_7_T3_N : Wuffs.U32 := 0;
+      G_S_7_T3_R : Wuffs.U32 := 0;
+      G_P_8_Eat : Wuffs.U32 := 0;
+      G_Scratch_9_T4 : Wuffs.U64 := 0;
+      G_P_9_T4 : Wuffs.U32 := 0;
+      G_Scratch_10_T5 : Wuffs.U64 := 0;
+      G_P_10_T5 : Wuffs.U32 := 0;
+      G_S_10_T5_Arr : Wuffs.Bytes (0 .. 3);
+      G_S_10_T5_I : Wuffs.U32 := 0;
+      G_P_11_T6 : Wuffs.U32 := 0;
+      G_Scratch_11_T6 : Wuffs.U64 := 0;
+      G_S_11_T6_I : Wuffs.U32 := 0;
+      G_Scratch_12_T7 : Wuffs.U64 := 0;
+      G_P_12_T7 : Wuffs.U32 := 0;
+      G_S_12_T7_N : G_U32_Range_0_10 := 0;
+      G_S_12_T7_I : Wuffs.U32 := 0;
+      G_Scratch_14_T8 : Wuffs.U64 := 0;
+      G_P_14_T8 : Wuffs.U32 := 0;
+      G_S_14_T8_C : Wuffs.U8 := 0;
+      G_Scratch_15_T9 : Wuffs.U64 := 0;
+      G_P_15_T9 : Wuffs.U32 := 0;
+      G_Scratch_16_U1 : Wuffs.U64 := 0;
+      G_P_16_U1 : Wuffs.U32 := 0;
+      G_S_16_U1_C : Wuffs.U8 := 0;
+      G_S_16_U1_I : G_U32_Range_0_10 := 0;
+      G_S_16_U1_N : Wuffs.U32 := 0;
+      G_Scratch_18_U2 : Wuffs.U64 := 0;
+      G_P_18_U2 : Wuffs.U32 := 0;
+      G_P_19_Eat2 : Wuffs.U32 := 0;
+      G_Scratch_20_U3 : Wuffs.U64 := 0;
+      G_P_20_U3 : Wuffs.U32 := 0;
+      G_S_20_U3_C : Wuffs.U8 := 0;
+      G_Scratch_22_U4 : Wuffs.U64 := 0;
+      G_P_22_U4 : Wuffs.U32 := 0;
+      G_S_22_U4_R : Wuffs.U32 := 0;
+      G_Scratch_23_U5 : Wuffs.U64 := 0;
+      G_P_23_U5 : Wuffs.U32 := 0;
+      G_Scratch_24_V1 : Wuffs.U64 := 0;
+      G_P_24_V1 : Wuffs.U32 := 0;
+      G_S_24_V1_M : Wuffs.U64 := 0;
+      G_S_24_V1_X : Wuffs.U32 := 0;
+      G_S_24_V1_Y : Wuffs.U64 := 0;
+      G_P_27_Eat3 : Wuffs.U32 := 0;
+      G_Scratch_28_W1 : Wuffs.U64 := 0;
+      G_P_28_W1 : Wuffs.U32 := 0;
+      G_S_28_W1_C : Wuffs.U8 := 0;
+      G_S_28_W1_I : Wuffs.U32 := 0;
+      G_Scratch_29_X1 : Wuffs.U64 := 0;
+      G_P_29_X1 : Wuffs.U32 := 0;
+      G_S_29_X1_C : Wuffs.U8 := 0;
+      G_S_29_X1_I : Wuffs.U32 := 0;
+      G_S_29_X1_J : Wuffs.U32 := 0;
+      G_S_29_X1_K : Wuffs.U32 := 0;
+      G_Scratch_30_Cal : Wuffs.U64 := 0;
+      G_P_30_Cal : Wuffs.U32 := 0;
+      G_S_30_Cal_A : Wuffs.U8 := 0;
+      G_S_30_Cal_I : Wuffs.U32 := 0;
+      G_Scratch_31_X2 : Wuffs.U64 := 0;
+      G_P_31_X2 : Wuffs.U32 := 0;
+      G_S_31_X2_N : Wuffs.U32 := 0;
+      G_Scratch_32_X3 : Wuffs.U64 := 0;
+      G_P_32_X3 : Wuffs.U32 := 0;
+      G_S_32_X3_C : Wuffs.U8 := 0;
+      G_S_32_X3_X : Wuffs.U32 := 0;
+      G_S_32_X3_I : Wuffs.U32 := 0;
+      G_Scratch_33_Wr : Wuffs.U64 := 0;
+      G_P_33_Wr : Wuffs.U32 := 0;
+      G_S_33_Wr_I : Wuffs.U32 := 0;
+      G_P_34_X4 : Wuffs.U32 := 0;
+      G_S_34_X4_M : Wuffs.U64 := 0;
+      G_S_34_X4_M2 : Wuffs.U64 := 0;
+      G_S_34_X4_C : Wuffs.U8 := 0;
+      G_Scratch_35_X5 : Wuffs.U64 := 0;
+      G_P_35_X5 : Wuffs.U32 := 0;
+      G_S_35_X5_N : G_U32_Range_0_100 := 0;
+      G_S_35_X5_M : G_U32_Range_0_100 := 0;
+      G_S_35_X5_I : G_U32_Range_0_20 := 0;
+      G_P_36_Fail : Wuffs.U32 := 0;
+      G_Scratch_37_X6 : Wuffs.U64 := 0;
+      G_P_37_X6 : Wuffs.U32 := 0;
+      G_S_37_X6_R : Wuffs.U32 := 0;
+      G_Scratch_38_X7 : Wuffs.U64 := 0;
+      G_P_38_X7 : Wuffs.U32 := 0;
+      G_Scratch_40_X8 : Wuffs.U64 := 0;
+      G_P_40_X8 : Wuffs.U32 := 0;
+      G_S_40_X8_I : Wuffs.U32 := 0;
+      G_Scratch_41_X9 : Wuffs.U64 := 0;
+      G_P_41_X9 : Wuffs.U32 := 0;
+      G_S_41_X9_C : Wuffs.U8 := 0;
+      G_S_41_X9_I : Wuffs.U32 := 0;
+      G_Scratch_42_X10 : Wuffs.U64 := 0;
+      G_P_42_X10 : Wuffs.U32 := 0;
+      G_S_42_X10_Flag : Boolean := False;
+      G_S_42_X10_Status : Wuffs.Status := Wuffs.Ok_Status;
+      G_S_42_X10_H : Wuffs.U16 := 0;
+      G_P_43_Noter : Wuffs.U32 := 0;
+      G_Scratch_44_X11 : Wuffs.U64 := 0;
+      G_P_44_X11 : Wuffs.U32 := 0;
+      G_Scratch_45_Y1 : Wuffs.U64 := 0;
+      G_P_45_Y1 : Wuffs.U32 := 0;
+      G_S_45_Y1_I : G_U32_Range_0_10 := 0;
+      G_S_45_Y1_K : Wuffs.U32 := 0;
+      G_Scratch_46_Z1 : Wuffs.U64 := 0;
+      G_P_46_Z1 : Wuffs.U32 := 0;
+      G_S_46_Z1_I : Wuffs.U32 := 0;
+      G_Scratch_47_Z2 : Wuffs.U64 := 0;
+      G_P_47_Z2 : Wuffs.U32 := 0;
    end record;
 
    --  Wuffs: func thing.inner
@@ -583,5 +613,25 @@ private
       A_Src : Wuffs.Bytes;
       A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
       return Wuffs.Status;
+
+   --  Wuffs: func thing.nr
+   function Nr
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Null : Boolean;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_K : Wuffs.U32)
+      return Wuffs.U64;
+
+   --  Wuffs: func thing.nq
+   function Nq
+     (Self : in out Thing;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Null : Boolean;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_K : Wuffs.U32)
+      return Wuffs.U64;
 
 end Wuffs.Std.Advtest;

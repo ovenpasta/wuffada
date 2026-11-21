@@ -36,6 +36,13 @@ const (
 	kCursor   // Wuffs.Base.IO.Reader or Writer.
 	kNptr     // A nullable pointer to a base value type: an object plus a "null" flag.
 	kPixBuf   // Wuffs "ptr base.pixel_buffer": a descriptor plus two arrays.
+
+	// kNptrPixBuf is Wuffs "nptr base.pixel_buffer": what kPixBuf is, plus
+	// a "null" flag (as for kNptr). When the flag is set, nothing reads the
+	// descriptor or either array: the Wuffs compiler proves a nullable
+	// pointer non-null before any method call on it, and method calls are
+	// the only way to the arrays.
+	kNptrPixBuf
 	kTable    // Wuffs "table base.u8": a Pixel_Buffers.Table, bound to an array.
 	kSwizzler // Wuffs "base.pixel_swizzler".
 
@@ -105,6 +112,7 @@ var (
 	typTable       = &adaType{kind: kTable, name: buffersPkg + ".Table"}
 	typSwizzler    = &adaType{kind: kSwizzler, name: swizzlerPkg + ".Swizzler"}
 	typPixBuf      = &adaType{kind: kPixBuf, name: buffersPkg + ".Pixel_Buffer"}
+	typNptrPixBuf  = &adaType{kind: kNptrPixBuf, name: buffersPkg + ".Pixel_Buffer"}
 
 	// The nullable pointers.
 	typNptrImageConfig = &adaType{kind: kNptr, name: formatsPkg + ".Image_Config"}
@@ -327,6 +335,8 @@ func (g *gen) typeOf(x *a.TypeExpr, public bool) (*adaType, error) {
 				return typNptrMoreInfo, nil
 			case t.IDDecodeFrameOptions:
 				return typNptrFrameOpts, nil
+			case t.IDPixelBuffer:
+				return typNptrPixBuf, nil
 			}
 		}
 		if in := x.Inner(); in.IsEitherArrayType() {

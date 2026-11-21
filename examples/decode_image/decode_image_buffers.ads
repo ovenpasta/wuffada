@@ -13,6 +13,7 @@ with Wuffs.Std.Etc2;
 with Wuffs.Std.Nie;
 with Wuffs.Std.Qoi;
 with Wuffs.Std.Wbmp;
+with Wuffs.Std.Webp;
 
 package Decode_Image_Buffers is
 
@@ -42,5 +43,6 @@ package Decode_Image_Buffers is
    Qoi_Decoder : Wuffs.Std.Qoi.Decoder;
    Etc2_Decoder : Wuffs.Std.Etc2.Decoder;
    Wbmp_Decoder : Wuffs.Std.Wbmp.Decoder;
+   Webp_Decoder : Wuffs.Std.Webp.Decoder;
 
 end Decode_Image_Buffers;

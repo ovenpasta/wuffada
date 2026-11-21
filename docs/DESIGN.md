@@ -49,6 +49,7 @@ Two GNAT projects so the halves build independently: `ada/wuffs_base.gpr`
 | `slice T` as a re-assignable value in generated code | `Wuffs.Runtime` slice handle (GNAT fat pointer); every index still bounds-checked |
 | `struct` | `limited record`; never copied, never returned by value |
 | `implements base.X` | Ada limited interface in `Wuffs.Runtime` |
+| `nptr base.image_config` etc., `nptr base.pixel_buffer` | the object (for a pixel buffer: descriptor, pixels and palette arrays) plus a `_Null : Boolean`; nothing is read or written when it is True, and everything is validated at entry when it is False |
 | `status` | `Wuffs.Status` (root package): a small value record (category + code), no pointers; base status constants live in `Wuffs.Base` |
 | `~mod+ ~mod- ~mod*` | native modular operators |
 | `~sat+ ~sat-` | `Wuffs.Base.Ints` saturating functions |
@@ -167,8 +168,9 @@ Not in scope yet. `choose` statements resolve to the scalar default.
    thumbhash, handsum; hashers and decompressors sha256, xxhash32/64, crc64,
    bzip2, lzma, lzip, xz; YCCK swizzle proved, about 0.9-1.1x of upstream's
    scalar C.
-4. Done: JPEG (baseline and progressive, scalar paths).
-5. Next: SIMD; vp8/webp; json/cbor (token I/O); the known follow-ups below.
+4. Done: JPEG (baseline and progressive) and WebP (lossy VP8 and lossless
+   VP8L), scalar paths.
+5. Next: json/cbor (token I/O); SIMD; the known follow-ups below.
 
 ## Known follow-ups
 
@@ -188,13 +190,23 @@ From the review of generator milestone 4a; none affects generated `std` code.
   hostile-caller tests (no short or zero work buffer).
 * Still rejected at generation time: writer `io_limit`, private and
   non-classy structs, local arrays over 1 KiB, slice types other than u8,
-  tables from non-destination memory, token I/O. vp8/webp need
-  `make_pixel_blend` / `demake_pixel_blend` and nullable pixel buffers;
-  json/cbor need token I/O.
+  tables from non-destination memory, token I/O (needed by json/cbor).
 * JPEG: the reference is upstream's *scalar* C build. Upstream's AVX2 IDCT
   saturates in 16-bit lanes where its scalar IDCT wraps, so the two upstream
   builds give different pixels for out-of-range coefficients in corrupt
   files; on valid files they and the Ada agree byte for byte.
+* WebP: upstream behaviours the Ada reproduces because it follows upstream
+  C byte for byte: the VP8 loop-filter sharpness clamp uses `max` where the
+  VP8 specification has `min` (pixels differ from libwebp by up to 15 when
+  sharpness is non-zero); a lossless image inside an extended (VP8X)
+  container is not decodable; `workbuf_len` omits the alpha plane for
+  VP8X+ALPH+VP8; animations are rejected. Files hitting these are compared
+  with upstream C only.
+* WebP: `Wuffs.Std.Webp.Decoder` is about 3.2 MB (Huffman tables and the
+  embedded VP8 decoder). Callers must declare it at library level or
+  allocate it; it never goes on the library's stack.
+* WebP tests: no damaged file has a chunk size exactly one below what its
+  header needs (one surviving mutant); `test.sh` requires libwebp.
 * JPEG: the comparison with Go's `image/jpeg` is a gross-error check only.
   On the default (triangle-filter) upsampling path its tolerance does not
   catch subtle errors; that path rests on the byte-exact C comparison.

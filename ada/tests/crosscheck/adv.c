@@ -196,6 +196,89 @@ static void run(int f, uint32_t seed, size_t s, size_t d) {
          wuffs_advtest__thing__get_st(&g_t), out_hash, workbuf, h);
 }
 
+// ---- The n functions: nullable pixel buffers, pixel blends, ranges.
+
+static uint8_t g_pix[64];
+static uint8_t g_pal[1024];
+
+static uint64_t fnv_bytes(const uint8_t* p, size_t n) {
+  uint64_t h = 0xCBF29CE484222325ull;
+  for (size_t i = 0; i < n; i++) {
+    h = (h ^ p[i]) * 0x100000001B3ull;
+  }
+  return h;
+}
+
+// Pixel buffer k: 0, BGRA (not premultiplied) 4 by 3; 1, indexed 5 by 2;
+// 2, a null pixel buffer.
+static void make_pb(wuffs_base__pixel_buffer* pb, int k) {
+  for (int i = 0; i < 64; i++) {
+    g_pix[i] = (uint8_t)(i * 5 + 2);
+  }
+  for (int i = 0; i < 1024; i++) {
+    g_pal[i] = (uint8_t)(i * 3 + 1);
+  }
+  *pb = wuffs_base__null_pixel_buffer();
+  if (k == 2) {
+    return;
+  }
+  wuffs_base__pixel_config pc = wuffs_base__null_pixel_config();
+  uint32_t w = k ? 5 : 4, h = k ? 2 : 3, bpp = k ? 1 : 4;
+  wuffs_base__pixel_config__set(
+      &pc,
+      k ? WUFFS_BASE__PIXEL_FORMAT__INDEXED__BGRA_BINARY
+        : WUFFS_BASE__PIXEL_FORMAT__BGRA_NONPREMUL,
+      0, w, h);
+  wuffs_base__table_u8 t = wuffs_base__make_table_u8(g_pix, w * bpp, h, w * bpp);
+  wuffs_base__status st = wuffs_base__pixel_buffer__set_interleaved(
+      pb, &pc, t, wuffs_base__make_slice_u8(g_pal, 1024));
+  if (st.repr) {
+    fprintf(stderr, "adv: set_interleaved: %s\n", st.repr);
+  }
+}
+
+static void run_n(void) {
+  wuffs_base__pixel_buffer pb;
+  for (int k = 0; k < 3; k++) {
+    for (uint32_t sel = 0; sel < 8; sel++) {
+      for (int f = 1; f <= 2; f++) {
+        make_pb(&pb, k);
+        if (wuffs_advtest__thing__initialize(&g_t, sizeof g_t, WUFFS_VERSION, 0)
+                .repr) {
+          return;
+        }
+        if (f == 1) {
+          wuffs_advtest__thing__n1(&g_t, &pb, sel);
+        } else {
+          wuffs_advtest__thing__n2(&g_t, (sel & 4) ? NULL : &pb, sel);
+        }
+        printf("= n%d pb%d sel%" PRIu32 " r=%016" PRIX64 " pix=%016" PRIX64
+               " pal=%016" PRIX64 "\n",
+               f, k, sel, wuffs_advtest__thing__get_nres(&g_t), fnv_bytes(g_pix, 64),
+               fnv_bytes(g_pal, 1024));
+      }
+    }
+  }
+  if (wuffs_advtest__thing__initialize(&g_t, sizeof g_t, WUFFS_VERSION, 0)
+          .repr) {
+    return;
+  }
+  static const uint8_t blends[] = {0, 1, 2, 255};
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      printf("= n3 b%d x%d r=%08" PRIX32 "\n", blends[i], blends[j],
+             wuffs_advtest__thing__n3(&g_t, blends[i], blends[j]));
+    }
+  }
+  static const uint64_t ranges[][2] = {
+      {0, 0}, {1, 0}, {5, 9}, {UINT64_MAX, UINT64_MAX}, {10, 5}, {3, UINT64_MAX},
+  };
+  for (int i = 0; i < 6; i++) {
+    printf("= n4 %d r=%016" PRIX64 "\n", i,
+           wuffs_advtest__thing__n4(&g_t, ranges[i][0], ranges[i][1]));
+  }
+}
+
 int main(void) {
   for (int f = 0; f < NUM_FUNCS; f++) {
     for (uint32_t seed = 0; seed < NUM_SEEDS; seed++) {
@@ -229,5 +312,6 @@ int main(void) {
          status_number(wuffs_advtest__thing__t9(&g_t, &dst, &src, workbuf)));
   printf("= interleave 5 %" PRIu64 "\n",
          (uint64_t)wuffs_advtest__thing__get_sum(&g_t));
+  run_n();
   return 0;
 }

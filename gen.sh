@@ -120,6 +120,25 @@ gen "$tmp/gen" jpeg \
     wuffs/std/jpeg/decode_mcu_progressive_dc_high_bits.wuffs \
     wuffs/std/jpeg/decode_mcu_progressive_dc_low_bit.wuffs \
     wuffs/std/jpeg/decode_quirks.wuffs
+gen "$tmp/gen" vp8 \
+    wuffs/std/vp8/common_consts.wuffs \
+    wuffs/std/vp8/decode_bitstream.wuffs \
+    wuffs/std/vp8/decode_coefficients.wuffs \
+    wuffs/std/vp8/decode_filter_default.wuffs \
+    wuffs/std/vp8/decode_header_partition.wuffs \
+    wuffs/std/vp8/decode_idct_default.wuffs \
+    wuffs/std/vp8/decode_macroblocks.wuffs \
+    wuffs/std/vp8/decode_predict_default.wuffs \
+    wuffs/std/vp8/decode_quirks.wuffs \
+    wuffs/std/vp8/decode_reconstruct.wuffs \
+    wuffs/std/vp8/decode_vp8.wuffs
+gen "$tmp/gen" webp \
+    wuffs/std/webp/decode_alph_default.wuffs \
+    wuffs/std/webp/decode_huffman.wuffs \
+    wuffs/std/webp/decode_pixels_slow.wuffs \
+    wuffs/std/webp/decode_transform.wuffs \
+    wuffs/std/webp/decode_vp8l.wuffs \
+    wuffs/std/webp/decode_webp.wuffs
 
 # A test-only package that exercises what the standard packages above do not
 # (see the comment in the .wuffs file). Its driver is ada/tests/test_m1.adb.

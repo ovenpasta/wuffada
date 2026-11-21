@@ -289,8 +289,20 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    --  d. A pixel buffer is valid for its two arrays (Valid_Pixel_Buffer),
    --     and Pixels and Palette, the two arrays that pixel operations
    --     write, are each apart from each other and from every other array
-   --     argument (the source buffer, the work buffer).
+   --     argument (the source buffer, the work buffer, another pixel
+   --     buffer's arrays).
    --  e. Every argument of a refined type (base.u32[..= 9]) is in range.
+   --
+   --  A nullable pixel buffer (`nptr base.pixel_buffer`) is four Ada
+   --  parameters: the descriptor, a Boolean that says that the Wuffs pointer
+   --  is null, then the two arrays.  The Boolean is checked under (a).  If
+   --  it is False, the descriptor and arrays are checked as under (b) and
+   --  (d); if it is True, they are not looked at, here or later (generated
+   --  code reaches them only through method calls, which the Wuffs compiler
+   --  proves are made on a pointer that is not null, and which assert it),
+   --  as C does not dereference a NULL pointer.  Generated code passes a
+   --  literal nullptr as Null_Pixel_Buffer, True and two empty arrays of its
+   --  own.
    --
    --  Overlap between array arguments other than under (d) is NOT an error
    --  at entry: a destination buffer, a source buffer and a work buffer may
@@ -440,7 +452,12 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    --  memory, the scratch buffer is a field of the decoder and the sources
    --  are parts of the caller's work buffer or of another field of the
    --  decoder, so after the checks at entry (see "Arguments" above) none of
-   --  this can fail there.
+   --  this can fail there.  In std/vp8 likewise: Src0 .. Src2 (the Y, U and
+   --  V planes) are parts of the caller's work buffer and Src3 (the alpha
+   --  plane, when std/webp has put one there) is the work buffer's first
+   --  Width * Height bytes, before them; they may overlap one another (they
+   --  do not), but not Pixels (checked at entry) or the scratch buffer (a
+   --  field of the decoder).
    procedure Swizzle_YCCK
      (PB                : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
       Pixels            : in out Wuffs.Bytes;

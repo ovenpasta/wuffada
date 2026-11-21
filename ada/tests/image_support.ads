@@ -15,6 +15,8 @@ with Wuffs.Std.Etc2;
 with Wuffs.Std.Thumbhash;
 with Wuffs.Std.Handsum;
 with Wuffs.Std.Jpeg;
+with Wuffs.Std.Vp8;
+with Wuffs.Std.Webp;
 
 package Image_Support is
 
@@ -64,6 +66,10 @@ package Image_Support is
    --  For test_hostile.adb.
    Arena : Wuffs.Bytes (100 .. 8291);
 
+   --  For test_entry.adb: a copy of the std/vp8 decoder inside the std/webp
+   --  decoder.
+   Sub_Copy : Wuffs.Bytes (0 .. 16383);
+
    Netpbm_Decoder : Wuffs.Std.Netpbm.Decoder;
    Bmp_Decoder    : Wuffs.Std.Bmp.Decoder;
    Gif_Decoder    : Wuffs.Std.Gif.Decoder;
@@ -76,5 +82,7 @@ package Image_Support is
    Thumbhash_Decoder : Wuffs.Std.Thumbhash.Decoder;
    Handsum_Decoder : Wuffs.Std.Handsum.Decoder;
    Jpeg_Decoder : Wuffs.Std.Jpeg.Decoder;
+   Vp8_Decoder : Wuffs.Std.Vp8.Decoder;
+   Webp_Decoder : Wuffs.Std.Webp.Decoder;
 
 end Image_Support;

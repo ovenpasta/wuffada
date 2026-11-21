@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 // pnmcheck compares what examples/decode_image wrote with what Go's
-// image/png, image/gif or image/jpeg decodes from the same input.
+// image/png, image/gif, image/jpeg or golang.org/x/image/webp decodes from
+// the same input.
 //
 // Usage: pnmcheck INPUT OUTPUT
 //
-// INPUT is a PNG, GIF or JPEG file and OUTPUT is the PPM (P6) or PAM (P7,
+// INPUT is a PNG, GIF, JPEG or WebP file and OUTPUT is the PPM (P6) or PAM (P7,
 // RGB_ALPHA) file that decode_image made from it. For a GIF, the first frame
 // is compared, within its bounds. Fully transparent pixels are equal
 // whatever their colour. A JPEG's pixels are compared with a tolerance, as
 // ada/tests/imgcorpus does (see jpegCategory there): 2 per channel for a
 // grayscale image, 4 for colour without chroma subsampling, and 96 with it
-// (Wuffs' default triangle upsampling against Go's box filter).
+// (Wuffs' default triangle upsampling against Go's box filter). A lossless
+// WebP's must be exact; a lossy one's within 4 of Go's planes converted as
+// ada/tests/imgcorpus does (package webpconv).
 package main
 
 import (
@@ -27,6 +30,10 @@ import (
 	"io"
 	"log"
 	"os"
+
+	"golang.org/x/image/webp"
+
+	"wuffada/ada/tests/webpconv"
 )
 
 func main() {
@@ -54,6 +61,29 @@ func main() {
 			if m.SubsampleRatio != image.YCbCrSubsampleRatio444 {
 				tolerance = 96
 			}
+		}
+	} else if len(in) >= 12 && bytes.HasPrefix(in, []byte("RIFF")) && string(in[8:12]) == "WEBP" {
+		if m, err = webp.Decode(bytes.NewReader(in)); err != nil {
+			log.Fatal(err)
+		}
+		bounds = m.Bounds()
+		var y *image.YCbCr
+		var a []byte
+		var aStride int
+		switch c := m.(type) {
+		case *image.YCbCr:
+			y = c
+		case *image.NYCbCrA:
+			y, a, aStride = &c.YCbCr, c.A, c.AStride
+		}
+		if y != nil {
+			// As NRGBA, converted here, not by Go's color package (JFIF).
+			bgra := webpconv.FancyBGRA(y, a, aStride)
+			n := image.NewNRGBA(bounds)
+			for i := 0; i+3 < len(bgra); i += 4 {
+				n.Pix[i], n.Pix[i+1], n.Pix[i+2], n.Pix[i+3] = bgra[i+2], bgra[i+1], bgra[i], bgra[i+3]
+			}
+			m, tolerance = n, 4
 		}
 	} else if bytes.HasPrefix(in, []byte("GIF")) {
 		g, err := gif.DecodeAll(bytes.NewReader(in))

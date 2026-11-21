@@ -2,8 +2,8 @@
 # A performance baseline (a report, not a test; not part of ./test.sh): the
 # generated Ada decoders, release profile, against upstream's C, for CRC-32
 # and Adler-32 of a 4 MiB buffer, gzip decompression of a few megabytes, and
-# decoding the largest PNGs, the largest GIF and the largest JPEGs of
-# wuffs/test/data to BGRA_PREMUL.
+# decoding the largest PNGs, the largest GIF, the largest JPEGs and the
+# largest lossy and lossless WebPs of wuffs/test/data to BGRA_PREMUL.
 #
 # usage: ada/tests/bench/run.sh
 #
@@ -36,6 +36,8 @@ cat wuffs/test/data/*.txt wuffs/test/data/*.bmp wuffs/test/data/*.json 2> /dev/n
     ls -S wuffs/test/data/*.png | head -n 4 | sed 's/^/png 10 /'
     ls -S wuffs/test/data/*.gif | head -n 1 | sed 's/^/gif 20 /'
     ls -S wuffs/test/data/*.jpeg | head -n 3 | sed 's/^/jpeg 10 /'
+    ls -S wuffs/test/data/*.lossy.webp | head -n 1 | sed 's/^/webp 10 /'
+    ls -S wuffs/test/data/*.lossless.webp | head -n 1 | sed 's/^/webp 10 /'
 } > "$tmp/list"
 
 (cd ada && alr exec -- gprbuild -q -P wuffs_gen.gpr -XWUFFS_PROFILE=release bench_main.adb)
@@ -69,13 +71,13 @@ fi
 echo "results (checksums of everything computed) are identical in all four builds (JPEG: but c-simd)"
 echo
 printf '%-8s %-28s %9s | %8s %8s %8s %8s | %7s %7s %7s\n' kind input bytes ada ada-O3 c-scalar c-simd ada/sc ada/simd O3/O2
-echo "(ns per input byte; for png and gif, ms per image in the second line)"
+echo "(ns per input byte; for images, ms per image in the second line)"
 paste -d ' ' "$tmp/ada.out" "$tmp/ada-O3.out" "$tmp/c-scalar.out" "$tmp/c-simd.out" |
     awk '{
         n = split($2, parts, "/"); name = parts[n]; bytes = $3
         a = $4; o = $9; s = $14; v = $19
         printf "%-8s %-28s %9d | %8.3f %8.3f %8.3f %8.3f | %7.2f %7.2f %7.2f\n",
             $1, substr(name, 1, 28), bytes, a / bytes, o / bytes, s / bytes, v / bytes, a / s, a / v, o / a
-        if ($1 == "png" || $1 == "gif" || $1 == "jpeg")
+        if ($1 == "png" || $1 == "gif" || $1 == "jpeg" || $1 == "webp")
             printf "%-8s %-28s %9s | %8.2f %8.2f %8.2f %8.2f |\n", "", "  ms per image", "", a / 1e6, o / 1e6, s / 1e6, v / 1e6
     }'
