@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 """The mutants of ada/tests/mutation.sh: deliberate faults, one at a time.
 
-usage: mutants.py list              print "NAME WHERE PROFILE EQUIVALENT" for each mutant
+usage: mutants.py check             apply every mutant in memory only; fail if any is stale
+       mutants.py list              print "NAME WHERE PROFILE EQUIVALENT" for each mutant
        mutants.py apply NAME        apply it to the tree in the current directory
        mutants.py why NAME          print why a known-equivalent mutant is one
 
@@ -23,7 +24,9 @@ in the release profile, GNAT's -gnatwc reports as a condition that is
 always False). S01 to S16 are for the SIMD milestone (run them in both
 profiles, with MUTATION_SIMD=1: see mutation.sh). P01 to P05 are for the
 performance milestone (cursor isolation, index arithmetic, copies between
-array fields of the receiver).
+array fields of the receiver), P06 and P07 for its review. "mutants.py
+check" applies every mutant in memory and fails if any no longer applies
+(run it after ./gen.sh or a change to the generator or the runtime shell).
 """
 
 import glob
@@ -35,45 +38,88 @@ RT = "ada/src/runtime/wuffs-runtime.adb"
 RTS = "ada/src/runtime/wuffs-runtime.ads"
 GEN = "ada/gen/wuffs-std-"
 GENS = "ada/gen/simd/wuffs-std-"
+GENSC = "ada/gen/scalar/wuffs-std-"
+# The packages that have a SIMD variant (png, jpeg, deflate, the hashers) are
+# in ada/gen/scalar and ada/gen/simd. mutation.sh builds the SIMD variant (the
+# default WUFFS_SIMD=on) and, outside MUTATION_SIMD mode, runs its scalar
+# code (WUFFS_TEST_CPU_DISABLE=all); a mutant of such a package's scalar code
+# changes both files (BOTH), so that it means the same in either build.
+BOTH = (GENSC, GENS)
 SSE42 = "ada/src/simd/wuffs-runtime-x86-sse42.ads"
 CPUID = "ada/src/simd/wuffs-runtime-x86-cpuid.adb"
 
 
+# In "check" mode, the mutants write here instead of to the tree.
+OVERLAY = None
+
+
+def read(path):
+    if OVERLAY is not None and path in OVERLAY:
+        return OVERLAY[path]
+    with open(path) as f:
+        return f.read()
+
+
+def write(path, s):
+    if OVERLAY is not None:
+        OVERLAY[path] = s
+        return
+    with open(path, "w") as f:
+        f.write(s)
+
+
 def rep(path, old, new, count=1):
-    s = open(path).read()
+    s = read(path)
     if s.count(old) != count:
         sys.exit("mutants.py: %d occurrences of %r in %s" % (s.count(old), old, path))
-    open(path, "w").write(s.replace(old, new))
+    write(path, s.replace(old, new))
 
 
 def nth_rep(path, old, new, k):
     """Replaces the k-th (from 0) occurrence of old in path."""
-    s = open(path).read()
+    s = read(path)
     i = -1
     for _ in range(k + 1):
         i = s.find(old, i + 1)
         if i < 0:
             sys.exit("mutants.py: fewer than %d occurrences of %r in %s" % (k + 1, old, path))
-    open(path, "w").write(s[:i] + new + s[i + len(old):])
+    write(path, s[:i] + new + s[i + len(old):])
 
 
 def drop_end_limit(k):
     """Removes the k-th End_Limit call of the generated png decoder."""
-    path = GEN + "png.adb"
-    s = open(path).read()
-    found = [m for m in re.finditer(r"\n *Wuffs\.Base\.IO\.End_Limit \([^;]*;", s)]
-    if len(found) != 4:
-        sys.exit("mutants.py: %d End_Limit calls in %s" % (len(found), path))
-    m = found[k]
-    indent = len(m.group(0)) - len(m.group(0).lstrip("\n ")) - 1
-    open(path, "w").write(s[: m.start()] + "\n" + " " * indent + "null;" + s[m.end():])
+    for prefix in BOTH:
+        path = prefix + "png.adb"
+        s = read(path)
+        found = [m for m in re.finditer(r"\n *Wuffs\.Base\.IO\.End_Limit \([^;]*;", s)]
+        if len(found) != 4:
+            sys.exit("mutants.py: %d End_Limit calls in %s" % (len(found), path))
+        m = found[k]
+        indent = len(m.group(0)) - len(m.group(0).lstrip("\n ")) - 1
+        write(path, s[: m.start()] + "\n" + " " * indent + "null;" + s[m.end():])
+
+
+def rep_both(name, old, new, count=1):
+    """rep in both variants (BOTH) of a generated package's body."""
+    for prefix in BOTH:
+        rep(prefix + name, old, new, count)
+
+
+def re_rep_both(name, pattern, new, count=1):
+    """Replaces the matches of a regular expression, in both variants."""
+    for prefix in BOTH:
+        path = prefix + name
+        s, n = re.subn(pattern, new, read(path))
+        if n != count:
+            sys.exit("mutants.py: %d matches of %r in %s" % (n, pattern, path))
+        write(path, s)
 
 
 def no_checks_on_resume():
     """Skips every argument check of a coroutine that is suspended."""
     n = 0
     for path in glob.glob(GEN + "*.adb"):
-        s = open(path).read()
+        s = read(path)
         pattern = re.compile(
             r"\n      if ((?:(?!\n      if )[\s\S])*?)(\n      then| then)"
             r"\n         Self\.Magic := Wuffs\.Runtime\.Magic_Disabled;"
@@ -91,34 +137,51 @@ def no_checks_on_resume():
 
         s, k = pattern.subn(wrap, s)
         n += k
-        open(path, "w").write(s)
+        write(path, s)
     if n < 20:
         sys.exit("mutants.py: only %d argument checks found" % n)
 
 
 def idct_constant():
     """Changes one multiplier of std/jpeg's scalar inverse DCT, everywhere."""
-    path = GEN + "jpeg.adb"
-    s = open(path).read()
-    n = s.count("16#0000_1151#")
-    if n < 8:
-        sys.exit("mutants.py: only %d IDCT constants found" % n)
-    open(path, "w").write(s.replace("16#0000_1151#", "16#0000_1152#"))
+    for prefix in BOTH:
+        path = prefix + "jpeg.adb"
+        s = read(path)
+        n = s.count("16#0000_1151#")
+        if n < 8:
+            sys.exit("mutants.py: only %d IDCT constants found" % n)
+        write(path, s.replace("16#0000_1151#", "16#0000_1152#"))
 
 
 def null_flag_ignored():
     n = 0
     for path in glob.glob(GEN + "*.adb"):
-        s = open(path).read()
+        s = read(path)
         n += s.count("if not A_Dst_Null then")
-        open(path, "w").write(
+        write(path, 
             s.replace("if not A_Dst_Null then", "if A_Dst_Null or else not A_Dst_Null then")
         )
     if n < 6:
         sys.exit("mutants.py: only %d null tests found" % n)
 
 
+def index_rewrite_mod():
+    """Computes ~mod+ and ~mod- in an index or slice bound in Wuffs.Index,
+    like the checked + and -, so that 0 ~mod- 1 is -1 there."""
+    path = G + "lower_expr.go"
+    rep(path, "if op := n.Operator(); (op == t.IDXBinaryPlus || op == t.IDXBinaryMinus) &&",
+        "if op := n.Operator(); (op == t.IDXBinaryPlus || op == t.IDXBinaryMinus ||\n"
+        "\t\top == t.IDXBinaryTildeModPlus || op == t.IDXBinaryTildeModMinus) &&")
+    rep(path, 'if op == t.IDXBinaryPlus {\n\t\t\treturn bin("+", li, ri), nil',
+        'if op == t.IDXBinaryPlus || op == t.IDXBinaryTildeModPlus {\n\t\t\treturn bin("+", li, ri), nil')
+
+
 INTERLACE_START = "[16#FFFF_FFFF#, 16#0000_0001#, 16#0000_0002#, 16#0000_0004#, 16#0000_0000#]"
+# The array arguments that a pixel buffer's arrays must be apart from.
+ENTRY_ARRAYS = "\t\tcase kBytes, kBytesVar, kIOReader, kIOWriter:\n\t\t\tarrays = append(arrays, arg.v)"
+# The array arguments that must not lie in the receiver.
+IN_SELF = ("if v.typ.kind == kBytes || v.typ.kind == kBytesVar || v.typ.kind == kTokenArray {\n"
+           "\t\t\t\tconds = append(conds, sharesSelf(v))")
 PALETTE_LENGTH = "is (if Wuffs.Base.Pixel_Buffers.Has_Palette (PB)\n         and then Palette'Length"
 
 # name: (where, profile, function)
@@ -144,8 +207,8 @@ MUTANTS = {
         "Length := Integer'Min (Text'Length - 1, Buffer'Length);")),
     "09-gen-entry-no-pixels-palette-check": ("src", "checked", lambda: rep(
         G + "lower.go",
-        'callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(pixels), "B", expr(palette)))',
-        'expr(raw("False")))')),
+        'callNamed("Wuffs.Runtime.Share_An_Element", "A", expr(pixels), "B", expr(palette)),\n',
+        'raw("False"),\n')),
     "10-gen-entry-palette-not-checked-against-others": ("src", "checked", lambda: rep(
         G + "lower.go", "for _, written := range []eVar{pixels, palette} {",
         "for _, written := range []eVar{pixels} {")),
@@ -163,11 +226,11 @@ MUTANTS = {
         G + "lower.go", "number = j + 1", "number = len(target.candidates) - j")),
     "14-gen-choose-default-not-restored": ("src", "checked", lambda: rep(
         G + "lower.go",
-        "return []stmt{sAssign{eSel{eVar{l.f.self}, target.choiceField}, "
-        "raw(fmt.Sprint(number))}}, nil",
-        "if number == 0 {\n\t\t\t\treturn nil, nil\n\t\t\t}\n\t\t\t"
-        "return []stmt{sAssign{eSel{eVar{l.f.self}, target.choiceField}, "
-        "raw(fmt.Sprint(number))}}, nil")),
+        "\t\t\tl.f.self.writes++\n\t\t\tassign := []stmt{sAssign{eSel{eVar{l.f.self}, target.choiceField}, "
+        "raw(fmt.Sprint(number))}}",
+        "\t\t\tif number == 0 {\n\t\t\t\treturn nil, nil\n\t\t\t}\n"
+        "\t\t\tl.f.self.writes++\n\t\t\tassign := []stmt{sAssign{eSel{eVar{l.f.self}, target.choiceField}, "
+        "raw(fmt.Sprint(number))}}")),
     "15-gen-iterate-takes-longest-slice": ("src", "checked", lambda: rep(
         G + "lower.go",
         'rel("<", eSel{src, "Length"}, shortest), []stmt{sAssign{shortest, eSel{src, "Length"}}}}}})',
@@ -212,10 +275,11 @@ MUTANTS = {
         '"Data_Length", length, "Closed", expr(raw("True")), "History_Position", hv.e)},')),
 
     "R01-entry-pixels-not-checked-against-src": ("src", "checked", lambda: rep(
-        G + "lower.go", "case kBytes, kBytesVar, kIOReader, kIOWriter:",
-        "case kBytes, kBytesVar, kIOWriter:")),
+        G + "lower.go", ENTRY_ARRAYS, ENTRY_ARRAYS.replace("kIOReader, ", ""))),
     "R02-valid-buffer-closed-not-validated": ("src", "checked", lambda: rep(
-        RTS, "       and then M.Closed'Valid\n", "")),
+        RTS, "M : Wuffs.Base.IO.Buffer_Meta) return Boolean\n   is (M.Ri'Valid\n       and then M.Wi'Valid\n"
+        "       and then M.Closed'Valid\n",
+        "M : Wuffs.Base.IO.Buffer_Meta) return Boolean\n   is (M.Ri'Valid\n       and then M.Wi'Valid\n")),
     "R03-share-an-element-misses-last": ("src", "checked", lambda: rep(
         RT,
         "        and then First_Address (B) < First_Address (A) + SE.Storage_Offset (A'Length);\n"
@@ -279,15 +343,12 @@ MUTANTS = {
         "Wuffs.Base.Ints.Max_U32 (X => Self.F_Dirty_Max_Excl_Y, Y => V_Replicate_Y1);",
         "Wuffs.Base.Ints.Max_U32 (X => Self.F_Dirty_Max_Excl_Y, Y => V_Replicate_Y0);")),
     "R17-entry-workbuf-not-checked": ("src", "checked", lambda: rep(
-        G + "lower.go", "case kBytes, kBytesVar, kIOReader, kIOWriter:",
-        "case kBytes, kIOReader, kIOWriter:")),
+        G + "lower.go", ENTRY_ARRAYS, ENTRY_ARRAYS.replace("kBytesVar, ", ""))),
 
     "N01-entry-read-only-arrays-in-self-accepted": ("src", "checked", lambda: rep(
-        G + "lower.go", "if v.typ.kind == kBytes || v.typ.kind == kBytesVar {\n\t\t\t\tconds",
-        "if v.typ.kind == kBytesVar {\n\t\t\t\tconds")),
+        G + "lower.go", IN_SELF, IN_SELF.replace("v.typ.kind == kBytes || ", ""))),
     "N02-entry-written-arrays-in-self-accepted": ("src", "checked", lambda: rep(
-        G + "lower.go", "if v.typ.kind == kBytes || v.typ.kind == kBytesVar {\n\t\t\t\tconds",
-        "if v.typ.kind == kBytes {\n\t\t\t\tconds")),
+        G + "lower.go", IN_SELF, IN_SELF.replace(" || v.typ.kind == kBytesVar", ""))),
     "N03-entry-booleans-not-validated": ("src", "release", lambda: rep(
         G + "lower.go", "case v.typ.kind == kBool:\n\t\t\t\tconds = append(conds,",
         "case v.typ.kind == kBool:\n\t\t\t\t_ = append(conds,")),
@@ -295,8 +356,8 @@ MUTANTS = {
         G + "lower.go", "body = []stmt{sAssign{magic, raw(rtMagicDisabled)}, ret}",
         "body = []stmt{ret}")),
     "N05-io-limit-exits-accepted": ("src", "checked", lambda: rep(
-        G + "lower.go", "if err := l.noExits(n.Body(), keyword); err != nil {",
-        "if err := l.noExits(nil, keyword); err != nil {")),
+        G + "lower.go", "so there must be none.\n\t\tif err := l.noExits(n.Body(), keyword); err != nil {",
+        "so there must be none.\n\t\tif err := l.noExits(nil, keyword); err != nil {")),
     "N06-positional-library-calls-accepted": ("src", "checked", lambda: rep(
         G + "passes.go", "if _, ok := o.(eNamed); !ok && !positionalCalls[fn.s] {",
         "if _, ok := o.(eNamed); !ok && !positionalCalls[fn.s] && false {")),
@@ -372,10 +433,10 @@ MUTANTS = {
         G + "lower_bulk.go", '"Dst", expr(row), "Byte_Value", arg.e)})...)',
         '"Dst", expr(row), "Byte_Value", arg.e)}, sAssign{k, bin("+", k, raw("1"))})...)')),
     "J06-gen-ycck-planes-1-and-2-swapped": ("src", "checked", lambda: rep(
-        G + "lower_call.go", "src, err := view(vs[6+i], false)",
-        "src, err := view(vs[6+[]int{0, 2, 1, 3}[i]], false)")),
-    "J07-jpeg-ycck-stride0-of-plane-1": ("gen", "checked", lambda: rep(
-        GEN + "jpeg.adb", "Stride0 => V_Width0,", "Stride0 => V_Width1,")),
+        G + "lower_call.go", "src, err := view(vs[8+i], false)",
+        "src, err := view(vs[8+[]int{0, 2, 1, 3}[i]], false)")),
+    "J07-jpeg-ycck-stride0-of-plane-1": ("gen", "checked", lambda: rep_both(
+        "jpeg.adb", "Stride0 => V_Width0,", "Stride0 => V_Width1,")),
     "J08-shell-ycck-scratch-overlap-unchecked": ("src", "checked", lambda: rep(
         RT, "        or else Touches_A_Source (Scratch_Buffer_2K)\n", "")),
     "J09-shell-ycck-pixels-scratch-overlap-unchecked": ("src", "checked", lambda: rep(
@@ -385,14 +446,14 @@ MUTANTS = {
         "      if False\n")),
     "J11-gen-row-pointer-always-row-0": ("src", "checked", lambda: rep(
         G + "lower.go", "return l.flush(sAssign{eVar{v}, iv}), nil", 'return l.flush(sAssign{eVar{v}, raw("0" + flat(iv)[:0])}), nil')),
-    "J12-jpeg-decode-sos-my-not-saved": ("gen", "checked", lambda: rep(
-        GEN + "jpeg.adb", "      Self.G_S_17_Decode_Sos_My := V_My;\n", "      null;\n")),
-    "J13-jpeg-restart-counter-counts-up": ("gen", "checked", lambda: rep(
-        GEN + "jpeg.adb", "Self.F_Restarts_Remaining := Self.F_Restarts_Remaining - 1;",
+    "J12-jpeg-decode-sos-my-not-saved": ("gen", "checked", lambda: re_rep_both(
+        "jpeg.adb", r"      Self\.G_S_\d+_Decode_Sos_My := V_My;\n", "      null;\n")),
+    "J13-jpeg-restart-counter-counts-up": ("gen", "checked", lambda: rep_both(
+        "jpeg.adb", "Self.F_Restarts_Remaining := Self.F_Restarts_Remaining - 1;",
         "Self.F_Restarts_Remaining := Self.F_Restarts_Remaining + 1;")),
     "J14-jpeg-scalar-idct-constant": ("gen", "checked", idct_constant),
-    "J15-jpeg-swizzle-immediately-status-ignored": ("gen", "checked", lambda: rep(
-        GEN + "jpeg.adb", "G_Status := Self.F_Swizzle_Immediately_Status;", "G_Status := Wuffs.Ok_Status;")),
+    "J15-jpeg-swizzle-immediately-status-ignored": ("gen", "checked", lambda: rep_both(
+        "jpeg.adb", "G_Status := Self.F_Swizzle_Immediately_Status;", "G_Status := Wuffs.Ok_Status;")),
     # The vp8/webp milestone: nullable pixel buffers at an entry and in calls,
     # the new built-ins, the shell's swizzle_ycck, generated vp8/webp code.
     "W01-gen-entry-nullable-pixbuf-checked-when-null": ("src", "checked", lambda: rep(
@@ -611,6 +672,11 @@ MUTANTS = {
     "P05-self-arrays-copy-length-off-by-one": ("gen", "release", lambda: rep(
         GEN + "gif.adb", "Src => Self.F_Lzw_Suffixes (Wuffs.Index (V_C)) (0 .. 7),",
         "Src => Self.F_Lzw_Suffixes (Wuffs.Index (V_C)) (1 .. 7),")),
+    # From the review of the performance milestone (TestSelfArrayCopyDispatch,
+    # TestModularIndexArithmetic, advtest's z3 and z4).
+    "P06-self-array-copy-same-component-direct": ("src", "checked", lambda: rep(
+        G + "lower_call.go", 'return fa != "" && fb != "" && fa != fb', 'return fa != "" && fb != ""')),
+    "P07-index-rewrite-applies-to-mod-operators": ("src", "checked", index_rewrite_mod),
 }
 
 
@@ -636,8 +702,35 @@ EQUIVALENT = {
 }
 
 
+def check():
+    """Applies every mutant to an in-memory copy of the tree (nothing is
+    written); prints and counts those whose text no longer applies or that
+    change nothing. A "gen" mutant is checked against the checked-in ada/gen,
+    which is what ./gen.sh makes."""
+    global OVERLAY
+    bad = 0
+    for name, (_, _, fn) in MUTANTS.items():
+        OVERLAY = {}
+        try:
+            fn()
+            changed = [p for p, t in OVERLAY.items() if t != open(p).read()]
+            problem = None if changed else "it changes nothing"
+        except SystemExit as e:
+            problem = str(e.code)
+        except OSError as e:
+            problem = str(e)
+        if problem:
+            bad += 1
+            print("%s: INVALID: %s" % (name, problem))
+    OVERLAY = None
+    print("%d mutants, %d invalid" % (len(MUTANTS), bad))
+    return bad == 0
+
+
 def main():
-    if len(sys.argv) == 2 and sys.argv[1] == "list":
+    if len(sys.argv) == 2 and sys.argv[1] == "check":
+        sys.exit(0 if check() else 1)
+    elif len(sys.argv) == 2 and sys.argv[1] == "list":
         for name, (where, profile, _) in MUTANTS.items():
             print(name, where, profile, "equivalent" if name in EQUIVALENT else "-")
     elif len(sys.argv) == 3 and sys.argv[1] == "why" and sys.argv[2] in EQUIVALENT:

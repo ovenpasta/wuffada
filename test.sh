@@ -50,6 +50,9 @@ go build ./...
 go vet ./...
 unformatted="$(gofmt -l cmd internal ada/tests)"
 [ -z "$unformatted" ] || die "gofmt wants to reformat: $unformatted"
+# Every mutant of ada/tests/mutants.py must still apply to the tree: a mutant
+# whose text has gone stale tests nothing.
+python3 ada/tests/mutants.py check || die "stale mutants in ada/tests/mutants.py"
 
 say "Generate (twice: the output must not change)"
 ./gen.sh

@@ -16,7 +16,11 @@
 // against. The w functions cover writable slices of a field passed next to
 // the receiver and element writes through a slice argument; the x functions
 // (x1 .. x11) are from a second review. The z functions (milestone jpeg)
-// cover the bulk methods (z1) and pointers to rows of a field (z2). The n
+// cover the bulk methods (z1) and pointers to rows of a field (z2); z3
+// (copies between two rows of one field, which may be the same row, and
+// between overlapping parts of one field) and z4 (~mod- and ~mod+ results
+// that wrap, used as indexes and slice bounds) come from the performance
+// milestone's review. The n
 // functions (milestone vp8/webp) are not coroutines: they cover nullable
 // pixel buffers ("nptr base.pixel_buffer": n1 passes a pixel buffer or
 // nullptr to one, n2 takes one at a public entry), make_pixel_blend and
@@ -41,6 +45,8 @@ pub struct thing? (
         u64s : array[2] base.u64,
         buf2 : array[24] base.u8,
         nres : base.u64,
+        brows : array[4] array[8] base.u8,
+        tab  : array[256] base.u8,
 )
 
 pub func thing.get_sum() base.u32 {
@@ -1089,6 +1095,83 @@ pub func thing.z2?(dst: base.io_writer, src: base.io_reader, workbuf: slice base
     p = this.rows[j][..] as ptr array[4] base.u16
     this.st ~mod+= p[(c >> 2) & 3] as base.u32
     args.dst.write_u8?(a: (this.sum & 0xFF) as base.u8)
+}
+
+// z3: copy_from_slice between rows j and k of one array-of-arrays field
+// (overlapping parts of the same row when j == k) and between overlapping
+// parts of one byte array field, with offsets from the input.
+pub func thing.z3?(dst: base.io_writer, src: base.io_reader, workbuf: slice base.u8) {
+    var c  : base.u8
+    var d  : base.u8
+    var i  : base.u32
+    var j  : base.u32[..= 3]
+    var k  : base.u32[..= 3]
+    var lo : base.u64[..= 7]
+    var m  : base.u64[..= 7]
+    var n  : base.u64
+
+    while i < 32 {
+        if (i & 3) == 0 {
+            c = args.src.read_u8?()
+        }
+        this.brows[i >> 3][i & 7] = (this.brows[i >> 3][i & 7] ~mod+ c) ~mod+ ((i & 0xFF) as base.u8)
+        i += 1
+    }
+    i = 0
+    while i < 4 {
+        c = args.src.read_u8?()
+        d = args.src.read_u8?()
+        j = (c & 3) as base.u32
+        k = ((c >> 2) & 3) as base.u32
+        lo = (d & 7) as base.u64
+        m = ((d >> 3) & 7) as base.u64
+        n = this.brows[j][lo ..].copy_from_slice!(s: this.brows[k][m ..])
+        this.sum = (this.sum ~mod* 31) ~mod+ ((n & 0xFF) as base.u32)
+        n = this.buf[lo ..].copy_from_slice!(s: this.buf[m ..])
+        this.sum = (this.sum ~mod* 31) ~mod+ ((n & 0xFF) as base.u32)
+        i += 1
+    }
+    i = 0
+    while i < 32 {
+        args.dst.write_u8?(a: this.brows[i >> 3][i & 7])
+        i += 1
+    }
+    i = 0
+    while i < 16 {
+        args.dst.write_u8?(a: this.buf[i])
+        i += 1
+    }
+}
+
+// z4: ~mod- and ~mod+ results that wrap (c is often 0 or small), and a
+// saturating one, as indexes and slice bounds: 0 ~mod- 1 is 255 here. (h
+// is a u32: for a u8 or u16 "~sat-" as an index, upstream's wuffs-c emits
+// C that does not compile, a cast around both arguments of
+// wuffs_base__u16__sat_sub.)
+pub func thing.z4?(dst: base.io_writer, src: base.io_reader, workbuf: slice base.u8) {
+    var c : base.u8
+    var h : base.u32[..= 255]
+    var w : base.u16
+    var i : base.u32
+
+    while i < 256 {
+        this.tab[i] = (((i ~mod* 151) ~mod+ 7) & 0xFF) as base.u8
+        i += 1
+    }
+    i = 0
+    while i < 6 {
+        c = args.src.read_u8?()
+        h = c as base.u32
+        w = c as base.u16
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.tab[c ~mod- 1] as base.u32)
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.tab[c ~mod+ 0xF0] as base.u32)
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.tab[h ~sat- 1] as base.u32)
+        this.sum = (this.sum ~mod* 31) ~mod+ (this.tab[(w ~mod- 2) & 0xFF] as base.u32)
+        this.sum = (this.sum ~mod* 31) ~mod+ ((this.tab[(c ~mod- 3) ..].length() & 0xFFFF) as base.u32)
+        this.sum = (this.sum ~mod* 31) ~mod+ ((this.tab[.. c ~mod+ 0xFE].length() & 0xFFFF) as base.u32)
+        args.dst.write_u8?(a: this.tab[c ~mod- 1])
+        i += 1
+    }
 }
 
 // (n1 and n2 return nothing and leave their result in nres: upstream's

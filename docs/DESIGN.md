@@ -279,13 +279,14 @@ From the review of generator milestone 4a; none affects generated `std` code.
   empty chunk inside an indefinite-length string ends the item early.
 * JSON/CBOR: the decoders make no progress below their minimum buffer sizes
   (json: 100 source bytes; cbor: 9 source bytes and 2 tokens), as upstream.
-* Mutation tests: 18 older mutants in `ada/tests/mutants.py` no longer apply
-  (their text went stale when generated files moved to `gen/scalar` and
-  `gen/simd`), among them the entry-validation and PNG `End_Limit` ones, so
-  that evidence needs re-establishing. Two generator rules have no test that
-  fails when they are broken: the direct copy must not be used for two rows
-  of one component, and the `Wuffs.Index` rewrite must not apply to `~mod`
-  operators.
+* Mutation tests: `python3 ada/tests/mutants.py check` (run by `test.sh`)
+  fails when a mutant no longer applies. Known weak spots: the rule that the
+  direct copy is not used for two parts of one component is caught only by
+  a generator unit test, because GNAT's expansion of the disjoint copy
+  behaves like `memmove` and the fault is invisible at run time; the PNG
+  iCCP `End_Limit` mutant is killed only on the full corpus; two older
+  mutants (R08, R10) no longer reach the packages under `gen/scalar` and
+  `gen/simd`.
 * JSON tests: a mutant that clears the continued bit of a string token of
   65532 bytes or more on the byte-at-a-time path survives the suite; a
   70000-byte string under random 1-12 byte source fills kills it. One shell

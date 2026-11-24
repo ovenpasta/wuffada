@@ -38,7 +38,7 @@ procedure Test_Adv is
    package AS renames Adv_Support;
    package IO renames Wuffs.Base.IO;
 
-   Num_Funcs : constant := 30;
+   Num_Funcs : constant := 32;
    Num_Seeds : constant := 64;
    Max_Calls : constant := 3000;
 
@@ -135,7 +135,7 @@ procedure Test_Adv is
          A.U4'Access, A.U5'Access, A.V1'Access, A.W1'Access, A.X1'Access, A.X2'Access,
          A.X3'Access, A.X4'Access, A.X5'Access, A.X6'Access, A.X7'Access, A.X8'Access,
          A.X9'Access, A.X10'Access, A.X11'Access, A.Y1'Access, A.Z1'Access,
-          A.Z2'Access];
+         A.Z2'Access, A.Z3'Access, A.Z4'Access];
    begin
       return
         Funcs (F)

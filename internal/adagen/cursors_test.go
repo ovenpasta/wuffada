@@ -162,3 +162,105 @@ func TestSelfArraysCopyAndIndexArithmetic(tt *testing.T) {
 		tt.Errorf("%d direct two-array copies, want 1:\n%s", n, got)
 	}
 }
+
+// TestSelfArrayCopyDispatch checks, case by case, when copy_from_slice calls
+// the base library's two-array Copy_From_Slice directly: only for parts of
+// two DIFFERENT array components of the receiver. Two parts of one component
+// (two slices of it, or two rows of one array of arrays, which may be the
+// same row) may overlap and go to Copy_Within or the run-time shell, and so
+// does anything that goes through a slice local, whatever it was made from.
+func TestSelfArrayCopyDispatch(tt *testing.T) {
+	const direct = "Wuffs.Base.Slices.Copy_From_Slice"
+	for _, c := range []struct {
+		name, body string
+		isDirect   bool
+		wants      []string
+	}{
+		{"two components", `this.n = this.a[.. 8].copy_from_slice!(s: this.c[.. 8])`, true,
+			[]string{direct + " (Dst => Self.F_A (0 .. 7),", "Src => Self.F_C (0 .. 7),"}},
+		{"two slices of one component", `this.n = this.a[0 .. 8].copy_from_slice!(s: this.a[4 .. 12])`, false,
+			[]string{"Wuffs.Base.Slices.Copy_Within (Data => Self.F_A,"}},
+		{"two rows of one component", `this.n = this.b[args.i][..].copy_from_slice!(s: this.b[args.j][2 ..])`, false,
+			[]string{"Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_B (Wuffs.Index (A_I)),"}},
+		{"two constant rows of one component", `this.n = this.b[1][..].copy_from_slice!(s: this.b[2][..])`, false,
+			[]string{"Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_B (1),"}},
+		{"one row of one component", `this.n = this.b[args.i][..].copy_from_slice!(s: this.b[args.i][2 ..])`, false,
+			[]string{"Wuffs.Base.Slices.Copy_Within (Data => Self.F_B (Wuffs.Index (A_I)),"}},
+		{"a row from another component", `this.n = this.b[args.i][.. 8].copy_from_slice!(s: this.a[.. 8])`, true,
+			[]string{direct + " (Dst => Self.F_B (Wuffs.Index (A_I)) (0 .. 7),", "Src => Self.F_A (0 .. 7),"}},
+		{"a component from a row", `this.n = this.a[.. 16].copy_from_slice!(s: this.b[args.j][..])`, true,
+			[]string{direct + " (Dst => Self.F_A (0 .. 15),", "Src => Self.F_B (Wuffs.Index (A_J)),"}},
+		{"a slice local made from a field, as the source", "s = this.a[..]\n\t\t\tthis.n = this.c[..].copy_from_slice!(s: s)", false,
+			[]string{"Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_C,"}},
+		{"a slice local made from a field, as the destination", "s = this.a[..]\n\t\t\tthis.n = s.copy_from_slice!(s: this.c[..])", false,
+			[]string{"Wuffs.Runtime.Copy_From_Slice (Dst => V_S.Base", "Src => Self.F_C,"}},
+	} {
+		got := mustGenerate(tt, `
+		pub struct foo?(a : array[32] base.u8, c : array[32] base.u8, b : array[4] array[16] base.u8, n : base.u64)
+		pub func foo.run!(i : base.u32[..= 3], j : base.u32[..= 3]) {
+			var s : slice base.u8
+			`+c.body+`
+		}`)
+		if n := strings.Count(got, direct); (n == 1) != c.isDirect || n > 1 {
+			tt.Errorf("%s: %d direct two-array copies, want direct=%v:\n%s", c.name, n, c.isDirect, got)
+		}
+		for _, want := range c.wants {
+			if !strings.Contains(got, want) {
+				tt.Errorf("%s: output does not contain %q:\n%s", c.name, want, got)
+			}
+		}
+	}
+}
+
+// TestModularIndexArithmetic checks which operators of an index or slice
+// bound are computed in Wuffs.Index: Wuffs' checked "+" and "-" on u8 to
+// u32 operands, but not "~mod+", "~mod-" (0 ~mod- 1 is the type's maximum,
+// not -1) or the saturating operators, at any depth, nor anything on u64.
+func TestModularIndexArithmetic(tt *testing.T) {
+	got := mustGenerate(tt, `
+		pub struct foo?(t : array[256] base.u8, n : base.u64)
+		pub func foo.run!(k : base.u8, m : base.u8[..= 100], h : base.u16[..= 255], w : base.u64[..= 200], o : base.u32[..= 8]) {
+			this.n = this.t[args.k ~mod- 1] as base.u64
+			this.n = this.t[args.k ~mod+ 1] as base.u64
+			this.n = this.t[args.h ~sat- 1] as base.u64
+			this.n = this.t[args.m ~sat+ 100] as base.u64
+			this.n = this.t[(args.m + 1) ~mod- 2] as base.u64
+			this.n = this.t[(args.h ~mod- 1) & 0xFF] as base.u64
+			if (args.k ~mod- 1) < 100 {
+				this.n = this.t[(args.k ~mod- 1) + 1] as base.u64
+			}
+			this.n = this.t[args.w + 1] as base.u64
+			this.n = this.t[(args.k ~mod- 1) ..].length()
+			this.n = this.t[.. args.k ~mod+ 1].length()
+			this.n = this.t[args.h ~sat- 1 ..].length()
+			assert args.o <= (args.o + 8) via "a <= (a + b): 0 <= b"(b: 8)
+			this.n = this.t[args.o .. args.o + 8].length()
+			if args.k >= 4 {
+				this.n = this.t[args.k - 4 ..].length()
+			}
+		}`)
+	wantContains(tt, got,
+		// ~mod- and ~mod+ as an index, in the modular type.
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_K - 1)));",
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_K + 1)));",
+		// The saturating operators keep their functions.
+		"(Self.F_T (Wuffs.Index (Wuffs.Base.Ints.Sat_Sub_U16 (X => A_H, Y => 1))))",
+		"(Self.F_T (Wuffs.Index (Wuffs.Base.Ints.Sat_Add_U8 (X => A_M, Y => 100))))",
+		// A ~mod- of a checked +: all of it modular.
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index ((A_M + 1) - 2)));",
+		// Under a mask.
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_H - 1 and 16#FF#)));",
+		// A checked + of a ~mod-: the + in Wuffs.Index, the ~mod- not.
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_K - 1) + 1));",
+		// u64: never in Wuffs.Index.
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_W + 1)));",
+		// Slice bounds.
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_K - 1) .. Self.F_T'Last)'Length);",
+		"Self.F_N := Wuffs.U64 (Self.F_T (0 .. Wuffs.Index (A_K + 1) - 1)'Length);",
+		"(Wuffs.Index (Wuffs.Base.Ints.Sat_Sub_U16 (X => A_H, Y => 1))\n",
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_O) .. (Wuffs.Index (A_O) + 8) - 1)'Length);",
+		"Self.F_N := Wuffs.U64 (Self.F_T (Wuffs.Index (A_K) - 4 .. Self.F_T'Last)'Length);",
+	)
+	wantNotContains(tt, got, "Wuffs.Index (A_K) - 1", "Wuffs.Index (A_K) + 1", "Wuffs.Index (A_H) - 1",
+		"Wuffs.Index (A_M) + 1", "Wuffs.Index (A_W)")
+}

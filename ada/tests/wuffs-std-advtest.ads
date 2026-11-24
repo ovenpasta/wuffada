@@ -341,6 +341,26 @@ package Wuffs.Std.Advtest with Preelaborate is
       A_Workbuf : in out Wuffs.Bytes)
       return Wuffs.Status;
 
+   --  Wuffs: func thing.z3
+   function Z3
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func thing.z4
+   function Z4
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
    --  Wuffs: func thing.n1
    procedure N1
      (Self : in out Thing;
@@ -369,6 +389,8 @@ private
 
    type G_Array_3_Of_Array_4_Of_U16 is array (Wuffs.Index range 0 .. 2) of Wuffs.U16_Array (0 .. 3);
 
+   type G_Array_4_Of_Array_8_Of_U8 is array (Wuffs.Index range 0 .. 3) of Wuffs.Bytes (0 .. 7);
+
    subtype G_U32_Range_0_10 is Wuffs.U32 range 0 .. 10;
 
    subtype G_U32_Range_0_100 is Wuffs.U32 range 0 .. 100;
@@ -380,6 +402,10 @@ private
    subtype G_U64_Range_0_3 is Wuffs.U64 range 0 .. 3;
 
    subtype G_U32_Range_0_2 is Wuffs.U32 range 0 .. 2;
+
+   subtype G_U32_Range_0_3 is Wuffs.U32 range 0 .. 3;
+
+   subtype G_U32_Range_0_255 is Wuffs.U32 range 0 .. 255;
 
    type Thing is limited record
       --  Whether Initialize has been called (C: private_impl.magic).
@@ -395,6 +421,8 @@ private
       F_U64s : Wuffs.U64_Array (0 .. 1);
       F_Buf2 : Wuffs.Bytes (0 .. 23);
       F_Nres : Wuffs.U64 := 0;
+      F_Brows : G_Array_4_Of_Array_8_Of_U8;
+      F_Tab : Wuffs.Bytes (0 .. 255);
       G_Scratch_4_T1 : Wuffs.U64 := 0;
       G_P_4_T1 : Wuffs.U32 := 0;
       G_S_4_T1_C : Wuffs.U8 := 0;
@@ -521,6 +549,13 @@ private
       G_S_46_Z1_I : Wuffs.U32 := 0;
       G_Scratch_47_Z2 : Wuffs.U64 := 0;
       G_P_47_Z2 : Wuffs.U32 := 0;
+      G_Scratch_48_Z3 : Wuffs.U64 := 0;
+      G_P_48_Z3 : Wuffs.U32 := 0;
+      G_S_48_Z3_C : Wuffs.U8 := 0;
+      G_S_48_Z3_I : Wuffs.U32 := 0;
+      G_Scratch_49_Z4 : Wuffs.U64 := 0;
+      G_P_49_Z4 : Wuffs.U32 := 0;
+      G_S_49_Z4_I : Wuffs.U32 := 0;
    end record;
 
 end Wuffs.Std.Advtest;

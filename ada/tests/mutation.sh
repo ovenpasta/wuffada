@@ -188,7 +188,7 @@ check() {
     fi
     killers=""
     if ! go test ./internal/adagen \
-        -run 'TestRejects|TestCheckCalls|TestEntryChecks|TestBulk|TestRowPointer|TestSwizzleYCCK|TestStatusField|TestChoosyRefined|TestPixelBlend|TestRangeAccessors|TestNullablePixelBuffer|TestTokenWriter|TestCheckCallsTokens' \
+        -run 'TestRejects|TestCheckCalls|TestEntryChecks|TestBulk|TestRowPointer|TestSwizzleYCCK|TestStatusField|TestChoosyRefined|TestPixelBlend|TestRangeAccessors|TestNullablePixelBuffer|TestTokenWriter|TestCheckCallsTokens|TestSelfArray|TestModularIndex|TestIsolateCursors|TestInlinedCursor|TestOutOfLineCursor' \
         >> "$log" 2>&1; then
         killers="$killers go-test"
     fi
