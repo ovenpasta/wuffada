@@ -256,6 +256,89 @@ package body Wuffs.Std.Deflate is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_transform_io
+   function Do_Transform_Io
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_blocks
+   function Decode_Blocks
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_uncompressed
+   function Decode_Uncompressed
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.init_fixed_huffman
+   function Init_Fixed_Huffman (Self : in out Decoder) return Wuffs.Status;
+
+   --  Wuffs: func decoder.init_dynamic_huffman
+   function Init_Dynamic_Huffman
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.init_huff
+   function Init_Huff
+     (Self : in out Decoder;
+      A_Which : G_U32_Range_0_1;
+      A_N_Codes0 : G_U32_Range_0_288;
+      A_N_Codes1 : G_U32_Range_0_320;
+      A_Base_Symbol : Wuffs.U32)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_huffman_fast32
+   function Decode_Huffman_Fast32
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_huffman_fast64
+   function G_Choosy_Default_Decode_Huffman_Fast64
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_huffman_fast64 (the choice of implementation)
+   function Decode_Huffman_Fast64
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_huffman_slow
+   function Decode_Huffman_Slow
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
    procedure Add_History (Self : in out Decoder; A_Hist : in out Wuffs.Bytes) is
       V_S : Wuffs.Runtime.Slice_U8;
       V_N_Copied : Wuffs.U64 := 0;
@@ -331,6 +414,7 @@ package body Wuffs.Std.Deflate is
    overriding function Set_Quirk
      (Self : in out Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -727,6 +811,8 @@ package body Wuffs.Std.Deflate is
       G_T3 : Wuffs.U64;
       G_Susp : Wuffs.U32;
       G_T4 : Wuffs.U32;
+      G_T5 : Wuffs.Base.IO.Reader;
+      G_T6 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -769,12 +855,14 @@ package body Wuffs.Std.Deflate is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T5 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T5,
                                      Scratch => Self.G_Scratch_9_Decode_Uncompressed,
                                      Last_Shift => 24,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T5;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
@@ -789,13 +877,17 @@ package body Wuffs.Std.Deflate is
       end if;
       V_Length := Wuffs.Base.Ints.Low_Bits_U32 (X => V_Length, N => 16);
       <<G_Head_3>>
+      G_T6 := G_W_Dst;
+      G_T5 := G_R_Src;
       Wuffs.Runtime.Writer_Limited_Copy_U32_From_Reader
         (Data => A_Dst,
-         W => G_W_Dst,
+         W => G_T6,
          Up_To => V_Length,
          Src_Data => A_Src,
-         R => G_R_Src,
+         R => G_T5,
          N => G_T4);
+      G_W_Dst := G_T6;
+      G_R_Src := G_T5;
       V_N_Copied := G_T4;
       if V_Length <= V_N_Copied then
          G_Status := Wuffs.Ok_Status;
@@ -1069,7 +1161,7 @@ package body Wuffs.Std.Deflate is
             G_Status := Error_Bad_Huffman_Code_Length_Repetition;
             goto G_Exit;
          end if;
-         V_Rep_Symbol := Self.F_Code_Lengths (Wuffs.Index (V_I - 1)) and 15;
+         V_Rep_Symbol := Self.F_Code_Lengths (Wuffs.Index (V_I) - 1) and 15;
          V_Rep_Count := 3;
          pragma Warnings ("C");
          pragma Assert (V_Rep_Count <= 11);
@@ -1259,7 +1351,7 @@ package body Wuffs.Std.Deflate is
          then
             V_I := 0;
             while V_I <= 29 loop
-               if Self.F_Code_Lengths (Wuffs.Index (A_N_Codes0 + V_I)) = 1 then
+               if Self.F_Code_Lengths (Wuffs.Index (A_N_Codes0) + Wuffs.Index (V_I)) = 1 then
                   Self.F_N_Huffs_Bits (1) := 1;
                   Self.F_Huffs (1) (0) := DCODE_MAGIC_NUMBERS (Wuffs.Index (V_I)) or 1;
                   Self.F_Huffs (1) (1) := DCODE_MAGIC_NUMBERS (31) or 1;
@@ -1364,7 +1456,8 @@ package body Wuffs.Std.Deflate is
          V_Initial_High_Bits := Interfaces.Shift_Left (Wuffs.U32'(1), Natural (V_Max_Cl));
       end if;
       V_Prev_Cl :=
-        Wuffs.U32 (Self.F_Code_Lengths (Wuffs.Index (A_N_Codes0 + Wuffs.U32 (V_Symbols (0))))
+        Wuffs.U32 (Self.F_Code_Lengths (Wuffs.Index (A_N_Codes0)
+                                          + Wuffs.Index (Wuffs.U32 (V_Symbols (0))))
                      and 15);
       V_Prev_Redirect_Key := 16#FFFF_FFFF#;
       V_Top := 0;
@@ -1383,9 +1476,9 @@ package body Wuffs.Std.Deflate is
             return Error_Internal_Error_Inconsistent_Huffman_Decoder_State;
          end if;
          V_Cl :=
-           Wuffs.U32 (Self.F_Code_Lengths (Wuffs.Index
-                                             (A_N_Codes0
-                                                + Wuffs.U32 (V_Symbols (Wuffs.Index (V_I)))))
+           Wuffs.U32 (Self.F_Code_Lengths (Wuffs.Index (A_N_Codes0)
+                                             + Wuffs.Index
+                                                 (Wuffs.U32 (V_Symbols (Wuffs.Index (V_I)))))
                         and 15);
          if V_Cl > V_Prev_Cl then
             V_Code := Interfaces.Shift_Left (V_Code, Natural (V_Cl - V_Prev_Cl));
@@ -1492,7 +1585,7 @@ package body Wuffs.Std.Deflate is
             pragma Assert (V_Top + ((V_High_Bits or V_Reversed_Key) and 511) < 1024);
             pragma Warnings ("c");
             Self.F_Huffs (Wuffs.Index (A_Which))
-              (Wuffs.Index (V_Top + ((V_High_Bits or V_Reversed_Key) and 511))) :=
+              (Wuffs.Index (V_Top) + Wuffs.Index ((V_High_Bits or V_Reversed_Key) and 511)) :=
               V_Value;
          end loop;
          pragma Warnings ("C");
@@ -1547,6 +1640,7 @@ package body Wuffs.Std.Deflate is
       pragma Warnings (Off, G_T2);
       G_T3 : Wuffs.U32;
       pragma Warnings (Off, G_T3);
+      G_T4 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -1890,14 +1984,16 @@ package body Wuffs.Std.Deflate is
                   Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
                   return Error_Bad_Distance;
                end if;
+               G_T4 := G_W_Dst;
                Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T4,
                   Up_To => V_Hlen,
                   Src => Self.F_History
                            (Wuffs.Index (Self.F_History_Index - V_Hdist and 16#7FFF#)
                             .. Self.F_History'Last),
                   N => G_T1);
+               G_W_Dst := G_T4;
                if V_Length = 0 then
                   goto G_Continue_1_Loop;
                end if;
@@ -1922,19 +2018,23 @@ package body Wuffs.Std.Deflate is
             pragma Assert (Wuffs.U64 (V_Length + 8) <= Wuffs.Base.IO.Length (G_W_Dst));
             pragma Warnings ("c");
             if V_Dist_Minus_1 + 1 >= 8 then
+               G_T4 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_8_Byte_Chunks_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T4,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T2);
+               G_W_Dst := G_T4;
             else
+               G_T4 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T4,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T3);
+               G_W_Dst := G_T4;
             end if;
             exit G_Loop_2;
          end loop G_Loop_2;
@@ -1999,6 +2099,7 @@ package body Wuffs.Std.Deflate is
       pragma Warnings (Off, G_T3);
       G_T4 : Wuffs.U32;
       pragma Warnings (Off, G_T4);
+      G_T5 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -2176,14 +2277,16 @@ package body Wuffs.Std.Deflate is
                   Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
                   return Error_Bad_Distance;
                end if;
+               G_T5 := G_W_Dst;
                Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Hlen,
                   Src => Self.F_History
                            (Wuffs.Index (Self.F_History_Index - V_Hdist and 16#7FFF#)
                             .. Self.F_History'Last),
                   N => G_T1);
+               G_W_Dst := G_T5;
                if V_Length = 0 then
                   goto G_Continue_1_Loop;
                end if;
@@ -2208,26 +2311,32 @@ package body Wuffs.Std.Deflate is
             pragma Assert (Wuffs.U64 (V_Length + 8) <= Wuffs.Base.IO.Length (G_W_Dst));
             pragma Warnings ("c");
             if V_Dist_Minus_1 + 1 >= 8 then
+               G_T5 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_8_Byte_Chunks_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T2);
+               G_W_Dst := G_T5;
             elsif V_Dist_Minus_1 + 1 = 1 then
+               G_T5 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_8_Byte_Chunks_Distance_1_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T3);
+               G_W_Dst := G_T5;
             else
+               G_T5 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T4);
+               G_W_Dst := G_T5;
             end if;
             exit G_Loop_2;
          end loop G_Loop_2;
@@ -2334,6 +2443,7 @@ package body Wuffs.Std.Deflate is
       G_T6 : Wuffs.U8;
       G_T7 : Wuffs.U32;
       G_T8 : Wuffs.U32;
+      G_T9 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -2700,14 +2810,16 @@ package body Wuffs.Std.Deflate is
          G_Status := Error_Bad_Distance;
          goto G_Exit;
       end if;
+      G_T9 := G_W_Dst;
       Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
         (Data => A_Dst,
-         W => G_W_Dst,
+         W => G_T9,
          Up_To => V_Hlen,
          Src => Self.F_History
                   (Wuffs.Index (Self.F_History_Index - V_Hdist and 16#7FFF#)
                    .. Self.F_History'Last),
          N => G_T7);
+      G_W_Dst := G_T9;
       V_N_Copied := G_T7;
       if V_N_Copied >= V_Hlen then
          goto G_Else_38;
@@ -2735,12 +2847,14 @@ package body Wuffs.Std.Deflate is
       <<G_Else_36>>
       null;
       <<G_Fi_35>>
+      G_T9 := G_W_Dst;
       Wuffs.Base.IO.Limited_Copy_U32_From_History
         (Data => A_Dst,
-         W => G_W_Dst,
+         W => G_T9,
          Up_To => V_Length,
          Distance => V_Dist_Minus_1 + 1,
          N => G_T8);
+      G_W_Dst := G_T9;
       V_N_Copied := G_T8;
       if V_Length <= V_N_Copied then
          goto G_Continue_1_Loop;

@@ -152,36 +152,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Decoder)
    is null;
 
-   --  Wuffs: func decoder.do_decode_image_config
-   function Do_Decode_Image_Config
-     (Self : in out Decoder;
-      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
-      A_Dst_Null : Boolean;
-      A_Src : Wuffs.Bytes;
-      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
-      return Wuffs.Status;
-
-   --  Wuffs: func decoder.do_decode_frame_config
-   function Do_Decode_Frame_Config
-     (Self : in out Decoder;
-      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
-      A_Dst_Null : Boolean;
-      A_Src : Wuffs.Bytes;
-      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
-      return Wuffs.Status;
-
-   --  Wuffs: func decoder.do_decode_frame
-   function Do_Decode_Frame
-     (Self : in out Decoder;
-      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
-      A_Dst_Pixels : in out Wuffs.Bytes;
-      A_Dst_Palette : in out Wuffs.Bytes;
-      A_Src : Wuffs.Bytes;
-      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
-      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
-      A_Workbuf : in out Wuffs.Bytes;
-      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
-      A_Opts_Null : Boolean)
-      return Wuffs.Status;
-
 end Wuffs.Std.Wbmp;

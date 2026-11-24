@@ -83,6 +83,62 @@ package body Wuffs.Std.Nie is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_animation_info
+   function Decode_Animation_Info
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.skip_frame
+   function Skip_Frame
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle
+   function Swizzle
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -97,6 +153,7 @@ package body Wuffs.Std.Nie is
    overriding function Set_Quirk
      (Self : in out Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -209,6 +266,7 @@ package body Wuffs.Std.Nie is
       G_T10 : Wuffs.U32;
       G_T11 : Boolean;
       G_T12 : Wuffs.U64;
+      G_T13 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_4_Do_Decode_Image_Config;
@@ -245,12 +303,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T13 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T13,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T13;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
@@ -279,12 +339,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T13 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T13,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T5,
                                      Value => G_T6);
+         G_R_Src := G_T13;
          exit when G_T5;
       end loop;
       G_T4 := Wuffs.U32 (G_T6);
@@ -318,12 +380,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T13 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T13,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T8,
                                      Value => G_T9);
+         G_R_Src := G_T13;
          exit when G_T8;
       end loop;
       G_T7 := Wuffs.U32 (G_T9);
@@ -352,12 +416,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T13 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T13,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T11,
                                      Value => G_T12);
+         G_R_Src := G_T13;
          exit when G_T11;
       end loop;
       G_T10 := Wuffs.U32 (G_T12);
@@ -622,6 +688,7 @@ package body Wuffs.Std.Nie is
       G_T13 : Wuffs.U32;
       G_T14 : Boolean;
       G_T15 : Wuffs.U64;
+      G_T16 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_7_Decode_Animation_Info;
@@ -656,12 +723,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_7_Decode_Animation_Info,
                                      Last_Shift => 56,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T16;
          exit when G_T2;
       end loop;
       G_T1 := G_T3;
@@ -698,12 +767,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_7_Decode_Animation_Info,
                                      Last_Shift => 24,
                                      Done => G_T5,
                                      Value => G_T6);
+         G_R_Src := G_T16;
          exit when G_T5;
       end loop;
       G_T4 := Wuffs.U32 (G_T6);
@@ -728,12 +799,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_7_Decode_Animation_Info,
                                      Last_Shift => 24,
                                      Done => G_T8,
                                      Value => G_T9);
+         G_R_Src := G_T16;
          exit when G_T8;
       end loop;
       G_T7 := Wuffs.U32 (G_T9);
@@ -758,12 +831,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_7_Decode_Animation_Info,
                                      Last_Shift => 24,
                                      Done => G_T11,
                                      Value => G_T12);
+         G_R_Src := G_T16;
          exit when G_T11;
       end loop;
       G_T10 := Wuffs.U32 (G_T12);
@@ -788,12 +863,14 @@ package body Wuffs.Std.Nie is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_7_Decode_Animation_Info,
                                      Last_Shift => 24,
                                      Done => G_T14,
                                      Value => G_T15);
+         G_R_Src := G_T16;
          exit when G_T14;
       end loop;
       G_T13 := Wuffs.U32 (G_T15);
@@ -825,6 +902,7 @@ package body Wuffs.Std.Nie is
       V_Src_Bytes_Per_Pixel : G_U64_Range_0_8 := 0;
       G_T1 : Boolean;
       G_Susp : Wuffs.U32;
+      G_T2 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_8_Skip_Frame;
@@ -845,7 +923,9 @@ package body Wuffs.Std.Nie is
         V_Src_Bytes_Per_Pixel * Wuffs.U64 (Self.F_Width) * Wuffs.U64 (Self.F_Height);
       G_Susp := 1;
       <<G_Resume_1>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_8_Skip_Frame, Done => G_T1);
+      G_T2 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T2, Scratch => Self.G_Scratch_8_Skip_Frame, Done => G_T1);
+      G_R_Src := G_T2;
       if not G_T1 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -1166,6 +1246,7 @@ package body Wuffs.Std.Nie is
       G_T2 : Wuffs.Index;
       G_T3 : Wuffs.Runtime.Slice_U8;
       G_T4 : Wuffs.U64;
+      G_T5 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       V_Dst_Pixfmt := Wuffs.Base.Pixel_Buffers.Get_Pixel_Format (A_Dst);
@@ -1229,6 +1310,7 @@ package body Wuffs.Std.Nie is
             end loop;
          else
             G_T3 := Wuffs.Runtime.Subslice_I (V_Dst, Wuffs.Index (V_I));
+            G_T5 := G_R_Src;
             Wuffs.Runtime.Swizzle_Interleaved_From_Reader
               (S => Self.F_Swizzler,
                Dst => G_T3.Base (G_T3.First .. Wuffs.Runtime.Last (G_T3)),
@@ -1240,8 +1322,9 @@ package body Wuffs.Std.Nie is
                                             Palette => A_Dst_Palette))
                                       - 1),
                Src_Data => A_Src,
-               R => G_R_Src,
+               R => G_T5,
                N => G_T4);
+            G_R_Src := G_T5;
             V_N := G_T4;
          end if;
          if V_N = 0 then

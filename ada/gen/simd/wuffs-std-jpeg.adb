@@ -577,12 +577,286 @@ package body Wuffs.Std.Jpeg is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.decode_idct
+   procedure G_Choosy_Default_Decode_Idct
+     (Self : in out Decoder;
+      A_Dst_Buffer : in out Wuffs.Bytes;
+      A_Dst_Stride : Wuffs.U64;
+      A_Q : G_U32_Range_0_3);
+
+   --  Wuffs: func decoder.decode_idct (the choice of implementation)
+   procedure Decode_Idct
+     (Self : in out Decoder;
+      A_Dst_Buffer : in out Wuffs.Bytes;
+      A_Dst_Stride : Wuffs.U64;
+      A_Q : G_U32_Range_0_3);
+
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_dqt
+   function Decode_Dqt
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_dri
+   function Decode_Dri
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_appn
+   function Decode_Appn
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Marker : Wuffs.U8)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_sof
+   function Decode_Sof
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.quantize_dimension
+   function Quantize_Dimension
+     (Self : Decoder;
+      A_Width : G_U32_Range_0_65535;
+      A_H : G_U8_Range_0_4;
+      A_Max_Incl_H : G_U8_Range_0_4)
+      return G_U32_Range_0_8192;
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_dht
+   function Decode_Dht
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.calculate_huff_tables
+   function Calculate_Huff_Tables
+     (Self : in out Decoder;
+      A_Tc4_Th : G_U8_Range_0_7;
+      A_Total_Count : G_U32_Range_0_256)
+      return Boolean;
+
+   --  Wuffs: func decoder.decode_sos
+   function Decode_Sos
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.prepare_scan
+   function Prepare_Scan
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.use_default_huffman_table
+   function Use_Default_Huffman_Table
+     (Self : in out Decoder; A_Tc4_Th : G_U8_Range_0_7) return Wuffs.Status;
+
+   --  Wuffs: func decoder.calculate_single_component_scan_fields
+   procedure Calculate_Single_Component_Scan_Fields (Self : in out Decoder);
+
+   --  Wuffs: func decoder.calculate_multiple_component_scan_fields
+   function Calculate_Multiple_Component_Scan_Fields (Self : in out Decoder) return Boolean;
+
+   --  Wuffs: func decoder.fill_bitstream
+   procedure Fill_Bitstream
+     (Self : in out Decoder; A_Src : Wuffs.Bytes; A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta);
+
+   --  Wuffs: func decoder.load_mcu_blocks_for_single_component
+   procedure G_Choosy_Default_Load_Mcu_Blocks_For_Single_Component
+     (Self : in out Decoder;
+      A_Mx : G_U32_Range_0_8192;
+      A_My : G_U32_Range_0_8192;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Csel : G_U32_Range_0_3);
+
+   --  Wuffs: func decoder.load_mcu_blocks_for_single_component (the choice of implementation)
+   procedure Load_Mcu_Blocks_For_Single_Component
+     (Self : in out Decoder;
+      A_Mx : G_U32_Range_0_8192;
+      A_My : G_U32_Range_0_8192;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Csel : G_U32_Range_0_3);
+
+   --  Wuffs: func decoder.load_mcu_blocks
+   procedure Load_Mcu_Blocks
+     (Self : in out Decoder;
+      A_Mx : G_U32_Range_0_8192;
+      A_My : G_U32_Range_0_8192;
+      A_Workbuf : in out Wuffs.Bytes);
+
+   --  Wuffs: func decoder.save_mcu_blocks
+   procedure Save_Mcu_Blocks
+     (Self : in out Decoder;
+      A_Mx : G_U32_Range_0_8192;
+      A_My : G_U32_Range_0_8192;
+      A_Workbuf : in out Wuffs.Bytes);
+
+   --  Wuffs: func decoder.skip_past_the_next_restart_marker
+   function Skip_Past_The_Next_Restart_Marker
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.apply_progressive_idct
+   procedure Apply_Progressive_Idct (Self : in out Decoder; A_Workbuf : in out Wuffs.Bytes);
+
+   --  Wuffs: func decoder.swizzle_gray
+   function Swizzle_Gray
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_X0 : Wuffs.U32;
+      A_X1 : Wuffs.U32;
+      A_Y0 : Wuffs.U32;
+      A_Y1 : Wuffs.U32;
+      A_Stride : Wuffs.U64)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle_colorful
+   function Swizzle_Colorful
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_X0 : Wuffs.U32;
+      A_X1 : Wuffs.U32;
+      A_Y0 : Wuffs.U32;
+      A_Y1 : Wuffs.U32)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.top_left_quants_has_zero
+   function Top_Left_Quants_Has_Zero (Self : Decoder; A_Q : G_U32_Range_0_3) return Boolean;
+
+   --  Wuffs: func decoder.load_mcu_blocks_for_single_component_smooth
+   procedure Load_Mcu_Blocks_For_Single_Component_Smooth
+     (Self : in out Decoder;
+      A_Mx : G_U32_Range_0_8192;
+      A_My : G_U32_Range_0_8192;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Csel : G_U32_Range_0_3);
+
+   --  Wuffs: func decoder.decode_mcu
+   function G_Choosy_Default_Decode_Mcu
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mx : G_U32_Range_0_8191;
+      A_My : G_U32_Range_0_8191)
+      return Wuffs.U32;
+
+   --  Wuffs: func decoder.decode_mcu (the choice of implementation)
+   function Decode_Mcu
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mx : G_U32_Range_0_8191;
+      A_My : G_U32_Range_0_8191)
+      return Wuffs.U32;
+
+   --  Wuffs: func decoder.decode_mcu_progressive_ac_high_bits
+   function Decode_Mcu_Progressive_Ac_High_Bits
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mx : G_U32_Range_0_8191;
+      A_My : G_U32_Range_0_8191)
+      return Wuffs.U32;
+
+   --  Wuffs: func decoder.decode_mcu_progressive_ac_low_bit
+   function Decode_Mcu_Progressive_Ac_Low_Bit
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mx : G_U32_Range_0_8191;
+      A_My : G_U32_Range_0_8191)
+      return Wuffs.U32;
+
+   --  Wuffs: func decoder.decode_mcu_progressive_dc_high_bits
+   function Decode_Mcu_Progressive_Dc_High_Bits
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mx : G_U32_Range_0_8191;
+      A_My : G_U32_Range_0_8191)
+      return Wuffs.U32;
+
+   --  Wuffs: func decoder.decode_mcu_progressive_dc_low_bit
+   function Decode_Mcu_Progressive_Dc_Low_Bit
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mx : G_U32_Range_0_8191;
+      A_My : G_U32_Range_0_8191)
+      return Wuffs.U32;
+
    procedure G_Choosy_Default_Decode_Idct
      (Self : in out Decoder;
       A_Dst_Buffer : in out Wuffs.Bytes;
       A_Dst_Stride : Wuffs.U64;
       A_Q : G_U32_Range_0_3)
    is
+      pragma Unmodified (Self);
       pragma Unmodified (A_Dst_Buffer);
       M_Dst_Buffer : Wuffs.Runtime.Slice_U8 :=
         (Base => A_Dst_Buffer'Unrestricted_Access,
@@ -2505,6 +2779,7 @@ package body Wuffs.Std.Jpeg is
       G_T6 : Boolean;
       G_T7 : Wuffs.U64;
       G_T8 : Boolean;
+      G_T9 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_6_Do_Decode_Image_Config;
@@ -2629,12 +2904,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T9 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T9,
                                      Scratch => Self.G_Scratch_6_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T6,
                                      Value => G_T7);
+         G_R_Src := G_T9;
          exit when G_T6;
       end loop;
       G_T5 := Wuffs.U16 (G_T7);
@@ -2789,9 +3066,11 @@ package body Wuffs.Std.Jpeg is
       Self.G_Scratch_6_Do_Decode_Image_Config := Wuffs.U64 (Self.F_Payload_Length);
       G_Susp := 11;
       <<G_Resume_11>>
-      Wuffs.Base.IO.Skip (R => G_R_Src,
+      G_T9 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T9,
                           Scratch => Self.G_Scratch_6_Do_Decode_Image_Config,
                           Done => G_T8);
+      G_R_Src := G_T9;
       if not G_T8 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -2937,6 +3216,7 @@ package body Wuffs.Std.Jpeg is
       G_T2 : Boolean;
       G_T3 : Wuffs.U64;
       G_Susp : Wuffs.U32;
+      G_T4 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_8_Decode_Dri;
@@ -2968,12 +3248,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T4 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T4,
                                      Scratch => Self.G_Scratch_8_Decode_Dri,
                                      Last_Shift => 8,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T4;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U16 (G_T3);
@@ -3017,6 +3299,7 @@ package body Wuffs.Std.Jpeg is
       G_T12 : Boolean;
       G_T13 : Wuffs.U64;
       G_T14 : Boolean;
+      G_T15 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_9_Decode_Appn;
@@ -3060,12 +3343,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T15 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T15,
                                      Scratch => Self.G_Scratch_9_Decode_Appn,
                                      Last_Shift => 24,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T15;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
@@ -3112,12 +3397,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T15 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T15,
                                      Scratch => Self.G_Scratch_9_Decode_Appn,
                                      Last_Shift => 24,
                                      Done => G_T6,
                                      Value => G_T7);
+         G_R_Src := G_T15;
          exit when G_T6;
       end loop;
       G_T5 := Wuffs.U32 (G_T7);
@@ -3142,12 +3429,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T15 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T15,
                                      Scratch => Self.G_Scratch_9_Decode_Appn,
                                      Last_Shift => 24,
                                      Done => G_T9,
                                      Value => G_T10);
+         G_R_Src := G_T15;
          exit when G_T9;
       end loop;
       G_T8 := Wuffs.U32 (G_T10);
@@ -3172,12 +3461,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T15 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T15,
                                      Scratch => Self.G_Scratch_9_Decode_Appn,
                                      Last_Shift => 24,
                                      Done => G_T12,
                                      Value => G_T13);
+         G_R_Src := G_T15;
          exit when G_T12;
       end loop;
       G_T11 := Wuffs.U32 (G_T13);
@@ -3201,7 +3492,9 @@ package body Wuffs.Std.Jpeg is
       Self.G_Scratch_9_Decode_Appn := Wuffs.U64 (Self.F_Payload_Length);
       G_Susp := 6;
       <<G_Resume_6>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_9_Decode_Appn, Done => G_T14);
+      G_T15 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T15, Scratch => Self.G_Scratch_9_Decode_Appn, Done => G_T14);
+      G_R_Src := G_T15;
       if not G_T14 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -3251,6 +3544,7 @@ package body Wuffs.Std.Jpeg is
       G_T9 : Wuffs.U8;
       G_T10 : Wuffs.U8;
       G_T11 : Wuffs.U8;
+      G_T12 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_10_Decode_Sof;
@@ -3317,12 +3611,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T12 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T12,
                                      Scratch => Self.G_Scratch_10_Decode_Sof,
                                      Last_Shift => 8,
                                      Done => G_T3,
                                      Value => G_T4);
+         G_R_Src := G_T12;
          exit when G_T3;
       end loop;
       G_T2 := Wuffs.U16 (G_T4);
@@ -3347,12 +3643,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T12 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T12,
                                      Scratch => Self.G_Scratch_10_Decode_Sof,
                                      Last_Shift => 8,
                                      Done => G_T6,
                                      Value => G_T7);
+         G_R_Src := G_T12;
          exit when G_T6;
       end loop;
       G_T5 := Wuffs.U16 (G_T7);
@@ -3975,6 +4273,7 @@ package body Wuffs.Std.Jpeg is
       G_T7 : Boolean;
       G_T8 : Wuffs.U64;
       G_T9 : Boolean;
+      G_T10 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_15_Do_Decode_Frame;
@@ -4163,12 +4462,14 @@ package body Wuffs.Std.Jpeg is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T10 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T10,
                                      Scratch => Self.G_Scratch_15_Do_Decode_Frame,
                                      Last_Shift => 8,
                                      Done => G_T7,
                                      Value => G_T8);
+         G_R_Src := G_T10;
          exit when G_T7;
       end loop;
       G_T6 := Wuffs.U16 (G_T8);
@@ -4289,7 +4590,9 @@ package body Wuffs.Std.Jpeg is
       Self.G_Scratch_15_Do_Decode_Frame := Wuffs.U64 (Self.F_Payload_Length);
       G_Susp := 9;
       <<G_Resume_9>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_15_Do_Decode_Frame, Done => G_T9);
+      G_T10 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T10, Scratch => Self.G_Scratch_15_Do_Decode_Frame, Done => G_T9);
+      G_R_Src := G_T10;
       if not G_T9 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -4743,7 +5046,7 @@ package body Wuffs.Std.Jpeg is
             pragma Warnings ("c");
             Wuffs.Base.Slices.Bulk_Memset_U8 (Dst => Self.F_Bitstream_Buffer
                                                        (Wuffs.Index (Self.F_Bitstream_Wi)
-                                                        .. Wuffs.Index (Self.F_Bitstream_Wi + 264)
+                                                        .. (Wuffs.Index (Self.F_Bitstream_Wi) + 264)
                                                              - 1),
                                               Byte_Value => 0);
             Self.F_Bitstream_Wi := Self.F_Bitstream_Wi + 264;
@@ -4848,6 +5151,7 @@ package body Wuffs.Std.Jpeg is
       G_T5 : Wuffs.U8;
       G_T6 : Wuffs.U8;
       G_T7 : Wuffs.U8;
+      G_T8 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_19_Prepare_Scan;
@@ -4996,7 +5300,9 @@ package body Wuffs.Std.Jpeg is
       Self.G_Scratch_19_Prepare_Scan := 3;
       G_Susp := 4;
       <<G_Resume_4>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_19_Prepare_Scan, Done => G_T4);
+      G_T8 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T8, Scratch => Self.G_Scratch_19_Prepare_Scan, Done => G_T4);
+      G_R_Src := G_T8;
       if not G_T4 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -5538,7 +5844,7 @@ package body Wuffs.Std.Jpeg is
             pragma Assert (V_B <= V_B + 1);
             pragma Warnings ("c");
             G_T1 := Wuffs.Index (V_B);
-            G_T2 := Wuffs.Index (V_B + 1);
+            G_T2 := Wuffs.Index (V_B) + 1;
             G_T4 :=
               Wuffs.Runtime.Subslice_I ((Base => A_Workbuf'Unrestricted_Access,
                                          First => A_Workbuf'First,
@@ -5571,6 +5877,7 @@ package body Wuffs.Std.Jpeg is
       A_My : G_U32_Range_0_8192;
       A_Workbuf : in out Wuffs.Bytes)
    is
+      pragma Unmodified (Self);
       V_B : Wuffs.U32 := 0;
       V_Csel : G_U8_Range_0_3 := 0;
       V_H : G_U64_Range_0_4 := 0;
@@ -5611,7 +5918,7 @@ package body Wuffs.Std.Jpeg is
             pragma Assert (V_B <= V_B + 1);
             pragma Warnings ("c");
             G_T1 := Wuffs.Index (V_B);
-            G_T2 := Wuffs.Index (V_B + 1);
+            G_T2 := Wuffs.Index (V_B) + 1;
             G_T4 :=
               Wuffs.Runtime.Subslice_I ((Base => A_Workbuf'Unrestricted_Access,
                                          First => A_Workbuf'First,
@@ -6470,7 +6777,7 @@ package body Wuffs.Std.Jpeg is
                Wuffs.Runtime.Bulk_Load_Host_Endian_U16
                  (Dst => Self.F_Block_Smoothing_Dc_Values (Wuffs.Index (V_Dy))
                            (Wuffs.Index (V_Dx)
-                            .. Wuffs.Index (V_Dx + 1) - 1),
+                            .. (Wuffs.Index (V_Dx) + 1) - 1),
                   Src => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_Offset) .. A_Workbuf'Last));
             end if;
             V_Dx := V_Dx + 1;
@@ -9506,7 +9813,7 @@ package body Wuffs.Std.Jpeg is
                      pragma Warnings ("C");
                      pragma Loop_Invariant (V_Ac_Huff_Table_Fast /= -1);
                      pragma Warnings ("c");
-                     V_Unzig := UNZIG (Wuffs.Index (1 + Self.F_Mcu_Zig_Index));
+                     V_Unzig := UNZIG (1 + Wuffs.Index (Self.F_Mcu_Zig_Index));
                      if Self.F_Mcu_Blocks (0) (Wuffs.Index (V_Unzig)) /= 0 then
                         if V_N_Bits = 0 then
                            if Wuffs.Base.IO.Length (G_R_Bound_1) < 8 then
@@ -9559,7 +9866,7 @@ package body Wuffs.Std.Jpeg is
                   pragma Warnings ("c");
                   if V_Ac_Value /= 0 then
                      Self.F_Mcu_Blocks (0) (Wuffs.Index
-                                              (UNZIG (Wuffs.Index (1 + Self.F_Mcu_Zig_Index)))) :=
+                                              (UNZIG (1 + Wuffs.Index (Self.F_Mcu_Zig_Index)))) :=
                        V_Ac_Value;
                   end if;
                   if Self.F_Mcu_Zig_Index >= Wuffs.U32 (Self.F_Scan_Se) then
@@ -9584,7 +9891,7 @@ package body Wuffs.Std.Jpeg is
                pragma Warnings ("C");
                pragma Loop_Invariant (Self.F_Eob_Run > 0);
                pragma Warnings ("c");
-               V_Unzig := UNZIG (Wuffs.Index (1 + Self.F_Mcu_Zig_Index));
+               V_Unzig := UNZIG (1 + Wuffs.Index (Self.F_Mcu_Zig_Index));
                if Self.F_Mcu_Blocks (0) (Wuffs.Index (V_Unzig)) /= 0 then
                   if V_N_Bits = 0 then
                      if Wuffs.Base.IO.Length (G_R_Bound_1) < 8 then

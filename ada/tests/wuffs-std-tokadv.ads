@@ -155,40 +155,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Thing)
    is null;
 
-   --  Wuffs: func thing.emit
-   function Emit
-     (Self : in out Thing;
-      A_Dst : in out Wuffs.U64_Array;
-      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
-      A_Src : Wuffs.Bytes;
-      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
-      A_N : G_U32_Range_0_31)
-      return Wuffs.Status;
-
-   --  Wuffs: func thing.put
-   function Put
-     (Self : in out Thing;
-      A_Dst : in out Wuffs.U64_Array;
-      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
-      A_V : Wuffs.U32)
-      return Wuffs.U32;
-
-   --  Wuffs: func thing.inner2
-   function Inner2
-     (Self : in out Thing;
-      A_Dst : in out Wuffs.U64_Array;
-      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
-      A_Src : Wuffs.Bytes;
-      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
-      return Wuffs.Status;
-
-   --  Wuffs: func thing.outer2
-   function Outer2
-     (Self : in out Thing;
-      A_Dst : in out Wuffs.U64_Array;
-      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
-      A_Src : Wuffs.Bytes;
-      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
-      return Wuffs.Status;
-
 end Wuffs.Std.Tokadv;

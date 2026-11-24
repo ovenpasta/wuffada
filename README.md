@@ -123,9 +123,11 @@ Things to know as a caller:
   chunk is longer than about 144 MiB is rejected as unsupported.
 - The decoders report ICC profiles and other metadata but do not apply
   colour management.
-- Speed: the checksums match upstream's SIMD build. PNG and JPEG decoding
-  are 1.5 to 3 times slower than upstream's SIMD build, because the deflate
-  core and the pixel converters are scalar.
+- Speed: within about 10% of upstream's scalar C for most formats (GIF and
+  lossless WebP about 20%, interlaced and 16-bit PNG about 30%). With SIMD
+  the checksums, gzip and PNG match upstream's SIMD build; JPEG is 1.2 to
+  1.7 times slower, because upstream's AVX2 colour conversion has no
+  counterpart here. `-O0` builds are not supported.
 - ARM SIMD is not generated.
 - More in [`docs/DESIGN.md`](docs/DESIGN.md), under "Known follow-ups".
 

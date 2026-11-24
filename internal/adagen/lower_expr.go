@@ -222,6 +222,28 @@ func (l *lowerer) toIndex(v val, n *a.Expr) (expr, error) {
 }
 
 func (l *lowerer) index(n *a.Expr) (expr, error) {
+	if op := n.Operator(); (op == t.IDXBinaryPlus || op == t.IDXBinaryMinus) && n.ConstValue() == nil &&
+		n.MType() != nil && !n.MType().IsIdeal() && uintBits(n.MType().QID()) > 0 && uintBits(n.MType().QID()) <= 32 {
+		// Wuffs' checked "+" and "-" (not "~mod+" or "~mod-") on 8 to
+		// 32-bit values: the Wuffs compiler has proved that the result is
+		// in the operands' type, so it equals the same operation on the
+		// operands converted to Wuffs.Index (where every such value fits:
+		// not so for u64, whence their exclusion). Computing in Wuffs.Index
+		// rather than converting a modular result lets GCC see, say, that
+		// s[o .. o + 8] has 8 elements: modular arithmetic could wrap.
+		li, err := l.index(n.LHS().AsExpr())
+		if err != nil {
+			return nil, err
+		}
+		ri, err := l.index(n.RHS().AsExpr())
+		if err != nil {
+			return nil, err
+		}
+		if op == t.IDXBinaryPlus {
+			return bin("+", li, ri), nil
+		}
+		return bin("-", li, ri), nil
+	}
 	v, err := l.expr(n)
 	if err != nil {
 		return nil, err

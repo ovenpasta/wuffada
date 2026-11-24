@@ -254,6 +254,75 @@ package body Wuffs.Std.Lzma is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.decode_bitstream_fast
+   function Decode_Bitstream_Fast
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_bitstream_slow
+   function Decode_Bitstream_Slow
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.add_history
+   function Add_History
+     (Self : in out Decoder;
+      A_Hist : in out Wuffs.Bytes;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_transform_io
+   function Do_Transform_Io
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_bitstream
+   function Decode_Bitstream
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.update_stashed_bytes
+   function Update_Stashed_Bytes
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_optional_end_of_stream
+   function Decode_Optional_End_Of_Stream
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.initialize_dict
+   procedure Initialize_Dict (Self : in out Decoder);
+
+   --  Wuffs: func decoder.initialize_probs
+   procedure Initialize_Probs (Self : in out Decoder);
+
    function Decode_Bitstream_Fast
      (Self : in out Decoder;
       A_Dst : in out Wuffs.Bytes;
@@ -317,6 +386,7 @@ package body Wuffs.Std.Lzma is
       pragma Warnings (Off, G_T4);
       G_T5 : Wuffs.U32;
       G_T6 : Wuffs.U32;
+      G_T7 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -1274,12 +1344,14 @@ package body Wuffs.Std.Lzma is
                return Error_Internal_Error_Inconsistent_Dictionary_State;
             end if;
             if V_Len < V_Adj_Dist then
+               G_T7 := G_W_Dst;
                Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T7,
                   Up_To => V_Len + 1,
                   Src => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_Wb_Index) .. A_Workbuf'Last),
                   N => G_T1);
+               G_W_Dst := G_T7;
                if not Wuffs.Base.IO.Can_Undo_Byte (G_W_Dst) then
                   Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
                   Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -1296,18 +1368,22 @@ package body Wuffs.Std.Lzma is
                V_Prev_Byte := Wuffs.Base.IO.Peek_Undo_Byte (Data => A_Dst, W => G_W_Dst);
                goto G_Continue_1_Outer;
             elsif V_Len = V_Adj_Dist then
+               G_T7 := G_W_Dst;
                Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T7,
                   Up_To => V_Len,
                   Src => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_Wb_Index) .. A_Workbuf'Last),
                   N => G_T2);
+               G_W_Dst := G_T7;
+               G_T7 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T7,
                   Up_To => 1,
                   Distance => V_Dist,
                   N => G_T3);
+               G_W_Dst := G_T7;
                if not Wuffs.Base.IO.Can_Undo_Byte (G_W_Dst) then
                   Wuffs.Base.IO.Save (A_Dst_Meta, G_W_Dst);
                   Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -1324,12 +1400,14 @@ package body Wuffs.Std.Lzma is
                V_Prev_Byte := Wuffs.Base.IO.Peek_Undo_Byte (Data => A_Dst, W => G_W_Dst);
                goto G_Continue_1_Outer;
             end if;
+            G_T7 := G_W_Dst;
             Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
               (Data => A_Dst,
-               W => G_W_Dst,
+               W => G_T7,
                Up_To => V_Adj_Dist,
                Src => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_Wb_Index) .. A_Workbuf'Last),
                N => G_T4);
+            G_W_Dst := G_T7;
             V_Len := V_Len - V_Adj_Dist;
             pragma Warnings ("C");
             pragma Assert (V_Len >= 1);
@@ -1351,22 +1429,26 @@ package body Wuffs.Std.Lzma is
          pragma Assert (Wuffs.U64 (V_Dist) <= Wuffs.Base.IO.History_Length (G_W_Dst));
          pragma Warnings ("c");
          if V_Dist >= 8 then
+            G_T7 := G_W_Dst;
             Wuffs.Base.IO.Limited_Copy_U32_From_History_8_Byte_Chunks_Fast_Return_Cusp
               (Data => A_Dst,
-               W => G_W_Dst,
+               W => G_T7,
                Up_To => V_Len,
                Distance => V_Dist,
                Cusp => G_T5);
+            G_W_Dst := G_T7;
             V_Match_Cusp := G_T5;
             V_Match_Byte := Interfaces.Shift_Right (V_Match_Cusp, 8);
             V_Prev_Byte := Wuffs.U8 (V_Match_Cusp and 16#FF#);
          else
+            G_T7 := G_W_Dst;
             Wuffs.Base.IO.Limited_Copy_U32_From_History_Fast_Return_Cusp
               (Data => A_Dst,
-               W => G_W_Dst,
+               W => G_T7,
                Up_To => V_Len,
                Distance => V_Dist,
                Cusp => G_T6);
+            G_W_Dst := G_T7;
             V_Match_Cusp := G_T6;
             V_Match_Byte := Interfaces.Shift_Right (V_Match_Cusp, 8);
             V_Prev_Byte := Wuffs.U8 (V_Match_Cusp and 16#FF#);
@@ -1486,6 +1568,7 @@ package body Wuffs.Std.Lzma is
       G_T36 : Wuffs.U32;
       pragma Warnings (Off, G_T36);
       G_T37 : Wuffs.U32;
+      G_T38 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -2823,12 +2906,14 @@ package body Wuffs.Std.Lzma is
             goto G_Exit;
          end if;
          if V_Len < V_Adj_Dist then
+            G_T38 := G_W_Dst;
             Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
               (Data => A_Dst,
-               W => G_W_Dst,
+               W => G_T38,
                Up_To => V_Len + 1,
                Src => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_Wb_Index) .. A_Workbuf'Last),
                N => G_T33);
+            G_W_Dst := G_T38;
             if not Wuffs.Base.IO.Can_Undo_Byte (G_W_Dst) then
                G_Status := Error_Internal_Error_Inconsistent_Dictionary_State;
                goto G_Exit;
@@ -2842,18 +2927,22 @@ package body Wuffs.Std.Lzma is
             V_Prev_Byte := Wuffs.Base.IO.Peek_Undo_Byte (Data => A_Dst, W => G_W_Dst);
             goto G_Continue_1_Outer;
          elsif V_Len = V_Adj_Dist then
+            G_T38 := G_W_Dst;
             Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
               (Data => A_Dst,
-               W => G_W_Dst,
+               W => G_T38,
                Up_To => V_Len,
                Src => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_Wb_Index) .. A_Workbuf'Last),
                N => G_T34);
+            G_W_Dst := G_T38;
+            G_T38 := G_W_Dst;
             Wuffs.Base.IO.Limited_Copy_U32_From_History
               (Data => A_Dst,
-               W => G_W_Dst,
+               W => G_T38,
                Up_To => 1,
                Distance => V_Dist,
                N => G_T35);
+            G_W_Dst := G_T38;
             if not Wuffs.Base.IO.Can_Undo_Byte (G_W_Dst) then
                G_Status := Error_Internal_Error_Inconsistent_Dictionary_State;
                goto G_Exit;
@@ -2867,12 +2956,14 @@ package body Wuffs.Std.Lzma is
             V_Prev_Byte := Wuffs.Base.IO.Peek_Undo_Byte (Data => A_Dst, W => G_W_Dst);
             goto G_Continue_1_Outer;
          end if;
+         G_T38 := G_W_Dst;
          Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
            (Data => A_Dst,
-            W => G_W_Dst,
+            W => G_T38,
             Up_To => V_Adj_Dist,
             Src => A_Workbuf (A_Workbuf'First + Wuffs.Index (V_Wb_Index) .. A_Workbuf'Last),
             N => G_T36);
+         G_W_Dst := G_T38;
          V_Len := V_Len - V_Adj_Dist;
          pragma Warnings ("C");
          pragma Assert (V_Len >= 1);
@@ -2890,12 +2981,14 @@ package body Wuffs.Std.Lzma is
       pragma Assert (Wuffs.U64 (V_Len) <= Wuffs.Base.IO.Length (G_W_Dst));
       pragma Assert (Wuffs.U64 (V_Dist) <= Wuffs.Base.IO.History_Length (G_W_Dst));
       pragma Warnings ("c");
+      G_T38 := G_W_Dst;
       Wuffs.Base.IO.Limited_Copy_U32_From_History_Fast_Return_Cusp
         (Data => A_Dst,
-         W => G_W_Dst,
+         W => G_T38,
          Up_To => V_Len,
          Distance => V_Dist,
          Cusp => G_T37);
+      G_W_Dst := G_T38;
       V_Match_Cusp := G_T37;
       V_Match_Byte := Interfaces.Shift_Right (V_Match_Cusp, 8);
       V_Prev_Byte := Wuffs.U8 (V_Match_Cusp and 16#FF#);
@@ -3308,6 +3401,8 @@ package body Wuffs.Std.Lzma is
       G_T21 : Wuffs.U32;
       G_T22 : Boolean;
       G_T23 : Wuffs.U64;
+      G_T24 : Wuffs.Base.IO.Reader;
+      G_T25 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -3401,12 +3496,14 @@ package body Wuffs.Std.Lzma is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T24 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T24,
                                      Scratch => Self.G_Scratch_9_Do_Transform_Io,
                                      Last_Shift => 24,
                                      Done => G_T3,
                                      Value => G_T4);
+         G_R_Src := G_T24;
          exit when G_T3;
       end loop;
       G_T2 := Wuffs.U32 (G_T4);
@@ -3428,12 +3525,14 @@ package body Wuffs.Std.Lzma is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T24 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T24,
                                      Scratch => Self.G_Scratch_9_Do_Transform_Io,
                                      Last_Shift => 56,
                                      Done => G_T6,
                                      Value => G_T7);
+         G_R_Src := G_T24;
          exit when G_T6;
       end loop;
       G_T5 := G_T7;
@@ -3513,12 +3612,14 @@ package body Wuffs.Std.Lzma is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T24 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T24,
                                      Scratch => Self.G_Scratch_9_Do_Transform_Io,
                                      Last_Shift => 8,
                                      Done => G_T10,
                                      Value => G_T11);
+         G_R_Src := G_T24;
          exit when G_T10;
       end loop;
       G_T9 := Wuffs.U16 (G_T11);
@@ -3526,13 +3627,17 @@ package body Wuffs.Std.Lzma is
       V_C32 := Wuffs.U32 (G_T9);
       V_Length := 1 + V_C32;
       <<G_Head_16>>
+      G_T25 := G_W_Dst;
+      G_T24 := G_R_Src;
       Wuffs.Runtime.Writer_Limited_Copy_U32_From_Reader
         (Data => A_Dst,
-         W => G_W_Dst,
+         W => G_T25,
          Up_To => V_Length,
          Src_Data => A_Src,
-         R => G_R_Src,
+         R => G_T24,
          N => G_T12);
+      G_W_Dst := G_T25;
+      G_R_Src := G_T24;
       V_N_Copied := G_T12;
       Self.F_Stashed_Pos :=
         Wuffs.Base.Ints.Sat_Add_U64 (X => Self.F_Stashed_Pos, Y => Wuffs.U64 (V_N_Copied));
@@ -3575,12 +3680,14 @@ package body Wuffs.Std.Lzma is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T24 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T24,
                                      Scratch => Self.G_Scratch_9_Do_Transform_Io,
                                      Last_Shift => 8,
                                      Done => G_T14,
                                      Value => G_T15);
+         G_R_Src := G_T24;
          exit when G_T14;
       end loop;
       G_T13 := Wuffs.U16 (G_T15);
@@ -3603,12 +3710,14 @@ package body Wuffs.Std.Lzma is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T24 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T24,
                                      Scratch => Self.G_Scratch_9_Do_Transform_Io,
                                      Last_Shift => 8,
                                      Done => G_T17,
                                      Value => G_T18);
+         G_R_Src := G_T24;
          exit when G_T17;
       end loop;
       G_T16 := Wuffs.U16 (G_T18);
@@ -3713,12 +3822,14 @@ package body Wuffs.Std.Lzma is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T24 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T24,
                                      Scratch => Self.G_Scratch_9_Do_Transform_Io,
                                      Last_Shift => 24,
                                      Done => G_T22,
                                      Value => G_T23);
+         G_R_Src := G_T24;
          exit when G_T22;
       end loop;
       G_T21 := Wuffs.U32 (G_T23);
@@ -3921,6 +4032,7 @@ package body Wuffs.Std.Lzma is
       G_Susp : Wuffs.U32;
       G_T1 : Wuffs.U32;
       pragma Warnings (Off, G_T1);
+      G_T2 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_Susp := Self.G_P_11_Update_Stashed_Bytes;
@@ -3946,12 +4058,14 @@ package body Wuffs.Std.Lzma is
       V_Which := 0;
       while V_Which < 2 loop
          if Wuffs.U64 (V_Dist) <= Wuffs.Base.IO.History_Length (G_W_Dst) then
+            G_T2 := G_W_Dst;
             Wuffs.Base.IO.Limited_Copy_U32_From_History
               (Data => A_Dst,
-               W => G_W_Dst,
+               W => G_T2,
                Up_To => 1,
                Distance => V_Dist,
                N => G_T1);
+            G_W_Dst := G_T2;
             if not Wuffs.Base.IO.Can_Undo_Byte (G_W_Dst) then
                G_Status := Error_Internal_Error_Inconsistent_Dictionary_State;
                goto G_Exit;

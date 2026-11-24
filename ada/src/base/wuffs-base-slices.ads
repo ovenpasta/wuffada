@@ -98,6 +98,7 @@ package Wuffs.Base.Slices with Pure, SPARK_Mode is
    --  DISJOINT ONLY: Dst and Src must not share any element.  For two
    --  parts of one array use Copy_Within.
    procedure Copy_From_Slice (Dst : in out Bytes; Src : Bytes; N : out U64) with
+     Inline_Always,
      Post => N = U64 (Offset'Min (Dst'Length, Src'Length))
        and then (for all J in Dst'Range =>
                    (if U64 (J - Dst'First) < N

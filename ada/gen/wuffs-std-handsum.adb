@@ -254,6 +254,113 @@ package body Wuffs.Std.Handsum is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_zigzag_coeffs
+   procedure Decode_Zigzag_Coeffs (Self : in out Decoder);
+
+   --  Wuffs: func decoder.decode_block_q0
+   procedure Decode_Block_Q0
+     (Self : in out Decoder;
+      A_Which : G_U32_Range_0_1;
+      A_Y_Offset : G_U32_Range_0_8;
+      A_X_Offset : G_U32_Range_0_32);
+
+   --  Wuffs: func decoder.decode_block_q1
+   procedure Decode_Block_Q1
+     (Self : in out Decoder;
+      A_Which : G_U32_Range_0_1;
+      A_Y_Offset : G_U32_Range_0_8;
+      A_X_Offset : G_U32_Range_0_32);
+
+   --  Wuffs: func decoder.decode_tile_q1
+   procedure Decode_Tile_Q1
+     (Self : in out Decoder;
+      A_Which : G_U32_Range_0_1;
+      A_Y_Offset : G_U32_Range_0_12;
+      A_X_Offset : G_U32_Range_0_48);
+
+   --  Wuffs: func decoder.decode_block_q3
+   procedure Decode_Block_Q3
+     (Self : in out Decoder;
+      A_Which : G_U32_Range_0_1;
+      A_Y_Offset : G_U32_Range_0_8;
+      A_X_Offset : G_U32_Range_0_32);
+
+   --  Wuffs: func decoder.set_block_0xff
+   procedure Set_Block_0xff
+     (Self : in out Decoder;
+      A_Which : G_U32_Range_0_1;
+      A_Y_Offset : G_U32_Range_0_8;
+      A_X_Offset : G_U32_Range_0_32);
+
+   --  Wuffs: func decoder.smooth_seams_16x16
+   procedure Smooth_Seams_16x16 (Self : in out Decoder);
+
+   --  Wuffs: func decoder.smooth_seams_8x8
+   procedure Smooth_Seams_8x8
+     (Self : in out Decoder;
+      A_Which : G_U32_Range_0_1;
+      A_Y_Offset : G_U32_Range_0_8;
+      A_X_Offset : G_U32_Range_0_32);
+
+   --  Wuffs: func decoder.scale_and_bias_chroma_down
+   procedure Scale_And_Bias_Chroma_Down (Self : in out Decoder);
+
+   --  Wuffs: func decoder.upsample_chroma_and_alpha
+   procedure Upsample_Chroma_And_Alpha (Self : in out Decoder);
+
+   --  Wuffs: func decoder.convert_yxxx_to_y
+   procedure Convert_Yxxx_To_Y (Self : in out Decoder; A_Which : G_U32_Range_0_1);
+
+   --  Wuffs: func decoder.convert_ycca_to_bgra
+   procedure Convert_Ycca_To_Bgra (Self : in out Decoder);
+
+   --  Wuffs: func decoder.scale_horizontal
+   procedure Scale_Horizontal (Self : in out Decoder);
+
+   --  Wuffs: func decoder.scale_vertical
+   procedure Scale_Vertical (Self : in out Decoder);
+
+   --  Wuffs: func decoder.from_pixels_to_dst
+   function From_Pixels_To_Dst
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Which : G_U32_Range_0_1)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -268,6 +375,7 @@ package body Wuffs.Std.Handsum is
    overriding function Set_Quirk
      (Self : in out Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -372,6 +480,7 @@ package body Wuffs.Std.Handsum is
       G_T2 : Boolean;
       G_T3 : Wuffs.U64;
       G_Susp : Wuffs.U32;
+      G_T4 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_4_Do_Decode_Image_Config;
@@ -402,12 +511,14 @@ package body Wuffs.Std.Handsum is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T4 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T4,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 16,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T4;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
@@ -770,6 +881,7 @@ package body Wuffs.Std.Handsum is
       G_T2 : Wuffs.Status;
       G_T3 : Wuffs.Runtime.Slice_U8;
       G_T4 : Wuffs.U32;
+      G_T5 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_8_Do_Decode_Frame;
@@ -859,12 +971,14 @@ package body Wuffs.Std.Handsum is
                                    First => Self.F_Bits'First,
                                    Length => Self.F_Bits'Length),
                                   Wuffs.Index (V_Num_Read));
+      G_T5 := G_R_Src;
       Wuffs.Runtime.Reader_Limited_Copy_U32_To_Slice
         (Data => A_Src,
-         R => G_R_Src,
+         R => G_T5,
          Up_To => V_Payload_Size - V_Num_Read,
          Dst => G_T3.Base (G_T3.First .. Wuffs.Runtime.Last (G_T3)),
          N => G_T4);
+      G_R_Src := G_T5;
       V_Num_Read := V_Num_Read + G_T4;
       if V_Num_Read >= V_Payload_Size then
          goto G_Else_7;
@@ -1071,7 +1185,7 @@ package body Wuffs.Std.Handsum is
                       + V_Alphas_16
                           * V_C_16
                           * Wuffs.Base.Ints.Sign_Extend_Convert_U16_U64
-                              (Self.F_Coeffs (Wuffs.Index (5 * V_V + V_U)));
+                              (Self.F_Coeffs (Wuffs.Index (5 * V_V) + Wuffs.Index (V_U)));
                   V_U := V_U + 1;
                end loop;
                pragma Warnings ("C");
@@ -1089,8 +1203,8 @@ package body Wuffs.Std.Handsum is
               Wuffs.Base.Ints.Sign_Extend_Rshift_U64
                 (A => V_Alphas_Sum_32 + 16#8000_0000#,
                  N => 32);
-            Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + V_Y))
-              (Wuffs.Index (A_X_Offset + 4 * V_X)) :=
+            Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + Wuffs.Index (V_Y))
+              (Wuffs.Index (A_X_Offset) + Wuffs.Index (4 * V_X)) :=
               BIAS_AND_CLAMP (Wuffs.Index (V_Result_0 and 1023));
             V_X := V_X + 1;
          end loop;
@@ -1186,7 +1300,7 @@ package body Wuffs.Std.Handsum is
                       + V_Alphas_16
                           * V_C_16
                           * Wuffs.Base.Ints.Sign_Extend_Convert_U16_U64
-                              (Self.F_Coeffs (Wuffs.Index (4 * V_V + V_U)));
+                              (Self.F_Coeffs (Wuffs.Index (4 * V_V) + Wuffs.Index (V_U)));
                   V_U := V_U + 1;
                end loop;
                pragma Warnings ("C");
@@ -1204,8 +1318,8 @@ package body Wuffs.Std.Handsum is
               Wuffs.Base.Ints.Sign_Extend_Rshift_U64
                 (A => V_Alphas_Sum_32 + 16#8000_0000#,
                  N => 32);
-            Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + V_Y))
-              (Wuffs.Index (A_X_Offset + 4 * V_X)) :=
+            Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + Wuffs.Index (V_Y))
+              (Wuffs.Index (A_X_Offset) + Wuffs.Index (4 * V_X)) :=
               BIAS_AND_CLAMP (Wuffs.Index (V_Result_0 and 1023));
             V_X := V_X + 1;
          end loop;
@@ -1411,8 +1525,8 @@ package body Wuffs.Std.Handsum is
             pragma Warnings ("C");
             pragma Loop_Invariant (V_Y < 7);
             pragma Warnings ("c");
-            Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + V_Y))
-              (Wuffs.Index (A_X_Offset + 4 * V_X)) :=
+            Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + Wuffs.Index (V_Y))
+              (Wuffs.Index (A_X_Offset) + Wuffs.Index (4 * V_X)) :=
               16#FF#;
             V_X := V_X + 1;
          end loop;
@@ -1446,8 +1560,8 @@ package body Wuffs.Std.Handsum is
    begin
       V_I := 0;
       while V_I <= 54 loop
-         V_P0 := SMOOTHING_PAIRS_16X16 (Wuffs.Index (V_I + 0));
-         V_P1 := SMOOTHING_PAIRS_16X16 (Wuffs.Index (V_I + 1));
+         V_P0 := SMOOTHING_PAIRS_16X16 (Wuffs.Index (V_I) + 0);
+         V_P1 := SMOOTHING_PAIRS_16X16 (Wuffs.Index (V_I) + 1);
          V_Y0 := Wuffs.U32 (Interfaces.Shift_Right (V_P0, 4));
          V_Y1 := Wuffs.U32 (Interfaces.Shift_Right (V_P1, 4));
          V_X0 := Interfaces.Shift_Left (Wuffs.U32 (V_P0 and 15), 2);
@@ -1502,8 +1616,8 @@ package body Wuffs.Std.Handsum is
    begin
       V_I := 0;
       while V_I <= 22 loop
-         V_P0 := SMOOTHING_PAIRS_8X8 (Wuffs.Index (V_I + 0));
-         V_P1 := SMOOTHING_PAIRS_8X8 (Wuffs.Index (V_I + 1));
+         V_P0 := SMOOTHING_PAIRS_8X8 (Wuffs.Index (V_I) + 0);
+         V_P1 := SMOOTHING_PAIRS_8X8 (Wuffs.Index (V_I) + 1);
          V_Y0 := A_Y_Offset + Wuffs.U32 (Interfaces.Shift_Right (V_P0, 3));
          V_Y1 := A_Y_Offset + Wuffs.U32 (Interfaces.Shift_Right (V_P1, 3));
          V_X0 := A_X_Offset + Interfaces.Shift_Left (Wuffs.U32 (V_P0 and 7), 2);
@@ -1523,32 +1637,32 @@ package body Wuffs.Std.Handsum is
          V_I := V_I + 2;
       end loop;
       V_V33 :=
-        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 3))
-                     (Wuffs.Index (A_X_Offset + 12)));
+        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 3)
+                     (Wuffs.Index (A_X_Offset) + 12));
       V_V34 :=
-        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 3))
-                     (Wuffs.Index (A_X_Offset + 16)));
+        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 3)
+                     (Wuffs.Index (A_X_Offset) + 16));
       V_V44 :=
-        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 4))
-                     (Wuffs.Index (A_X_Offset + 16)));
+        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 4)
+                     (Wuffs.Index (A_X_Offset) + 16));
       V_V43 :=
-        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 4))
-                     (Wuffs.Index (A_X_Offset + 12)));
+        Wuffs.U32 (Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 4)
+                     (Wuffs.Index (A_X_Offset) + 12));
       V_W33 := (9 * V_V33 + 3 * V_V34 + V_V44 + 3 * V_V43 + 8) / 16;
       V_W34 := (9 * V_V34 + 3 * V_V44 + V_V43 + 3 * V_V33 + 8) / 16;
       V_W44 := (9 * V_V44 + 3 * V_V43 + V_V33 + 3 * V_V34 + 8) / 16;
       V_W43 := (9 * V_V43 + 3 * V_V33 + V_V34 + 3 * V_V44 + 8) / 16;
-      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 3))
-        (Wuffs.Index (A_X_Offset + 12)) :=
+      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 3)
+        (Wuffs.Index (A_X_Offset) + 12) :=
         Wuffs.U8 (V_W33);
-      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 3))
-        (Wuffs.Index (A_X_Offset + 16)) :=
+      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 3)
+        (Wuffs.Index (A_X_Offset) + 16) :=
         Wuffs.U8 (V_W34);
-      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 4))
-        (Wuffs.Index (A_X_Offset + 16)) :=
+      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 4)
+        (Wuffs.Index (A_X_Offset) + 16) :=
         Wuffs.U8 (V_W44);
-      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset + 4))
-        (Wuffs.Index (A_X_Offset + 12)) :=
+      Self.F_Buffers (Wuffs.Index (A_Which)) (Wuffs.Index (A_Y_Offset) + 4)
+        (Wuffs.Index (A_X_Offset) + 12) :=
         Wuffs.U8 (V_W43);
    end Smooth_Seams_8x8;
 
@@ -1563,15 +1677,15 @@ package body Wuffs.Std.Handsum is
             pragma Warnings ("C");
             pragma Loop_Invariant (V_Y < 8);
             pragma Warnings ("c");
-            Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 1)) :=
+            Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 1) :=
               16#3C#
                 + Interfaces.Shift_Right (Self.F_Buffers (1) (Wuffs.Index (V_Y))
-                                            (Wuffs.Index (4 * V_X + 1)),
+                                            (Wuffs.Index (4 * V_X) + 1),
                                           1);
-            Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 2)) :=
+            Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 2) :=
               16#3C#
                 + Interfaces.Shift_Right (Self.F_Buffers (1) (Wuffs.Index (V_Y))
-                                            (Wuffs.Index (4 * V_X + 2)),
+                                            (Wuffs.Index (4 * V_X) + 2),
                                           1);
             V_X := V_X + 1;
          end loop;
@@ -1605,46 +1719,46 @@ package body Wuffs.Std.Handsum is
             V_Dx := (V_X and 1) * 2 - 1;
             V_X0 := Interfaces.Shift_Right (V_X, 1);
             V_X1 := Wuffs.U32 (CLAMP_7 (Wuffs.Index (V_X0 + V_Dx and 31)));
-            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 1)) :=
+            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 1) :=
               Wuffs.U8 ((Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y0))
-                                      (Wuffs.Index (4 * V_X0 + 1)))
+                                      (Wuffs.Index (4 * V_X0) + 1))
                            * 9
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y0))
-                                          (Wuffs.Index (4 * V_X1 + 1)))
+                                          (Wuffs.Index (4 * V_X1) + 1))
                                * 3
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y1))
-                                          (Wuffs.Index (4 * V_X0 + 1)))
+                                          (Wuffs.Index (4 * V_X0) + 1))
                                * 3
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y1))
-                                          (Wuffs.Index (4 * V_X1 + 1)))
+                                          (Wuffs.Index (4 * V_X1) + 1))
                            + 8)
                           / 16);
-            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 2)) :=
+            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 2) :=
               Wuffs.U8 ((Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y0))
-                                      (Wuffs.Index (4 * V_X0 + 2)))
+                                      (Wuffs.Index (4 * V_X0) + 2))
                            * 9
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y0))
-                                          (Wuffs.Index (4 * V_X1 + 2)))
+                                          (Wuffs.Index (4 * V_X1) + 2))
                                * 3
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y1))
-                                          (Wuffs.Index (4 * V_X0 + 2)))
+                                          (Wuffs.Index (4 * V_X0) + 2))
                                * 3
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y1))
-                                          (Wuffs.Index (4 * V_X1 + 2)))
+                                          (Wuffs.Index (4 * V_X1) + 2))
                            + 8)
                           / 16);
-            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 3)) :=
+            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 3) :=
               Wuffs.U8 ((Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y0))
-                                      (Wuffs.Index (4 * V_X0 + 3)))
+                                      (Wuffs.Index (4 * V_X0) + 3))
                            * 9
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y0))
-                                          (Wuffs.Index (4 * V_X1 + 3)))
+                                          (Wuffs.Index (4 * V_X1) + 3))
                                * 3
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y1))
-                                          (Wuffs.Index (4 * V_X0 + 3)))
+                                          (Wuffs.Index (4 * V_X0) + 3))
                                * 3
                            + Wuffs.U32 (Self.F_Buffers (1) (Wuffs.Index (V_Y1))
-                                          (Wuffs.Index (4 * V_X1 + 3)))
+                                          (Wuffs.Index (4 * V_X1) + 3))
                            + 8)
                           / 16);
             V_X := V_X + 1;
@@ -1664,9 +1778,9 @@ package body Wuffs.Std.Handsum is
             pragma Warnings ("C");
             pragma Loop_Invariant (V_Y < 16);
             pragma Warnings ("c");
-            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 3)) :=
+            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 3) :=
               CUBE_ROOT (Wuffs.Index (Self.F_Buffers (0) (Wuffs.Index (V_Y))
-                                        (Wuffs.Index (4 * V_X + 3))));
+                                        (Wuffs.Index (4 * V_X) + 3)));
             V_X := V_X + 1;
          end loop;
          pragma Warnings ("C");
@@ -1716,13 +1830,13 @@ package body Wuffs.Std.Handsum is
             pragma Loop_Invariant (V_Y < 16);
             pragma Warnings ("c");
             V_Yy1 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 0)))
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 0))
                 * 16#1_0101#;
             V_Cb1 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 1)))
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 1))
                 - 16#80#;
             V_Cr1 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 2)))
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 2))
                 - 16#80#;
             V_R := V_Yy1 + 91881 * V_Cr1;
             if (V_R and 16#FF00_0000#) = 0 then
@@ -1742,11 +1856,11 @@ package body Wuffs.Std.Handsum is
             else
                V_B := 16#FFFF_FFFF# xor Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_B, N => 31);
             end if;
-            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 0)) :=
+            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 0) :=
               Wuffs.U8 (V_B and 16#FF#);
-            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 1)) :=
+            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 1) :=
               Wuffs.U8 (V_G and 16#FF#);
-            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 2)) :=
+            Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 2) :=
               Wuffs.U8 (V_R and 16#FF#);
             V_X := V_X + 1;
          end loop;
@@ -1786,13 +1900,13 @@ package body Wuffs.Std.Handsum is
             pragma Loop_Invariant (V_Y < 16);
             pragma Warnings ("c");
             V_S0 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx + 0)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx) + 0));
             V_S1 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx + 1)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx) + 1));
             V_S2 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx + 2)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx) + 2));
             V_S3 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx + 3)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Srcx) + 3));
             if V_Remainder > Self.F_Width then
                V_Remainder := V_Remainder - Self.F_Width;
                V_Acc0 := V_Acc0 + Self.F_Width * V_S0;
@@ -1807,13 +1921,13 @@ package body Wuffs.Std.Handsum is
                V_Acc1 := V_Acc1 + V_Remainder * V_S1;
                V_Acc2 := V_Acc2 + V_Remainder * V_S2;
                V_Acc3 := V_Acc3 + V_Remainder * V_S3;
-               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx + 0)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx) + 0) :=
                  Wuffs.U8 ((V_Acc0 + 8) / 16 and 16#FF#);
-               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx + 1)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx) + 1) :=
                  Wuffs.U8 ((V_Acc1 + 8) / 16 and 16#FF#);
-               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx + 2)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx) + 2) :=
                  Wuffs.U8 ((V_Acc2 + 8) / 16 and 16#FF#);
-               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx + 3)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_Dstx) + 3) :=
                  Wuffs.U8 ((V_Acc3 + 8) / 16 and 16#FF#);
                V_Dstx := V_Dstx + 1 and 15;
                V_Partial := Self.F_Width - V_Remainder;
@@ -1861,13 +1975,13 @@ package body Wuffs.Std.Handsum is
             pragma Loop_Invariant (V_X < 16);
             pragma Warnings ("c");
             V_S0 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X + 0)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X) + 0));
             V_S1 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X + 1)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X) + 1));
             V_S2 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X + 2)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X) + 2));
             V_S3 :=
-              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X + 3)));
+              Wuffs.U32 (Self.F_Buffers (0) (Wuffs.Index (V_Srcy)) (Wuffs.Index (4 * V_X) + 3));
             if V_Remainder > Self.F_Height then
                V_Remainder := V_Remainder - Self.F_Height;
                V_Acc0 := V_Acc0 + Self.F_Height * V_S0;
@@ -1882,13 +1996,13 @@ package body Wuffs.Std.Handsum is
                V_Acc1 := V_Acc1 + V_Remainder * V_S1;
                V_Acc2 := V_Acc2 + V_Remainder * V_S2;
                V_Acc3 := V_Acc3 + V_Remainder * V_S3;
-               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X + 0)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X) + 0) :=
                  Wuffs.U8 ((V_Acc0 + 8) / 16 and 16#FF#);
-               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X + 1)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X) + 1) :=
                  Wuffs.U8 ((V_Acc1 + 8) / 16 and 16#FF#);
-               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X + 2)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X) + 2) :=
                  Wuffs.U8 ((V_Acc2 + 8) / 16 and 16#FF#);
-               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X + 3)) :=
+               Self.F_Buffers (1) (Wuffs.Index (V_Dsty)) (Wuffs.Index (4 * V_X) + 3) :=
                  Wuffs.U8 ((V_Acc3 + 8) / 16 and 16#FF#);
                V_Dsty := V_Dsty + 1 and 15;
                V_Partial := Self.F_Height - V_Remainder;

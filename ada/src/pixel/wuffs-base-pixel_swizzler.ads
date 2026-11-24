@@ -131,6 +131,7 @@ package Wuffs.Base.Pixel_Swizzler with Pure, SPARK_Mode is
       Src         : Bytes;
       N           : out U64)
    with
+     Inline_Always,
      Post => N <= U64 (Dst'Length)
        and then N <= U64 (Src'Length)
        and then (if S.Has_Func

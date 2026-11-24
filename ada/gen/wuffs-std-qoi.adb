@@ -76,6 +76,53 @@ package body Wuffs.Std.Qoi is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.from_src_to_buffer
+   function From_Src_To_Buffer
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.from_buffer_to_dst
+   function From_Buffer_To_Dst
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -90,6 +137,7 @@ package body Wuffs.Std.Qoi is
    overriding function Set_Quirk
      (Self : in out Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -200,6 +248,7 @@ package body Wuffs.Std.Qoi is
       G_T8 : Boolean;
       G_T9 : Wuffs.U64;
       G_T10 : Wuffs.U8;
+      G_T11 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_4_Do_Decode_Image_Config;
@@ -238,12 +287,14 @@ package body Wuffs.Std.Qoi is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T11 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T11,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T11;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
@@ -268,12 +319,14 @@ package body Wuffs.Std.Qoi is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T11 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T11,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T5,
                                      Value => G_T6);
+         G_R_Src := G_T11;
          exit when G_T5;
       end loop;
       G_T4 := Wuffs.U32 (G_T6);
@@ -299,12 +352,14 @@ package body Wuffs.Std.Qoi is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T11 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T11,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T8,
                                      Value => G_T9);
+         G_R_Src := G_T11;
          exit when G_T8;
       end loop;
       G_T7 := Wuffs.U32 (G_T9);
@@ -663,6 +718,7 @@ package body Wuffs.Std.Qoi is
       G_T3 : Wuffs.U64;
       G_T4 : Boolean;
       G_T5 : Wuffs.U64;
+      G_T6 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_8_Do_Decode_Frame;
@@ -788,12 +844,14 @@ package body Wuffs.Std.Qoi is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T6 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T6,
                                      Scratch => Self.G_Scratch_8_Do_Decode_Frame,
                                      Last_Shift => 56,
                                      Done => G_T4,
                                      Value => G_T5);
+         G_R_Src := G_T6;
          exit when G_T4;
       end loop;
       G_T3 := G_T5;
@@ -960,14 +1018,14 @@ package body Wuffs.Std.Qoi is
          goto G_Else_6;
       end if;
       V_Ci := 4 * Wuffs.U32 (V_C8 and 16#3F#);
-      Self.F_Pixel (0) := Self.F_Cache (Wuffs.Index (V_Ci + 0));
-      Self.F_Pixel (1) := Self.F_Cache (Wuffs.Index (V_Ci + 1));
-      Self.F_Pixel (2) := Self.F_Cache (Wuffs.Index (V_Ci + 2));
-      Self.F_Pixel (3) := Self.F_Cache (Wuffs.Index (V_Ci + 3));
-      Self.F_Buffer (Wuffs.Index (V_Bi + 0)) := Self.F_Pixel (0);
-      Self.F_Buffer (Wuffs.Index (V_Bi + 1)) := Self.F_Pixel (1);
-      Self.F_Buffer (Wuffs.Index (V_Bi + 2)) := Self.F_Pixel (2);
-      Self.F_Buffer (Wuffs.Index (V_Bi + 3)) := Self.F_Pixel (3);
+      Self.F_Pixel (0) := Self.F_Cache (Wuffs.Index (V_Ci) + 0);
+      Self.F_Pixel (1) := Self.F_Cache (Wuffs.Index (V_Ci) + 1);
+      Self.F_Pixel (2) := Self.F_Cache (Wuffs.Index (V_Ci) + 2);
+      Self.F_Pixel (3) := Self.F_Cache (Wuffs.Index (V_Ci) + 3);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 0) := Self.F_Pixel (0);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 1) := Self.F_Pixel (1);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 2) := Self.F_Pixel (2);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 3) := Self.F_Pixel (3);
       V_Bi := V_Bi + 4;
       goto G_Continue_1;
       <<G_Else_6>>
@@ -1002,10 +1060,10 @@ package body Wuffs.Std.Qoi is
          pragma Warnings ("C");
          pragma Assert (V_Bi < 8188);
          pragma Warnings ("c");
-         Self.F_Buffer (Wuffs.Index (V_Bi + 0)) := Self.F_Pixel (0);
-         Self.F_Buffer (Wuffs.Index (V_Bi + 1)) := Self.F_Pixel (1);
-         Self.F_Buffer (Wuffs.Index (V_Bi + 2)) := Self.F_Pixel (2);
-         Self.F_Buffer (Wuffs.Index (V_Bi + 3)) := Self.F_Pixel (3);
+         Self.F_Buffer (Wuffs.Index (V_Bi) + 0) := Self.F_Pixel (0);
+         Self.F_Buffer (Wuffs.Index (V_Bi) + 1) := Self.F_Pixel (1);
+         Self.F_Buffer (Wuffs.Index (V_Bi) + 2) := Self.F_Pixel (2);
+         Self.F_Buffer (Wuffs.Index (V_Bi) + 3) := Self.F_Pixel (3);
          V_Bi := V_Bi + 4;
       end loop;
       goto G_Continue_1;
@@ -1017,14 +1075,14 @@ package body Wuffs.Std.Qoi is
                      + Wuffs.U32 (Self.F_Pixel (1)) * 5
                      + Wuffs.U32 (Self.F_Pixel (0)) * 7
                      + Wuffs.U32 (Self.F_Pixel (3)) * 11);
-      Self.F_Cache (Wuffs.Index (V_Hash4 + 0)) := Self.F_Pixel (0);
-      Self.F_Cache (Wuffs.Index (V_Hash4 + 1)) := Self.F_Pixel (1);
-      Self.F_Cache (Wuffs.Index (V_Hash4 + 2)) := Self.F_Pixel (2);
-      Self.F_Cache (Wuffs.Index (V_Hash4 + 3)) := Self.F_Pixel (3);
-      Self.F_Buffer (Wuffs.Index (V_Bi + 0)) := Self.F_Pixel (0);
-      Self.F_Buffer (Wuffs.Index (V_Bi + 1)) := Self.F_Pixel (1);
-      Self.F_Buffer (Wuffs.Index (V_Bi + 2)) := Self.F_Pixel (2);
-      Self.F_Buffer (Wuffs.Index (V_Bi + 3)) := Self.F_Pixel (3);
+      Self.F_Cache (Wuffs.Index (V_Hash4) + 0) := Self.F_Pixel (0);
+      Self.F_Cache (Wuffs.Index (V_Hash4) + 1) := Self.F_Pixel (1);
+      Self.F_Cache (Wuffs.Index (V_Hash4) + 2) := Self.F_Pixel (2);
+      Self.F_Cache (Wuffs.Index (V_Hash4) + 3) := Self.F_Pixel (3);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 0) := Self.F_Pixel (0);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 1) := Self.F_Pixel (1);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 2) := Self.F_Pixel (2);
+      Self.F_Buffer (Wuffs.Index (V_Bi) + 3) := Self.F_Pixel (3);
       V_Bi := V_Bi + 4;
       <<G_Continue_1>>
       goto G_Head_1;

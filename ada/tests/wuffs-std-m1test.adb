@@ -103,6 +103,39 @@ package body Wuffs.Std.M1test is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func widget.low3
+   function Low3 (Self : Widget; A_V : Wuffs.U32) return G_U32_Range_0_7;
+
+   --  Wuffs: func widget.add_small
+   function Add_Small (Self : in out Widget; A_D : G_U32_Range_0_7) return Wuffs.U32;
+
+   --  Wuffs: func widget.sum4
+   function Sum4 (Self : Widget; A_X : Wuffs.Bytes) return Wuffs.U32;
+
+   --  Wuffs: func widget.toggle
+   function Toggle (Self : in out Widget) return Boolean;
+
+   --  Wuffs: func widget.loop_1
+   function Loop_1 (Self : in out Widget) return Wuffs.U32;
+
+   --  Wuffs: func widget.g_loop_1
+   function W_G_Loop_1 (Self : in out Widget) return Wuffs.U32;
+
+   --  Wuffs: func widget.sum_buf
+   function Sum_Buf (Self : Widget) return Wuffs.U64;
+
+   --  Wuffs: func widget.mix
+   function G_Choosy_Default_Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func widget.mix (the choice of implementation)
+   function Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func widget.mix_double
+   function Mix_Double (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func widget.mix_square
+   function Mix_Square (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
+
    procedure Set_Count (Self : in out Widget; A_N : Wuffs.U32) is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
@@ -146,6 +179,7 @@ package body Wuffs.Std.M1test is
    end Get_Hist;
 
    function Loops (Self : in out Widget; A_N : Wuffs.U32) return Wuffs.U32 is
+      pragma Unmodified (Self);
       V_I : G_U32_Range_0_1000 := 0;
       V_J : G_U32_Range_0_16 := 0;
       V_Total : Wuffs.U32 := 0;
@@ -195,6 +229,7 @@ package body Wuffs.Std.M1test is
    function Arith
      (Self : in out Widget; A_A : Wuffs.U32; A_B : Wuffs.U32; A_S : Wuffs.U8) return Wuffs.U64
    is
+      pragma Unmodified (Self);
       V_X : Wuffs.U32 := 0;
       V_Y : Wuffs.U64 := 0;
       V_Z : Wuffs.U8 range 0 .. 7 := 0;
@@ -349,6 +384,7 @@ package body Wuffs.Std.M1test is
    end Windows;
 
    function Countdown (Self : in out Widget; A_N : Wuffs.U32) return Wuffs.U32 is
+      pragma Unmodified (Self);
       M_N : Wuffs.U32 := A_N;
       V_Steps : Wuffs.U32 := 0;
    begin
@@ -536,14 +572,13 @@ package body Wuffs.Std.M1test is
       V_I : Wuffs.U32 := 0;
       V_Loc : Wuffs.U16_Array (0 .. 7) := [others => 0];
       V_C : Wuffs.U32 := 0;
-      G_T1 : Wuffs.Runtime.RO_Slice_U8;
+      G_T1 : Wuffs.U64;
       G_T2 : Wuffs.U64;
       G_T3 : Wuffs.U64;
       G_T4 : Wuffs.U64;
       G_T5 : Wuffs.U64;
       G_T6 : Wuffs.U64;
       G_T7 : Wuffs.U64;
-      G_T8 : Wuffs.U64;
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return 0;
@@ -558,23 +593,18 @@ package body Wuffs.Std.M1test is
          Self.F_Buf (Wuffs.Index (V_I)) := Wuffs.U8 (V_I * 7 and 16#FF#);
          V_I := V_I + 1;
       end loop;
-      G_T1 :=
-        Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
-                                   First => Self.F_Buf'First,
-                                   Length => Self.F_Buf'Length),
-                                  8);
-      Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_Aux (0 .. 15),
-                                     Src => G_T1.Base (G_T1.First .. Wuffs.Runtime.Last (G_T1)),
-                                     N => G_T2);
-      V_N := G_T2;
+      Wuffs.Base.Slices.Copy_From_Slice (Dst => Self.F_Aux (0 .. 15),
+                                         Src => Self.F_Buf (8 .. Self.F_Buf'Last),
+                                         N => G_T1);
+      V_N := G_T1;
       V_T := V_T + V_N;
       Wuffs.Base.Slices.Copy_Within (Data => Self.F_Buf,
                                      Dst_First => 4,
                                      Dst_Length => 20 - 4,
                                      Src_First => 0,
                                      Src_Length => 32,
-                                     N => G_T3);
-      V_N := G_T3;
+                                     N => G_T2);
+      V_N := G_T2;
       V_T := V_T * 3 + V_N;
       V_S :=
         Wuffs.Runtime.Subslice_I ((Base => Self.F_Buf'Unrestricted_Access,
@@ -583,8 +613,8 @@ package body Wuffs.Std.M1test is
                                   2);
       Wuffs.Runtime.Copy_From_Slice (Dst => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
                                      Src => Self.F_Buf (10 .. 13),
-                                     N => G_T4);
-      V_N := G_T4;
+                                     N => G_T3);
+      V_N := G_T3;
       V_T := V_T * 3 + V_N;
       V_R :=
         (Base => Self.F_Buf'Unrestricted_Access,
@@ -597,8 +627,8 @@ package body Wuffs.Std.M1test is
                                   20);
       Wuffs.Runtime.Copy_From_Slice (Dst => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
                                      Src => V_R.Base (V_R.First .. Wuffs.Runtime.Last (V_R)),
-                                     N => G_T5);
-      V_N := G_T5;
+                                     N => G_T4);
+      V_N := G_T4;
       V_T := V_T * 3 + V_N;
       V_S :=
         Wuffs.Runtime.Subslice_J ((Base => Self.F_Buf'Unrestricted_Access,
@@ -607,8 +637,8 @@ package body Wuffs.Std.M1test is
                                   12);
       Wuffs.Runtime.Copy_From_Slice (Dst => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
                                      Src => Self.F_Aux,
-                                     N => G_T6);
-      V_N := G_T6;
+                                     N => G_T5);
+      V_N := G_T5;
       V_T := V_T * 3 + V_N;
       V_S :=
         (Base => Self.F_Aux'Unrestricted_Access,
@@ -644,13 +674,13 @@ package body Wuffs.Std.M1test is
       if Wuffs.U64 (A_X'Length) >= 2 then
          V_T := V_T * 3 + Wuffs.U64 (Wuffs.Base.Endian.Peek_U16LE (Data => A_X, Pos => A_X'First));
       end if;
-      Wuffs.Runtime.Copy_From_Slice (Dst => A_X, Src => Self.F_Buf (0 .. 2), N => G_T7);
-      V_N := G_T7;
+      Wuffs.Runtime.Copy_From_Slice (Dst => A_X, Src => Self.F_Buf (0 .. 2), N => G_T6);
+      V_N := G_T6;
       V_T := V_T * 3 + V_N;
       Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_Buf (28 .. Self.F_Buf'Last),
                                      Src => A_X,
-                                     N => G_T8);
-      V_N := G_T8;
+                                     N => G_T7);
+      V_N := G_T7;
       V_T := V_T * 3 + V_N;
       V_Loc (Wuffs.Index (A_K and 7)) := 513;
       V_Loc (Wuffs.Index (Interfaces.Shift_Right (A_K, 3) and 7)) :=

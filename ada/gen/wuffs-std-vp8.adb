@@ -720,6 +720,273 @@ package body Wuffs.Std.Vp8 is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.read_bit
+   function Read_Bit
+     (Self : in out Decoder;
+      A_Workbuf : Wuffs.Bytes;
+      A_Part : G_U32_Range_0_8;
+      A_Prob : G_U32_Range_0_255)
+      return G_U32_Range_0_1;
+
+   --  Wuffs: func decoder.read_unsigned
+   function Read_Unsigned
+     (Self : in out Decoder;
+      A_Workbuf : Wuffs.Bytes;
+      A_Part : G_U32_Range_0_8;
+      A_N : G_U32_Range_0_31)
+      return Wuffs.U32;
+
+   --  Wuffs: func decoder.read_signed
+   function Read_Signed
+     (Self : in out Decoder;
+      A_Workbuf : Wuffs.Bytes;
+      A_Part : G_U32_Range_0_8;
+      A_N : G_U32_Range_0_31)
+      return Wuffs.U32;
+
+   --  Wuffs: func decoder.decode_coefficients
+   function Decode_Coefficients
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mbx : G_U32_Range_0_1023;
+      A_Mby : G_U32_Range_0_1023;
+      A_Seg : G_U32_Range_0_3;
+      A_Luma_Mode : G_U32_Range_0_4)
+      return G_U32_Range_0_1;
+
+   --  Wuffs: func decoder.initialize_mb_coeffs
+   procedure Initialize_Mb_Coeffs (Self : in out Decoder);
+
+   --  Wuffs: func decoder.decode_subblock_coefficients
+   function Decode_Subblock_Coefficients
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mby : G_U32_Range_0_1023;
+      A_Seg : G_U32_Range_0_3;
+      A_B : G_U32_Range_0_24;
+      A_Plane : G_U32_Range_0_3;
+      A_Context : G_U32_Range_0_2)
+      return G_U32_Range_0_1;
+
+   --  Wuffs: func decoder.decode_large_value
+   function Decode_Large_Value
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Part : G_U32_Range_0_8;
+      A_Prob_Base : G_U32_Range_0_1045)
+      return G_U32_Range_2_2114;
+
+   --  Wuffs: func decoder.filter_simple
+   procedure Filter_Simple
+     (Self : in out Decoder; A_Workbuf : in out Wuffs.Bytes; A_Mby : G_U32_Range_0_1023);
+
+   --  Wuffs: func decoder.filter_normal
+   procedure Filter_Normal
+     (Self : in out Decoder; A_Workbuf : in out Wuffs.Bytes; A_Mby : G_U32_Range_0_1023);
+
+   --  Wuffs: func decoder.filter_2
+   procedure Filter_2
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_W : Wuffs.U64;
+      A_Filter_Bits : Wuffs.U32;
+      A_I_Step : Wuffs.U32;
+      A_J_Step : Wuffs.U32);
+
+   --  Wuffs: func decoder.filter_246
+   procedure Filter_246
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_W : Wuffs.U64;
+      A_Filter_Bits : Wuffs.U32;
+      A_I_Step : Wuffs.U32;
+      A_J_Step : Wuffs.U32;
+      A_N : Wuffs.U32;
+      A_Inner : Boolean);
+
+   --  Wuffs: func decoder.abs_diff
+   function Abs_Diff (Self : Decoder; A_A : Wuffs.U32; A_B : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func decoder.clip_m16_p15
+   function Clip_M16_P15 (Self : Decoder; A_A : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func decoder.clip_m128_p127
+   function Clip_M128_P127 (Self : Decoder; A_A : Wuffs.U32) return Wuffs.U32;
+
+   --  Wuffs: func decoder.clip_255_u8
+   function Clip_255_U8 (Self : Decoder; A_A : Wuffs.U32) return Wuffs.U8;
+
+   --  Wuffs: func decoder.copy_partitions_to_workbuf
+   function Copy_Partitions_To_Workbuf
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_header_partition
+   function Decode_Header_Partition
+     (Self : in out Decoder; A_Workbuf : Wuffs.Bytes) return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_segment_header
+   procedure Decode_Segment_Header (Self : in out Decoder; A_Workbuf : Wuffs.Bytes);
+
+   --  Wuffs: func decoder.decode_filter_header
+   procedure Decode_Filter_Header (Self : in out Decoder; A_Workbuf : Wuffs.Bytes);
+
+   --  Wuffs: func decoder.decode_coeff_probs
+   procedure Decode_Coeff_Probs (Self : in out Decoder; A_Workbuf : Wuffs.Bytes);
+
+   --  Wuffs: func decoder.calculate_loop_filters
+   procedure Calculate_Loop_Filters (Self : in out Decoder);
+
+   --  Wuffs: func decoder.calculate_dequants
+   procedure Calculate_Dequants (Self : in out Decoder);
+
+   --  Wuffs: func decoder.clip_127
+   function Clip_127 (Self : Decoder; A_A : Wuffs.U32) return G_U32_Range_0_127;
+
+   --  Wuffs: func decoder.decode_other_partition_lengths
+   function Decode_Other_Partition_Lengths
+     (Self : in out Decoder; A_Workbuf : Wuffs.Bytes) return Wuffs.Status;
+
+   --  Wuffs: func decoder.inverse_dct_dc_only
+   procedure Inverse_Dct_Dc_Only
+     (Self : in out Decoder;
+      A_Cachex : G_U32_Range_0_28;
+      A_Cachey : G_U32_Range_0_22;
+      A_B : G_U32_Range_0_23);
+
+   --  Wuffs: func decoder.inverse_dct_full
+   procedure Inverse_Dct_Full
+     (Self : in out Decoder;
+      A_Cachex : G_U32_Range_0_28;
+      A_Cachey : G_U32_Range_0_22;
+      A_B : G_U32_Range_0_23);
+
+   --  Wuffs: func decoder.inverse_wht
+   procedure Inverse_Wht (Self : in out Decoder);
+
+   --  Wuffs: func decoder.decode_macroblocks
+   function Decode_Macroblocks
+     (Self : in out Decoder; A_Workbuf : in out Wuffs.Bytes) return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_one_macroblock
+   procedure Decode_One_Macroblock
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mbx : G_U32_Range_0_1023;
+      A_Mby : G_U32_Range_0_1023);
+
+   --  Wuffs: func decoder.decode_luma_mode
+   function Decode_Luma_Mode
+     (Self : in out Decoder; A_Workbuf : in out Wuffs.Bytes) return G_U32_Range_0_4;
+
+   --  Wuffs: func decoder.decode_chroma_mode
+   function Decode_Chroma_Mode
+     (Self : in out Decoder; A_Workbuf : in out Wuffs.Bytes) return G_U32_Range_0_3;
+
+   --  Wuffs: func decoder.decode_subblock_modes
+   procedure Decode_Subblock_Modes
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mbx : G_U32_Range_0_1023;
+      A_Luma_Mode : G_U32_Range_0_4);
+
+   --  Wuffs: func decoder.decode_one_subblock_mode
+   function Decode_One_Subblock_Mode
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Top_Mode : G_U8_Range_0_9;
+      A_Left_Mode : G_U8_Range_0_9)
+      return G_U8_Range_0_9;
+
+   --  Wuffs: func decoder.copy_from_yuv_cache
+   procedure Copy_From_Yuv_Cache
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mbx : G_U32_Range_0_1023;
+      A_Mby : G_U32_Range_0_1023);
+
+   --  Wuffs: func decoder.swizzle
+   function Swizzle
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.predict_y4
+   procedure Predict_Y4 (Self : in out Decoder; A_B : G_U32_Range_0_15);
+
+   --  Wuffs: func decoder.predict_y16
+   procedure Predict_Y16 (Self : in out Decoder; A_Mode : G_U32_Range_0_12);
+
+   --  Wuffs: func decoder.predict_uv8
+   procedure Predict_Uv8
+     (Self : in out Decoder; A_B : G_U32_Range_0_1; A_Mode : G_U32_Range_0_12);
+
+   --  Wuffs: func decoder.reconstruct
+   procedure Reconstruct
+     (Self : in out Decoder;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Mbx : G_U32_Range_0_1023;
+      A_Mby : G_U32_Range_0_1023;
+      A_Luma_Mode : G_U32_Range_0_4;
+      A_Chroma_Mode : G_U32_Range_0_3);
+
+   --  Wuffs: func decoder.substitute_dc_top_left
+   function Substitute_Dc_Top_Left
+     (Self : Decoder;
+      A_Mode : G_U32_Range_0_3;
+      A_Mbx : G_U32_Range_0_1023;
+      A_Mby : G_U32_Range_0_1023)
+      return G_U32_Range_0_12;
+
+   --  Wuffs: func decoder.prepare_yuv_cache
+   procedure Prepare_Yuv_Cache
+     (Self : in out Decoder;
+      A_Workbuf : Wuffs.Bytes;
+      A_Mbx : G_U32_Range_0_1023;
+      A_Mby : G_U32_Range_0_1023);
+
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.calculate_mbw_mbh
+   procedure Calculate_Mbw_Mbh (Self : in out Decoder);
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
    function Read_Bit
      (Self : in out Decoder;
       A_Workbuf : Wuffs.Bytes;
@@ -1030,7 +1297,7 @@ package body Wuffs.Std.Vp8 is
         Read_Bit (Self,
                   A_Workbuf => A_Workbuf,
                   A_Part => V_Part,
-                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base + 0))));
+                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base) + 0)));
       if V_V1 = 0 then
          return 0;
       end if;
@@ -1043,30 +1310,30 @@ package body Wuffs.Std.Vp8 is
            Read_Bit (Self,
                      A_Workbuf => A_Workbuf,
                      A_Part => V_Part,
-                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base + 1))));
+                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base) + 1)));
          if V_V1 = 0 then
             V_I := V_I + 1;
             if V_I >= 16 then
                exit G_Loop_1;
             end if;
-            V_Prob_Base := A_Plane * 264 + COEFF_BANDS_33 (Wuffs.Index (V_I + 0)) + 0;
+            V_Prob_Base := A_Plane * 264 + COEFF_BANDS_33 (Wuffs.Index (V_I) + 0) + 0;
             goto G_Continue_1;
          end if;
          V_V1 :=
            Read_Bit (Self,
                      A_Workbuf => A_Workbuf,
                      A_Part => V_Part,
-                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base + 2))));
+                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base) + 2)));
          if V_V1 = 0 then
             V_Value := 1;
-            V_Prob_Base := A_Plane * 264 + COEFF_BANDS_33 (Wuffs.Index (V_I + 1)) + 11;
+            V_Prob_Base := A_Plane * 264 + COEFF_BANDS_33 (Wuffs.Index (V_I) + 1) + 11;
          else
             V_Value :=
               Decode_Large_Value (Self,
                                   A_Workbuf => A_Workbuf,
                                   A_Part => V_Part,
                                   A_Prob_Base => V_Prob_Base);
-            V_Prob_Base := A_Plane * 264 + COEFF_BANDS_33 (Wuffs.Index (V_I + 1)) + 22;
+            V_Prob_Base := A_Plane * 264 + COEFF_BANDS_33 (Wuffs.Index (V_I) + 1) + 22;
          end if;
          V_V1 := Read_Bit (Self, A_Workbuf => A_Workbuf, A_Part => V_Part, A_Prob => 128);
          if V_V1 /= 0 then
@@ -1088,7 +1355,7 @@ package body Wuffs.Std.Vp8 is
            Read_Bit (Self,
                      A_Workbuf => A_Workbuf,
                      A_Part => V_Part,
-                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base + 0))));
+                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (V_Prob_Base) + 0)));
          if V_V1 = 0 then
             exit G_Loop_1;
          end if;
@@ -1117,13 +1384,13 @@ package body Wuffs.Std.Vp8 is
         Read_Bit (Self,
                   A_Workbuf => A_Workbuf,
                   A_Part => A_Part,
-                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base + 3))));
+                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base) + 3)));
       if V_V1 = 0 then
          V_V1 :=
            Read_Bit (Self,
                      A_Workbuf => A_Workbuf,
                      A_Part => A_Part,
-                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base + 4))));
+                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base) + 4)));
          if V_V1 = 0 then
             return 2;
          end if;
@@ -1131,20 +1398,20 @@ package body Wuffs.Std.Vp8 is
            Read_Bit (Self,
                      A_Workbuf => A_Workbuf,
                      A_Part => A_Part,
-                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base + 5))));
+                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base) + 5)));
          return 3 + V_V1;
       end if;
       V_V1 :=
         Read_Bit (Self,
                   A_Workbuf => A_Workbuf,
                   A_Part => A_Part,
-                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base + 6))));
+                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base) + 6)));
       if V_V1 = 0 then
          V_V1 :=
            Read_Bit (Self,
                      A_Workbuf => A_Workbuf,
                      A_Part => A_Part,
-                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base + 7))));
+                     A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base) + 7)));
          if V_V1 = 0 then
             V_V1 := Read_Bit (Self, A_Workbuf => A_Workbuf, A_Part => A_Part, A_Prob => 159);
             return 5 + V_V1;
@@ -1157,7 +1424,7 @@ package body Wuffs.Std.Vp8 is
         Read_Bit (Self,
                   A_Workbuf => A_Workbuf,
                   A_Part => A_Part,
-                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base + 8))));
+                  A_Prob => Wuffs.U32 (Self.F_Coeff_Probs (Wuffs.Index (A_Prob_Base) + 8)));
       V_W1 :=
         Read_Bit (Self,
                   A_Workbuf => A_Workbuf,
@@ -1449,6 +1716,7 @@ package body Wuffs.Std.Vp8 is
       A_I_Step : Wuffs.U32;
       A_J_Step : Wuffs.U32)
    is
+      pragma Unmodified (Self);
       M_W : Wuffs.U64 := A_W;
       V_N : Wuffs.U32 := 0;
       V_Level : Wuffs.U32 range 0 .. 255 := 0;
@@ -1525,6 +1793,7 @@ package body Wuffs.Std.Vp8 is
       A_N : Wuffs.U32;
       A_Inner : Boolean)
    is
+      pragma Unmodified (Self);
       M_W : Wuffs.U64 := A_W;
       M_N : Wuffs.U32 := A_N;
       V_Level : Wuffs.U32 range 0 .. 255 := 0;
@@ -1752,6 +2021,7 @@ package body Wuffs.Std.Vp8 is
       G_T1 : Wuffs.Runtime.Slice_U8;
       G_T2 : Wuffs.U32;
       G_Susp : Wuffs.U32;
+      G_T3 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_16_Copy_Partitions_To_Workbuf;
@@ -1789,12 +2059,14 @@ package body Wuffs.Std.Vp8 is
                                          Length => A_Workbuf'Length),
                                    I => Wuffs.Index (V_I),
                                    J => Wuffs.Index (V_J));
+      G_T3 := G_R_Src;
       Wuffs.Runtime.Reader_Limited_Copy_U32_To_Slice
         (Data => A_Src,
-         R => G_R_Src,
+         R => G_T3,
          Up_To => Wuffs.U32 (V_J - V_I and 16#FFFF_FFFF#),
          Dst => G_T1.Base (G_T1.First .. Wuffs.Runtime.Last (G_T1)),
          N => G_T2);
+      G_R_Src := G_T3;
       V_N := G_T2;
       V_I := V_I + Wuffs.U64 (V_N);
       if V_I >= V_J then
@@ -2019,7 +2291,7 @@ package body Wuffs.Std.Vp8 is
                end if;
             end if;
             if V_Level = 0 or else V_Level >= 16#8000_0000# then
-               Self.F_Loop_Filters (Wuffs.Index (2 * V_Seg + V_Inner)) := 0;
+               Self.F_Loop_Filters (Wuffs.Index (2 * V_Seg) + Wuffs.Index (V_Inner)) := 0;
                V_Inner := V_Inner + 1;
                goto G_Continue_2;
             elsif V_Level > 63 then
@@ -2047,7 +2319,7 @@ package body Wuffs.Std.Vp8 is
                V_Hlevel := 2;
             end if;
             V_Level := 2 * V_Level + V_Ilevel;
-            Self.F_Loop_Filters (Wuffs.Index (2 * V_Seg + V_Inner)) :=
+            Self.F_Loop_Filters (Wuffs.Index (2 * V_Seg) + Wuffs.Index (V_Inner)) :=
               V_Level
                 or Interfaces.Shift_Left (V_Ilevel, 8)
                 or Interfaces.Shift_Left (V_Hlevel, 16)
@@ -2169,20 +2441,20 @@ package body Wuffs.Std.Vp8 is
             return Error_Bad_Header;
          end if;
          V_Remainder := V_Remainder - V_V32;
-         Self.F_Part_Lens (Wuffs.Index (1 + V_I)) := V_V32;
+         Self.F_Part_Lens (1 + Wuffs.Index (V_I)) := V_V32;
          V_I := V_I + 1;
       end loop;
       if V_Remainder > 16#FF_FFFF# then
          return Error_Unsupported_VP8_File;
       end if;
-      Self.F_Part_Lens (Wuffs.Index (1 + Self.F_Num_Other_Partitions_M1)) := V_Remainder;
+      Self.F_Part_Lens (1 + Wuffs.Index (Self.F_Num_Other_Partitions_M1)) := V_Remainder;
       V_I := 0;
       while V_I < 1 + Self.F_Num_Other_Partitions_M1 loop
          pragma Warnings ("C");
          pragma Assert (V_I < 8);
          pragma Warnings ("c");
-         Self.F_Part_Workbuf_Ris (Wuffs.Index (1 + V_I)) := V_O;
-         V_O := V_O + Wuffs.U64 (Self.F_Part_Lens (Wuffs.Index (1 + V_I)));
+         Self.F_Part_Workbuf_Ris (1 + Wuffs.Index (V_I)) := V_O;
+         V_O := V_O + Wuffs.U64 (Self.F_Part_Lens (1 + Wuffs.Index (V_I)));
          if V_O > Wuffs.U64 (A_Workbuf'Length) then
             return Error_Bad_Header;
          end if;
@@ -2205,15 +2477,15 @@ package body Wuffs.Std.Vp8 is
                                                 N => 3);
       V_I := 0;
       while V_I < 16 loop
-         Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + Interfaces.Shift_Right (V_I, 2)))
-           (Wuffs.Index (A_Cachex + (V_I and 3))) :=
+         Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + Wuffs.Index (Interfaces.Shift_Right (V_I, 2)))
+           (Wuffs.Index (A_Cachex) + Wuffs.Index (V_I and 3)) :=
            CLAMP (Wuffs.Index (1023
                                  and V_Dc
                                        + Wuffs.U16
                                            (Self.F_Yuv_Cache
-                                              (Wuffs.Index
-                                                 (A_Cachey + Interfaces.Shift_Right (V_I, 2)))
-                                              (Wuffs.Index (A_Cachex + (V_I and 3))))));
+                                              (Wuffs.Index (A_Cachey)
+                                                 + Wuffs.Index (Interfaces.Shift_Right (V_I, 2)))
+                                              (Wuffs.Index (A_Cachex) + Wuffs.Index (V_I and 3)))));
          V_I := V_I + 1;
       end loop;
    end Inverse_Dct_Dc_Only;
@@ -2402,25 +2674,25 @@ package body Wuffs.Std.Vp8 is
       V_Q01 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P01 + V_P02, N => 3);
       V_Q02 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P01 - V_P02, N => 3);
       V_Q03 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P00 - V_P03, N => 3);
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0)) (Wuffs.Index (A_Cachex + 0)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0) (Wuffs.Index (A_Cachex) + 0) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0))
-                                               (Wuffs.Index (A_Cachex + 0)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0)
+                                               (Wuffs.Index (A_Cachex) + 0))
                                     + V_Q00));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0)) (Wuffs.Index (A_Cachex + 1)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0) (Wuffs.Index (A_Cachex) + 1) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0))
-                                               (Wuffs.Index (A_Cachex + 1)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0)
+                                               (Wuffs.Index (A_Cachex) + 1))
                                     + V_Q01));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0)) (Wuffs.Index (A_Cachex + 2)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0) (Wuffs.Index (A_Cachex) + 2) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0))
-                                               (Wuffs.Index (A_Cachex + 2)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0)
+                                               (Wuffs.Index (A_Cachex) + 2))
                                     + V_Q02));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0)) (Wuffs.Index (A_Cachex + 3)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0) (Wuffs.Index (A_Cachex) + 3) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 0))
-                                               (Wuffs.Index (A_Cachex + 3)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 0)
+                                               (Wuffs.Index (A_Cachex) + 3))
                                     + V_Q03));
       V_Dc1 := V_M01 + 4;
       V_P10 := V_Dc1 + V_M21;
@@ -2435,25 +2707,25 @@ package body Wuffs.Std.Vp8 is
       V_Q11 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P11 + V_P12, N => 3);
       V_Q12 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P11 - V_P12, N => 3);
       V_Q13 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P10 - V_P13, N => 3);
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1)) (Wuffs.Index (A_Cachex + 0)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1) (Wuffs.Index (A_Cachex) + 0) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1))
-                                               (Wuffs.Index (A_Cachex + 0)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1)
+                                               (Wuffs.Index (A_Cachex) + 0))
                                     + V_Q10));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1)) (Wuffs.Index (A_Cachex + 1)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1) (Wuffs.Index (A_Cachex) + 1) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1))
-                                               (Wuffs.Index (A_Cachex + 1)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1)
+                                               (Wuffs.Index (A_Cachex) + 1))
                                     + V_Q11));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1)) (Wuffs.Index (A_Cachex + 2)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1) (Wuffs.Index (A_Cachex) + 2) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1))
-                                               (Wuffs.Index (A_Cachex + 2)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1)
+                                               (Wuffs.Index (A_Cachex) + 2))
                                     + V_Q12));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1)) (Wuffs.Index (A_Cachex + 3)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1) (Wuffs.Index (A_Cachex) + 3) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 1))
-                                               (Wuffs.Index (A_Cachex + 3)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 1)
+                                               (Wuffs.Index (A_Cachex) + 3))
                                     + V_Q13));
       V_Dc2 := V_M02 + 4;
       V_P20 := V_Dc2 + V_M22;
@@ -2468,25 +2740,25 @@ package body Wuffs.Std.Vp8 is
       V_Q21 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P21 + V_P22, N => 3);
       V_Q22 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P21 - V_P22, N => 3);
       V_Q23 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P20 - V_P23, N => 3);
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2)) (Wuffs.Index (A_Cachex + 0)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2) (Wuffs.Index (A_Cachex) + 0) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2))
-                                               (Wuffs.Index (A_Cachex + 0)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2)
+                                               (Wuffs.Index (A_Cachex) + 0))
                                     + V_Q20));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2)) (Wuffs.Index (A_Cachex + 1)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2) (Wuffs.Index (A_Cachex) + 1) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2))
-                                               (Wuffs.Index (A_Cachex + 1)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2)
+                                               (Wuffs.Index (A_Cachex) + 1))
                                     + V_Q21));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2)) (Wuffs.Index (A_Cachex + 2)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2) (Wuffs.Index (A_Cachex) + 2) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2))
-                                               (Wuffs.Index (A_Cachex + 2)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2)
+                                               (Wuffs.Index (A_Cachex) + 2))
                                     + V_Q22));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2)) (Wuffs.Index (A_Cachex + 3)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2) (Wuffs.Index (A_Cachex) + 3) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 2))
-                                               (Wuffs.Index (A_Cachex + 3)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 2)
+                                               (Wuffs.Index (A_Cachex) + 3))
                                     + V_Q23));
       V_Dc3 := V_M03 + 4;
       V_P30 := V_Dc3 + V_M23;
@@ -2501,25 +2773,25 @@ package body Wuffs.Std.Vp8 is
       V_Q31 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P31 + V_P32, N => 3);
       V_Q32 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P31 - V_P32, N => 3);
       V_Q33 := Wuffs.Base.Ints.Sign_Extend_Rshift_U32 (A => V_P30 - V_P33, N => 3);
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3)) (Wuffs.Index (A_Cachex + 0)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3) (Wuffs.Index (A_Cachex) + 0) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3))
-                                               (Wuffs.Index (A_Cachex + 0)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3)
+                                               (Wuffs.Index (A_Cachex) + 0))
                                     + V_Q30));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3)) (Wuffs.Index (A_Cachex + 1)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3) (Wuffs.Index (A_Cachex) + 1) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3))
-                                               (Wuffs.Index (A_Cachex + 1)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3)
+                                               (Wuffs.Index (A_Cachex) + 1))
                                     + V_Q31));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3)) (Wuffs.Index (A_Cachex + 2)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3) (Wuffs.Index (A_Cachex) + 2) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3))
-                                               (Wuffs.Index (A_Cachex + 2)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3)
+                                               (Wuffs.Index (A_Cachex) + 2))
                                     + V_Q32));
-      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3)) (Wuffs.Index (A_Cachex + 3)) :=
+      Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3) (Wuffs.Index (A_Cachex) + 3) :=
         CLAMP (Wuffs.Index (1023
-                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey + 3))
-                                               (Wuffs.Index (A_Cachex + 3)))
+                              and Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (A_Cachey) + 3)
+                                               (Wuffs.Index (A_Cachex) + 3))
                                     + V_Q33));
    end Inverse_Dct_Full;
 
@@ -2905,7 +3177,7 @@ package body Wuffs.Std.Vp8 is
                                                (Self.F_Mb_States_Top (Wuffs.Index (A_Mbx)),
                                                 Natural (V_I * 4))));
          else
-            V_Top_Mode := Self.F_Mb_Subblock_Modes (Wuffs.Index (V_I - 4));
+            V_Top_Mode := Self.F_Mb_Subblock_Modes (Wuffs.Index (V_I) - 4);
          end if;
          if (V_I and 3) = 0 then
             V_Left_Mode :=
@@ -3045,6 +3317,7 @@ package body Wuffs.Std.Vp8 is
       A_Mbx : G_U32_Range_0_1023;
       A_Mby : G_U32_Range_0_1023)
    is
+      pragma Unmodified (Self);
       V_W : Wuffs.U64 := 0;
       V_I : Wuffs.U32 := 0;
       V_Dst : Wuffs.Runtime.Slice_U8;
@@ -3067,7 +3340,7 @@ package body Wuffs.Std.Vp8 is
             Wuffs.Runtime.Copy_From_Slice (Dst => V_Dst.Base
                                                     (V_Dst.First
                                                      .. Wuffs.Runtime.Last (V_Dst)),
-                                           Src => Self.F_Yuv_Cache (Wuffs.Index (V_I + 16#01#))
+                                           Src => Self.F_Yuv_Cache (Wuffs.Index (V_I) + 16#01#)
                                                     (16#08#
                                                      .. 16#18# - 1),
                                            N => G_T1);
@@ -3088,7 +3361,7 @@ package body Wuffs.Std.Vp8 is
             Wuffs.Runtime.Copy_From_Slice (Dst => V_Dst.Base
                                                     (V_Dst.First
                                                      .. Wuffs.Runtime.Last (V_Dst)),
-                                           Src => Self.F_Yuv_Cache (Wuffs.Index (V_I + 16#12#))
+                                           Src => Self.F_Yuv_Cache (Wuffs.Index (V_I) + 16#12#)
                                                     (16#08#
                                                      .. 16#10# - 1),
                                            N => G_T2);
@@ -3109,7 +3382,7 @@ package body Wuffs.Std.Vp8 is
             Wuffs.Runtime.Copy_From_Slice (Dst => V_Dst.Base
                                                     (V_Dst.First
                                                      .. Wuffs.Runtime.Last (V_Dst)),
-                                           Src => Self.F_Yuv_Cache (Wuffs.Index (V_I + 16#12#))
+                                           Src => Self.F_Yuv_Cache (Wuffs.Index (V_I) + 16#12#)
                                                     (16#18#
                                                      .. 16#20# - 1),
                                            N => G_T3);
@@ -3301,33 +3574,34 @@ package body Wuffs.Std.Vp8 is
       if V_Mode = 0 then
          V_Avg :=
            Wuffs.U8 ((4
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 0)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 2)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 3)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3))
-                                       (Wuffs.Index (V_Cachex - 1))))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 0))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 2))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 3))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3)
+                                       (Wuffs.Index (V_Cachex) - 1)))
                        / 8);
          V_Z := 0;
          while V_Z < 16 loop
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 2)))
-              (Wuffs.Index (V_Cachex + (V_Z and 3))) :=
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                + Wuffs.Index (Interfaces.Shift_Right (V_Z, 2)))
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 3)) :=
               V_Avg;
             V_Z := V_Z + 1;
          end loop;
       elsif V_Mode = 1 then
          V_Tm0 :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) - 1));
          V_Z := 0;
          while V_Z < 16 loop
             pragma Warnings ("C");
@@ -3335,13 +3609,15 @@ package body Wuffs.Std.Vp8 is
             pragma Loop_Invariant (V_Cachex >= 8);
             pragma Warnings ("c");
             V_Tm1 :=
-              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 2)))
-                           (Wuffs.Index (V_Cachex - 1)));
+              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                             + Wuffs.Index (Interfaces.Shift_Right (V_Z, 2)))
+                           (Wuffs.Index (V_Cachex) - 1));
             V_Tm2 :=
-              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                           (Wuffs.Index (V_Cachex + (V_Z and 3))));
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 2)))
-              (Wuffs.Index (V_Cachex + (V_Z and 3))) :=
+              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                           (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 3)));
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                + Wuffs.Index (Interfaces.Shift_Right (V_Z, 2)))
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 3)) :=
               CLAMP (Wuffs.Index ((V_Tm1 + V_Tm2) - V_Tm0 and 1023));
             V_Z := V_Z + 1;
          end loop;
@@ -3351,71 +3627,87 @@ package body Wuffs.Std.Vp8 is
          pragma Warnings ("c");
       elsif V_Mode = 2 then
          V_A :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) - 1));
          V_B :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 0)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 0));
          V_C :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 1));
          V_D :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 2)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 2));
          V_E :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 3)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 3));
          V_F :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 4)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 4));
          V_Def := Wuffs.U8 ((V_D + 2 * V_E + V_F + 2) / 4 and 16#FF#);
          V_Cde := Wuffs.U8 ((V_C + 2 * V_D + V_E + 2) / 4 and 16#FF#);
          V_Bcd := Wuffs.U8 ((V_B + 2 * V_C + V_D + 2) / 4 and 16#FF#);
          V_Abc := Wuffs.U8 ((V_A + 2 * V_B + V_C + 2) / 4 and 16#FF#);
          V_Z := 0;
          while V_Z < 4 loop
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + V_Z)) (Wuffs.Index (V_Cachex + 0)) := V_Abc;
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + V_Z)) (Wuffs.Index (V_Cachex + 1)) := V_Bcd;
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + V_Z)) (Wuffs.Index (V_Cachex + 2)) := V_Cde;
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + V_Z)) (Wuffs.Index (V_Cachex + 3)) := V_Def;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + Wuffs.Index (V_Z))
+              (Wuffs.Index (V_Cachex) + 0) :=
+              V_Abc;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + Wuffs.Index (V_Z))
+              (Wuffs.Index (V_Cachex) + 1) :=
+              V_Bcd;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + Wuffs.Index (V_Z))
+              (Wuffs.Index (V_Cachex) + 2) :=
+              V_Cde;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + Wuffs.Index (V_Z))
+              (Wuffs.Index (V_Cachex) + 3) :=
+              V_Def;
             V_Z := V_Z + 1;
          end loop;
       elsif V_Mode = 3 then
          V_S :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) - 1));
          V_R :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) - 1));
          V_Q :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) - 1));
          V_P :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) - 1));
          V_A :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) - 1));
          V_Qpa := Wuffs.U8 ((V_Q + 2 * V_P + V_A + 2) / 4 and 16#FF#);
          V_Rqp := Wuffs.U8 ((V_R + 2 * V_Q + V_P + 2) / 4 and 16#FF#);
          V_Srq := Wuffs.U8 ((V_S + 2 * V_R + V_Q + 2) / 4 and 16#FF#);
          V_Ssr := Wuffs.U8 ((V_S + 2 * V_S + V_R + 2) / 4 and 16#FF#);
          V_Z := 0;
          while V_Z < 4 loop
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + V_Z)) := V_Qpa;
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + V_Z)) := V_Rqp;
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + V_Z)) := V_Srq;
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + V_Z)) := V_Ssr;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0)
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z)) :=
+              V_Qpa;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1)
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z)) :=
+              V_Rqp;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2)
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z)) :=
+              V_Srq;
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3)
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z)) :=
+              V_Ssr;
             V_Z := V_Z + 1;
          end loop;
       elsif V_Mode = 4 then
          V_S :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) - 1));
          V_R :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) - 1));
          V_Q :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) - 1));
          V_P :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) - 1));
          V_A :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) - 1));
          V_B :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 0)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 0));
          V_C :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 1));
          V_D :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 2)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 2));
          V_E :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 3)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 3));
          V_Cde := Wuffs.U8 ((V_C + 2 * V_D + V_E + 2) / 4 and 16#FF#);
          V_Bcd := Wuffs.U8 ((V_B + 2 * V_C + V_D + 2) / 4 and 16#FF#);
          V_Abc := Wuffs.U8 ((V_A + 2 * V_B + V_C + 2) / 4 and 16#FF#);
@@ -3423,39 +3715,39 @@ package body Wuffs.Std.Vp8 is
          V_Qpa := Wuffs.U8 ((V_Q + 2 * V_P + V_A + 2) / 4 and 16#FF#);
          V_Rqp := Wuffs.U8 ((V_R + 2 * V_Q + V_P + 2) / 4 and 16#FF#);
          V_Srq := Wuffs.U8 ((V_S + 2 * V_R + V_Q + 2) / 4 and 16#FF#);
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 0)) := V_Pab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 1)) := V_Abc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 2)) := V_Bcd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 3)) := V_Cde;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 0)) := V_Qpa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 1)) := V_Pab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 2)) := V_Abc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 3)) := V_Bcd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 0)) := V_Rqp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 1)) := V_Qpa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 2)) := V_Pab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 3)) := V_Abc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 0)) := V_Srq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 1)) := V_Rqp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 2)) := V_Qpa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 3)) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 0) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 1) := V_Abc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 2) := V_Bcd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 3) := V_Cde;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 0) := V_Qpa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 1) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 2) := V_Abc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 3) := V_Bcd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 0) := V_Rqp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 1) := V_Qpa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 2) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 3) := V_Abc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 0) := V_Srq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 1) := V_Rqp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 2) := V_Qpa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 3) := V_Pab;
       elsif V_Mode = 5 then
          V_R :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) - 1));
          V_Q :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) - 1));
          V_P :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) - 1));
          V_A :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) - 1));
          V_B :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 0)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 0));
          V_C :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 1));
          V_D :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 2)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 2));
          V_E :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 3)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 3));
          V_Ab := Wuffs.U8 ((V_A + V_B + 1) / 2 and 16#FF#);
          V_Bc := Wuffs.U8 ((V_B + V_C + 1) / 2 and 16#FF#);
          V_Cd := Wuffs.U8 ((V_C + V_D + 1) / 2 and 16#FF#);
@@ -3466,39 +3758,39 @@ package body Wuffs.Std.Vp8 is
          V_Pab := Wuffs.U8 ((V_P + 2 * V_A + V_B + 2) / 4 and 16#FF#);
          V_Qpa := Wuffs.U8 ((V_Q + 2 * V_P + V_A + 2) / 4 and 16#FF#);
          V_Rqp := Wuffs.U8 ((V_R + 2 * V_Q + V_P + 2) / 4 and 16#FF#);
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 0)) := V_Ab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 1)) := V_Bc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 2)) := V_Cd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 3)) := V_De;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 0)) := V_Pab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 1)) := V_Abc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 2)) := V_Bcd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 3)) := V_Cde;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 0)) := V_Qpa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 1)) := V_Ab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 2)) := V_Bc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 3)) := V_Cd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 0)) := V_Rqp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 1)) := V_Pab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 2)) := V_Abc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 3)) := V_Bcd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 0) := V_Ab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 1) := V_Bc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 2) := V_Cd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 3) := V_De;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 0) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 1) := V_Abc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 2) := V_Bcd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 3) := V_Cde;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 0) := V_Qpa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 1) := V_Ab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 2) := V_Bc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 3) := V_Cd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 0) := V_Rqp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 1) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 2) := V_Abc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 3) := V_Bcd;
       elsif V_Mode = 6 then
          V_B :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 0)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 0));
          V_C :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 1));
          V_D :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 2)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 2));
          V_E :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 3)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 3));
          V_F :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 4)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 4));
          V_G :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 5)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 5));
          V_H :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 6)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 6));
          V_I :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 7)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 7));
          V_Hii := Wuffs.U8 ((V_H + 2 * V_I + V_I + 2) / 4 and 16#FF#);
          V_Ghi := Wuffs.U8 ((V_G + 2 * V_H + V_I + 2) / 4 and 16#FF#);
          V_Fgh := Wuffs.U8 ((V_F + 2 * V_G + V_H + 2) / 4 and 16#FF#);
@@ -3506,39 +3798,39 @@ package body Wuffs.Std.Vp8 is
          V_Def := Wuffs.U8 ((V_D + 2 * V_E + V_F + 2) / 4 and 16#FF#);
          V_Cde := Wuffs.U8 ((V_C + 2 * V_D + V_E + 2) / 4 and 16#FF#);
          V_Bcd := Wuffs.U8 ((V_B + 2 * V_C + V_D + 2) / 4 and 16#FF#);
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 0)) := V_Bcd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 1)) := V_Cde;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 2)) := V_Def;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 3)) := V_Efg;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 0)) := V_Cde;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 1)) := V_Def;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 2)) := V_Efg;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 3)) := V_Fgh;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 0)) := V_Def;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 1)) := V_Efg;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 2)) := V_Fgh;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 3)) := V_Ghi;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 0)) := V_Efg;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 1)) := V_Fgh;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 2)) := V_Ghi;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 3)) := V_Hii;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 0) := V_Bcd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 1) := V_Cde;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 2) := V_Def;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 3) := V_Efg;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 0) := V_Cde;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 1) := V_Def;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 2) := V_Efg;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 3) := V_Fgh;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 0) := V_Def;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 1) := V_Efg;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 2) := V_Fgh;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 3) := V_Ghi;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 0) := V_Efg;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 1) := V_Fgh;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 2) := V_Ghi;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 3) := V_Hii;
       elsif V_Mode = 7 then
          V_B :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 0)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 0));
          V_C :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 1));
          V_D :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 2)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 2));
          V_E :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 3)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 3));
          V_F :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 4)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 4));
          V_G :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 5)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 5));
          V_H :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 6)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 6));
          V_I :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 7)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 7));
          V_Ef := Wuffs.U8 ((V_E + V_F + 1) / 2 and 16#FF#);
          V_De := Wuffs.U8 ((V_D + V_E + 1) / 2 and 16#FF#);
          V_Cd := Wuffs.U8 ((V_C + V_D + 1) / 2 and 16#FF#);
@@ -3549,39 +3841,39 @@ package body Wuffs.Std.Vp8 is
          V_Def := Wuffs.U8 ((V_D + 2 * V_E + V_F + 2) / 4 and 16#FF#);
          V_Cde := Wuffs.U8 ((V_C + 2 * V_D + V_E + 2) / 4 and 16#FF#);
          V_Bcd := Wuffs.U8 ((V_B + 2 * V_C + V_D + 2) / 4 and 16#FF#);
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 0)) := V_Bc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 1)) := V_Cd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 2)) := V_De;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 3)) := V_Ef;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 0)) := V_Bcd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 1)) := V_Cde;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 2)) := V_Def;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 3)) := V_Efg;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 0)) := V_Cd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 1)) := V_De;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 2)) := V_Ef;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 3)) := V_Fgh;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 0)) := V_Cde;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 1)) := V_Def;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 2)) := V_Efg;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 3)) := V_Ghi;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 0) := V_Bc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 1) := V_Cd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 2) := V_De;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 3) := V_Ef;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 0) := V_Bcd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 1) := V_Cde;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 2) := V_Def;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 3) := V_Efg;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 0) := V_Cd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 1) := V_De;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 2) := V_Ef;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 3) := V_Fgh;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 0) := V_Cde;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 1) := V_Def;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 2) := V_Efg;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 3) := V_Ghi;
       elsif V_Mode = 8 then
          V_S :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) - 1));
          V_R :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) - 1));
          V_Q :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) - 1));
          V_P :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) - 1));
          V_A :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) - 1));
          V_B :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 0)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 0));
          V_C :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 1));
          V_D :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + 2)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) + 2));
          V_Sr := Wuffs.U8 ((V_S + V_R + 1) / 2 and 16#FF#);
          V_Rq := Wuffs.U8 ((V_R + V_Q + 1) / 2 and 16#FF#);
          V_Qp := Wuffs.U8 ((V_Q + V_P + 1) / 2 and 16#FF#);
@@ -3592,31 +3884,31 @@ package body Wuffs.Std.Vp8 is
          V_Qpa := Wuffs.U8 ((V_Q + 2 * V_P + V_A + 2) / 4 and 16#FF#);
          V_Rqp := Wuffs.U8 ((V_R + 2 * V_Q + V_P + 2) / 4 and 16#FF#);
          V_Srq := Wuffs.U8 ((V_S + 2 * V_R + V_Q + 2) / 4 and 16#FF#);
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 0)) := V_Pa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 1)) := V_Pab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 2)) := V_Abc;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 3)) := V_Bcd;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 0)) := V_Qp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 1)) := V_Qpa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 2)) := V_Pa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 3)) := V_Pab;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 0)) := V_Rq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 1)) := V_Rqp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 2)) := V_Qp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 3)) := V_Qpa;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 0)) := V_Sr;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 1)) := V_Srq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 2)) := V_Rq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 3)) := V_Rqp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 0) := V_Pa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 1) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 2) := V_Abc;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 3) := V_Bcd;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 0) := V_Qp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 1) := V_Qpa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 2) := V_Pa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 3) := V_Pab;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 0) := V_Rq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 1) := V_Rqp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 2) := V_Qp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 3) := V_Qpa;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 0) := V_Sr;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 1) := V_Srq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 2) := V_Rq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 3) := V_Rqp;
       else
          V_S :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) - 1));
          V_R :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) - 1));
          V_Q :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) - 1));
          V_P :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) - 1));
          V_Sr := Wuffs.U8 ((V_S + V_R + 1) / 2 and 16#FF#);
          V_Rq := Wuffs.U8 ((V_R + V_Q + 1) / 2 and 16#FF#);
          V_Qp := Wuffs.U8 ((V_Q + V_P + 1) / 2 and 16#FF#);
@@ -3624,22 +3916,22 @@ package body Wuffs.Std.Vp8 is
          V_Srq := Wuffs.U8 ((V_S + 2 * V_R + V_Q + 2) / 4 and 16#FF#);
          V_Ssr := Wuffs.U8 ((V_S + 2 * V_S + V_R + 2) / 4 and 16#FF#);
          V_Sss := Wuffs.U8 (V_S and 16#FF#);
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 0)) := V_Qp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 1)) := V_Rqp;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 2)) := V_Rq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0)) (Wuffs.Index (V_Cachex + 3)) := V_Srq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 0)) := V_Rq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 1)) := V_Srq;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 2)) := V_Sr;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1)) (Wuffs.Index (V_Cachex + 3)) := V_Ssr;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 0)) := V_Sr;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 1)) := V_Ssr;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 2)) := V_Sss;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2)) (Wuffs.Index (V_Cachex + 3)) := V_Sss;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 0)) := V_Sss;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 1)) := V_Sss;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 2)) := V_Sss;
-         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3)) (Wuffs.Index (V_Cachex + 3)) := V_Sss;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 0) := V_Qp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 1) := V_Rqp;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 2) := V_Rq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0) (Wuffs.Index (V_Cachex) + 3) := V_Srq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 0) := V_Rq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 1) := V_Srq;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 2) := V_Sr;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1) (Wuffs.Index (V_Cachex) + 3) := V_Ssr;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 0) := V_Sr;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 1) := V_Ssr;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 2) := V_Sss;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2) (Wuffs.Index (V_Cachex) + 3) := V_Sss;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 0) := V_Sss;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 1) := V_Sss;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 2) := V_Sss;
+         Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3) (Wuffs.Index (V_Cachex) + 3) := V_Sss;
       end if;
    end Predict_Y4;
 
@@ -3691,8 +3983,8 @@ package body Wuffs.Std.Vp8 is
                        / 32);
          V_Z := 0;
          while V_Z < 256 loop
-            Self.F_Yuv_Cache (Wuffs.Index (16#01# + Interfaces.Shift_Right (V_Z, 4)))
-              (Wuffs.Index (16#08# + (V_Z and 15))) :=
+            Self.F_Yuv_Cache (16#01# + Wuffs.Index (Interfaces.Shift_Right (V_Z, 4)))
+              (16#08# + Wuffs.Index (V_Z and 15)) :=
               V_Avg;
             V_Z := V_Z + 1;
          end loop;
@@ -3701,24 +3993,24 @@ package body Wuffs.Std.Vp8 is
          V_Z := 0;
          while V_Z < 256 loop
             V_Tm1 :=
-              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (16#01# + Interfaces.Shift_Right (V_Z, 4)))
+              Wuffs.U32 (Self.F_Yuv_Cache (16#01# + Wuffs.Index (Interfaces.Shift_Right (V_Z, 4)))
                            (16#07#));
-            V_Tm2 := Wuffs.U32 (Self.F_Yuv_Cache (16#00#) (Wuffs.Index (16#08# + (V_Z and 15))));
-            Self.F_Yuv_Cache (Wuffs.Index (16#01# + Interfaces.Shift_Right (V_Z, 4)))
-              (Wuffs.Index (16#08# + (V_Z and 15))) :=
+            V_Tm2 := Wuffs.U32 (Self.F_Yuv_Cache (16#00#) (16#08# + Wuffs.Index (V_Z and 15)));
+            Self.F_Yuv_Cache (16#01# + Wuffs.Index (Interfaces.Shift_Right (V_Z, 4)))
+              (16#08# + Wuffs.Index (V_Z and 15)) :=
               CLAMP (Wuffs.Index ((V_Tm1 + V_Tm2) - V_Tm0 and 1023));
             V_Z := V_Z + 1;
          end loop;
       elsif A_Mode = 2 then
          V_X := 0;
          while V_X < 16 loop
-            V_Val := Self.F_Yuv_Cache (16#00#) (Wuffs.Index (16#08# + V_X));
+            V_Val := Self.F_Yuv_Cache (16#00#) (16#08# + Wuffs.Index (V_X));
             V_Y := 0;
             while V_Y < 16 loop
                pragma Warnings ("C");
                pragma Loop_Invariant (V_X < 16);
                pragma Warnings ("c");
-               Self.F_Yuv_Cache (Wuffs.Index (16#01# + V_Y)) (Wuffs.Index (16#08# + V_X)) := V_Val;
+               Self.F_Yuv_Cache (16#01# + Wuffs.Index (V_Y)) (16#08# + Wuffs.Index (V_X)) := V_Val;
                V_Y := V_Y + 1;
             end loop;
             pragma Warnings ("C");
@@ -3729,13 +4021,13 @@ package body Wuffs.Std.Vp8 is
       elsif A_Mode = 3 then
          V_Y := 0;
          while V_Y < 16 loop
-            V_Val := Self.F_Yuv_Cache (Wuffs.Index (16#01# + V_Y)) (16#07#);
+            V_Val := Self.F_Yuv_Cache (16#01# + Wuffs.Index (V_Y)) (16#07#);
             V_X := 0;
             while V_X < 16 loop
                pragma Warnings ("C");
                pragma Loop_Invariant (V_Y < 16);
                pragma Warnings ("c");
-               Self.F_Yuv_Cache (Wuffs.Index (16#01# + V_Y)) (Wuffs.Index (16#08# + V_X)) := V_Val;
+               Self.F_Yuv_Cache (16#01# + Wuffs.Index (V_Y)) (16#08# + Wuffs.Index (V_X)) := V_Val;
                V_X := V_X + 1;
             end loop;
             pragma Warnings ("C");
@@ -3765,8 +4057,8 @@ package body Wuffs.Std.Vp8 is
                        / 16);
          V_Z := 0;
          while V_Z < 256 loop
-            Self.F_Yuv_Cache (Wuffs.Index (16#01# + Interfaces.Shift_Right (V_Z, 4)))
-              (Wuffs.Index (16#08# + (V_Z and 15))) :=
+            Self.F_Yuv_Cache (16#01# + Wuffs.Index (Interfaces.Shift_Right (V_Z, 4)))
+              (16#08# + Wuffs.Index (V_Z and 15)) :=
               V_Avg;
             V_Z := V_Z + 1;
          end loop;
@@ -3792,16 +4084,16 @@ package body Wuffs.Std.Vp8 is
                        / 16);
          V_Z := 0;
          while V_Z < 256 loop
-            Self.F_Yuv_Cache (Wuffs.Index (16#01# + Interfaces.Shift_Right (V_Z, 4)))
-              (Wuffs.Index (16#08# + (V_Z and 15))) :=
+            Self.F_Yuv_Cache (16#01# + Wuffs.Index (Interfaces.Shift_Right (V_Z, 4)))
+              (16#08# + Wuffs.Index (V_Z and 15)) :=
               V_Avg;
             V_Z := V_Z + 1;
          end loop;
       else
          V_Z := 0;
          while V_Z < 256 loop
-            Self.F_Yuv_Cache (Wuffs.Index (16#01# + Interfaces.Shift_Right (V_Z, 4)))
-              (Wuffs.Index (16#08# + (V_Z and 15))) :=
+            Self.F_Yuv_Cache (16#01# + Wuffs.Index (Interfaces.Shift_Right (V_Z, 4)))
+              (16#08# + Wuffs.Index (V_Z and 15)) :=
               16#80#;
             V_Z := V_Z + 1;
          end loop;
@@ -3827,49 +4119,50 @@ package body Wuffs.Std.Vp8 is
       if A_Mode = 0 then
          V_Avg :=
            Wuffs.U8 ((8
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 0)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 2)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 3)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 4)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 5)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 6)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 7)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 4))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 5))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 6))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 7))
-                                       (Wuffs.Index (V_Cachex - 1))))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 0))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 2))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 3))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 4))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 5))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 6))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 7))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 4)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 5)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 6)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 7)
+                                       (Wuffs.Index (V_Cachex) - 1)))
                        / 16);
          V_Z := 0;
          while V_Z < 64 loop
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 3)))
-              (Wuffs.Index (V_Cachex + (V_Z and 7))) :=
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                + Wuffs.Index (Interfaces.Shift_Right (V_Z, 3)))
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 7)) :=
               V_Avg;
             V_Z := V_Z + 1;
          end loop;
       elsif A_Mode = 1 then
          V_Tm0 :=
-           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex - 1)));
+           Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1) (Wuffs.Index (V_Cachex) - 1));
          V_Z := 0;
          while V_Z < 64 loop
             pragma Warnings ("C");
@@ -3877,13 +4170,15 @@ package body Wuffs.Std.Vp8 is
             pragma Loop_Invariant (V_Cachex >= 8);
             pragma Warnings ("c");
             V_Tm1 :=
-              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 3)))
-                           (Wuffs.Index (V_Cachex - 1)));
+              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                             + Wuffs.Index (Interfaces.Shift_Right (V_Z, 3)))
+                           (Wuffs.Index (V_Cachex) - 1));
             V_Tm2 :=
-              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                           (Wuffs.Index (V_Cachex + (V_Z and 7))));
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 3)))
-              (Wuffs.Index (V_Cachex + (V_Z and 7))) :=
+              Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                           (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 7)));
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                + Wuffs.Index (Interfaces.Shift_Right (V_Z, 3)))
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 7)) :=
               CLAMP (Wuffs.Index ((V_Tm1 + V_Tm2) - V_Tm0 and 1023));
             V_Z := V_Z + 1;
          end loop;
@@ -3898,7 +4193,9 @@ package body Wuffs.Std.Vp8 is
             pragma Loop_Invariant (V_Cachey = 16#12#);
             pragma Loop_Invariant (V_Cachex >= 8);
             pragma Warnings ("c");
-            V_Val := Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1)) (Wuffs.Index (V_Cachex + V_X));
+            V_Val :=
+              Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                (Wuffs.Index (V_Cachex) + Wuffs.Index (V_X));
             V_Y := 0;
             while V_Y < 8 loop
                pragma Warnings ("C");
@@ -3906,7 +4203,8 @@ package body Wuffs.Std.Vp8 is
                pragma Loop_Invariant (V_Cachex >= 8);
                pragma Loop_Invariant (V_X < 8);
                pragma Warnings ("c");
-               Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + V_Y)) (Wuffs.Index (V_Cachex + V_X)) :=
+               Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + Wuffs.Index (V_Y))
+                 (Wuffs.Index (V_Cachex) + Wuffs.Index (V_X)) :=
                  V_Val;
                V_Y := V_Y + 1;
             end loop;
@@ -3928,7 +4226,9 @@ package body Wuffs.Std.Vp8 is
             pragma Loop_Invariant (V_Cachey = 16#12#);
             pragma Loop_Invariant (V_Cachex >= 8);
             pragma Warnings ("c");
-            V_Val := Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + V_Y)) (Wuffs.Index (V_Cachex - 1));
+            V_Val :=
+              Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + Wuffs.Index (V_Y))
+                (Wuffs.Index (V_Cachex) - 1);
             V_X := 0;
             while V_X < 8 loop
                pragma Warnings ("C");
@@ -3936,7 +4236,8 @@ package body Wuffs.Std.Vp8 is
                pragma Loop_Invariant (V_Cachex >= 8);
                pragma Loop_Invariant (V_Y < 8);
                pragma Warnings ("c");
-               Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + V_Y)) (Wuffs.Index (V_Cachex + V_X)) :=
+               Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + Wuffs.Index (V_Y))
+                 (Wuffs.Index (V_Cachex) + Wuffs.Index (V_X)) :=
                  V_Val;
                V_X := V_X + 1;
             end loop;
@@ -3954,62 +4255,65 @@ package body Wuffs.Std.Vp8 is
       elsif A_Mode <= 10 then
          V_Avg :=
            Wuffs.U8 ((4
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 0))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 1))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 2))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 3))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 4))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 5))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 6))
-                                       (Wuffs.Index (V_Cachex - 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + 7))
-                                       (Wuffs.Index (V_Cachex - 1))))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 0)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 1)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 2)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 3)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 4)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 5)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 6)
+                                       (Wuffs.Index (V_Cachex) - 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) + 7)
+                                       (Wuffs.Index (V_Cachex) - 1)))
                        / 8);
          V_Z := 0;
          while V_Z < 64 loop
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 3)))
-              (Wuffs.Index (V_Cachex + (V_Z and 7))) :=
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                + Wuffs.Index (Interfaces.Shift_Right (V_Z, 3)))
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 7)) :=
               V_Avg;
             V_Z := V_Z + 1;
          end loop;
       elsif A_Mode = 11 then
          V_Avg :=
            Wuffs.U8 ((4
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 0)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 1)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 2)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 3)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 4)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 5)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 6)))
-                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey - 1))
-                                       (Wuffs.Index (V_Cachex + 7))))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 0))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 1))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 2))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 3))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 4))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 5))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 6))
+                        + Wuffs.U32 (Self.F_Yuv_Cache (Wuffs.Index (V_Cachey) - 1)
+                                       (Wuffs.Index (V_Cachex) + 7)))
                        / 8);
          V_Z := 0;
          while V_Z < 64 loop
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 3)))
-              (Wuffs.Index (V_Cachex + (V_Z and 7))) :=
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                + Wuffs.Index (Interfaces.Shift_Right (V_Z, 3)))
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 7)) :=
               V_Avg;
             V_Z := V_Z + 1;
          end loop;
       else
          V_Z := 0;
          while V_Z < 64 loop
-            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey + Interfaces.Shift_Right (V_Z, 3)))
-              (Wuffs.Index (V_Cachex + (V_Z and 7))) :=
+            Self.F_Yuv_Cache (Wuffs.Index (V_Cachey)
+                                + Wuffs.Index (Interfaces.Shift_Right (V_Z, 3)))
+              (Wuffs.Index (V_Cachex) + Wuffs.Index (V_Z and 7)) :=
               16#80#;
             V_Z := V_Z + 1;
          end loop;
@@ -4178,7 +4482,7 @@ package body Wuffs.Std.Vp8 is
             pragma Warnings ("c");
             V_O := V_Offset + Wuffs.U64 (V_I);
             if V_O < Wuffs.U64 (A_Workbuf'Length) then
-               Self.F_Yuv_Cache (16#00#) (Wuffs.Index (16#08# + V_I)) :=
+               Self.F_Yuv_Cache (16#00#) (16#08# + Wuffs.Index (V_I)) :=
                  A_Workbuf (A_Workbuf'First + Wuffs.Index (V_O));
             end if;
             V_I := V_I + 1;
@@ -4193,7 +4497,7 @@ package body Wuffs.Std.Vp8 is
                pragma Warnings ("c");
                V_O := V_Offset + Wuffs.U64 (V_I);
                if V_O < Wuffs.U64 (A_Workbuf'Length) then
-                  Self.F_Yuv_Cache (16#00#) (Wuffs.Index (16#08# + V_I)) :=
+                  Self.F_Yuv_Cache (16#00#) (16#08# + Wuffs.Index (V_I)) :=
                     A_Workbuf (A_Workbuf'First + Wuffs.Index (V_O));
                end if;
                V_I := V_I + 1;
@@ -4208,7 +4512,7 @@ package body Wuffs.Std.Vp8 is
                pragma Warnings ("c");
                V_O := V_Offset + Wuffs.U64'(16#0F#);
                if V_O < Wuffs.U64 (A_Workbuf'Length) then
-                  Self.F_Yuv_Cache (16#00#) (Wuffs.Index (16#08# + V_I)) :=
+                  Self.F_Yuv_Cache (16#00#) (16#08# + Wuffs.Index (V_I)) :=
                     A_Workbuf (A_Workbuf'First + Wuffs.Index (V_O));
                end if;
                V_I := V_I + 1;
@@ -4227,7 +4531,7 @@ package body Wuffs.Std.Vp8 is
             pragma Warnings ("c");
             V_O := V_Offset + Wuffs.U64 (V_I);
             if V_O < Wuffs.U64 (A_Workbuf'Length) then
-               Self.F_Yuv_Cache (16#11#) (Wuffs.Index (16#08# + V_I)) :=
+               Self.F_Yuv_Cache (16#11#) (16#08# + Wuffs.Index (V_I)) :=
                  A_Workbuf (A_Workbuf'First + Wuffs.Index (V_O));
             end if;
             V_I := V_I + 1;
@@ -4245,7 +4549,7 @@ package body Wuffs.Std.Vp8 is
             pragma Warnings ("c");
             V_O := V_Offset + Wuffs.U64 (V_I);
             if V_O < Wuffs.U64 (A_Workbuf'Length) then
-               Self.F_Yuv_Cache (16#11#) (Wuffs.Index (16#18# + V_I)) :=
+               Self.F_Yuv_Cache (16#11#) (16#18# + Wuffs.Index (V_I)) :=
                  A_Workbuf (A_Workbuf'First + Wuffs.Index (V_O));
             end if;
             V_I := V_I + 1;
@@ -4439,6 +4743,7 @@ package body Wuffs.Std.Vp8 is
       G_T7 : Wuffs.U32;
       G_T8 : Boolean;
       G_T9 : Wuffs.U64;
+      G_T10 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_45_Do_Decode_Image_Config;
@@ -4477,12 +4782,14 @@ package body Wuffs.Std.Vp8 is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T10 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T10,
                                      Scratch => Self.G_Scratch_45_Do_Decode_Image_Config,
                                      Last_Shift => 16,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T10;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
@@ -4513,12 +4820,14 @@ package body Wuffs.Std.Vp8 is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T10 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T10,
                                      Scratch => Self.G_Scratch_45_Do_Decode_Image_Config,
                                      Last_Shift => 16,
                                      Done => G_T5,
                                      Value => G_T6);
+         G_R_Src := G_T10;
          exit when G_T5;
       end loop;
       G_T4 := Wuffs.U32 (G_T6);
@@ -4543,12 +4852,14 @@ package body Wuffs.Std.Vp8 is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T10 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T10,
                                      Scratch => Self.G_Scratch_45_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T8,
                                      Value => G_T9);
+         G_R_Src := G_T10;
          exit when G_T8;
       end loop;
       G_T7 := Wuffs.U32 (G_T9);

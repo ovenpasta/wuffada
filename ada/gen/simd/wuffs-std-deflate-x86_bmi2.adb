@@ -52,6 +52,7 @@ package body Wuffs.Std.Deflate.X86_BMI2 is
       pragma Warnings (Off, G_T3);
       G_T4 : Wuffs.U32;
       pragma Warnings (Off, G_T4);
+      G_T5 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -229,14 +230,16 @@ package body Wuffs.Std.Deflate.X86_BMI2 is
                   Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
                   return Error_Bad_Distance;
                end if;
+               G_T5 := G_W_Dst;
                Wuffs.Runtime.Writer_Limited_Copy_U32_From_Slice
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Hlen,
                   Src => Self.F_History
                            (Wuffs.Index (Self.F_History_Index - V_Hdist and 16#7FFF#)
                             .. Self.F_History'Last),
                   N => G_T1);
+               G_W_Dst := G_T5;
                if V_Length = 0 then
                   goto G_Continue_1_Loop;
                end if;
@@ -261,26 +264,32 @@ package body Wuffs.Std.Deflate.X86_BMI2 is
             pragma Assert (Wuffs.U64 (V_Length + 8) <= Wuffs.Base.IO.Length (G_W_Dst));
             pragma Warnings ("c");
             if V_Dist_Minus_1 + 1 >= 8 then
+               G_T5 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_8_Byte_Chunks_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T2);
+               G_W_Dst := G_T5;
             elsif V_Dist_Minus_1 + 1 = 1 then
+               G_T5 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_8_Byte_Chunks_Distance_1_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T3);
+               G_W_Dst := G_T5;
             else
+               G_T5 := G_W_Dst;
                Wuffs.Base.IO.Limited_Copy_U32_From_History_Fast
                  (Data => A_Dst,
-                  W => G_W_Dst,
+                  W => G_T5,
                   Up_To => V_Length,
                   Distance => V_Dist_Minus_1 + 1,
                   N => G_T4);
+               G_W_Dst := G_T5;
             end if;
             exit G_Loop_2;
          end loop G_Loop_2;

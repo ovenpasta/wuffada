@@ -103,6 +103,9 @@ type lowerer struct {
 	resumables map[t.ID]bool
 	scratch    expr // Self.G_Scratch_Func, once something needs it.
 	pfield     expr // Self.G_P_Func, once something needs it.
+
+	// cursorCopies are isolateCursors' temporaries, by cursor.
+	cursorCopies map[*variable]*variable
 }
 
 func (g *gen) lowerFunc(fi *funcInfo) error {
@@ -164,10 +167,10 @@ func (g *gen) lowerFunc(fi *funcInfo) error {
 	}
 
 	if fi.coroutine {
-		l.f.body = l.assembleCoroutine(head, body)
+		l.f.body = l.isolateCursors(l.assembleCoroutine(head, body))
 		return nil
 	}
-	l.f.body = append(head, body...)
+	l.f.body = l.isolateCursors(append(head, body...))
 	if a.Terminates(n.Body()) {
 		// The body ends with a return, or with an if-else chain or a "while
 		// true" loop (without a break) that cannot fall through.

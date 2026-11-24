@@ -56,6 +56,9 @@ package body Wuffs.Std.Xxhash64 is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func hasher.up
+   procedure Up (Self : in out Hasher; A_X : Wuffs.Bytes);
+
    overriding function Get_Quirk (Self : Hasher; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -70,6 +73,7 @@ package body Wuffs.Std.Xxhash64 is
    overriding function Set_Quirk
      (Self : in out Hasher; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -385,11 +389,11 @@ package body Wuffs.Std.Xxhash64 is
       if (V_N and 4) /= 0 then
          V_I8 := V_I and 24;
          V_Buf_U32 :=
-           Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8 + 16#00#)))
-             or Interfaces.Shift_Left (Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8 + 16#01#))), 8)
-             or Interfaces.Shift_Left (Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8 + 16#02#))),
+           Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8) + 16#00#))
+             or Interfaces.Shift_Left (Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8) + 16#01#)), 8)
+             or Interfaces.Shift_Left (Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8) + 16#02#)),
                                        16)
-             or Interfaces.Shift_Left (Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8 + 16#03#))),
+             or Interfaces.Shift_Left (Wuffs.U32 (Self.F_Buf_Data (Wuffs.Index (V_I8) + 16#03#)),
                                        24);
          V_Ret := V_Ret xor Wuffs.U64 (V_Buf_U32) * XXH_PRIME64_1;
          V_Ret := Interfaces.Shift_Left (V_Ret, 23) or Interfaces.Shift_Right (V_Ret, 41);

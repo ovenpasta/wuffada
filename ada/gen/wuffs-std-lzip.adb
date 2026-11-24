@@ -62,6 +62,16 @@ package body Wuffs.Std.Lzip is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_transform_io
+   function Do_Transform_Io
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized
@@ -237,6 +247,7 @@ package body Wuffs.Std.Lzip is
       G_T13 : Wuffs.U64;
       G_T14 : Boolean;
       G_T15 : Wuffs.U64;
+      G_T16 : Wuffs.Base.IO.Reader;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
@@ -277,12 +288,14 @@ package body Wuffs.Std.Lzip is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_6_Do_Transform_Io,
                                      Last_Shift => 32,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T16;
          exit when G_T2;
       end loop;
       G_T1 := G_T3;
@@ -384,12 +397,14 @@ package body Wuffs.Std.Lzip is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_6_Do_Transform_Io,
                                      Last_Shift => 24,
                                      Done => G_T8,
                                      Value => G_T9);
+         G_R_Src := G_T16;
          exit when G_T8;
       end loop;
       G_T7 := Wuffs.U32 (G_T9);
@@ -417,12 +432,14 @@ package body Wuffs.Std.Lzip is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_6_Do_Transform_Io,
                                      Last_Shift => 56,
                                      Done => G_T11,
                                      Value => G_T12);
+         G_R_Src := G_T16;
          exit when G_T11;
       end loop;
       G_T10 := G_T12;
@@ -447,12 +464,14 @@ package body Wuffs.Std.Lzip is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T16 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T16,
                                      Scratch => Self.G_Scratch_6_Do_Transform_Io,
                                      Last_Shift => 56,
                                      Done => G_T14,
                                      Value => G_T15);
+         G_R_Src := G_T16;
          exit when G_T14;
       end loop;
       G_T13 := G_T15;

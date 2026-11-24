@@ -9,6 +9,7 @@ project Wuffs_YCCK is
    for Create_Missing_Dirs use "True";
    package Compiler is
       for Default_Switches ("Ada") use Wuffs_Common.Switches;
+      for Switches ("wuffs-base-pixel_swizzler_ycck.adb") use Wuffs_Common.YCCK_Switches;
    end Compiler;
    package Prove is
       --  Level 2 (provers cvc5, z3, altergo), but with a step limit in place

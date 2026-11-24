@@ -57,10 +57,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Hasher)
    is null;
 
-   --  Wuffs: func hasher.up
-   procedure G_Choosy_Default_Up (Self : in out Hasher; A_X : Wuffs.Bytes);
-
-   --  Wuffs: func hasher.up (the choice of implementation)
-   procedure Up (Self : in out Hasher; A_X : Wuffs.Bytes);
-
 end Wuffs.Std.Adler32;

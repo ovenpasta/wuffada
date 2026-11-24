@@ -300,6 +300,57 @@ package body Wuffs.Std.Json is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.decode_number
+   function Decode_Number
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return G_U32_Range_0_1023;
+
+   --  Wuffs: func decoder.decode_digits
+   function Decode_Digits
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_N : G_U32_Range_0_99)
+      return G_U32_Range_0_1023;
+
+   --  Wuffs: func decoder.decode_leading
+   function Decode_Leading
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_comment
+   function Decode_Comment
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_inf_nan
+   function Decode_Inf_Nan
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_trailer
+   function Decode_Trailer
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
       V_Key : Wuffs.U32 range 0 .. 3127310335 := 0;
    begin
@@ -391,6 +442,7 @@ package body Wuffs.Std.Json is
       V_Expect : Wuffs.U32 := 0;
       V_Expect_After_Value : Wuffs.U32 := 0;
       G_Susp : Wuffs.U32;
+      G_T1 : Wuffs.Base.IO.Reader;
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
@@ -1656,7 +1708,8 @@ package body Wuffs.Std.Json is
       if V_Class /= CLASS_FALSE then
          goto G_Else_78;
       end if;
-      V_Match := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_R_Src, A => 16#6573_6C61_6605#);
+      G_T1 := G_R_Src;
+      V_Match := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_T1, A => 16#6573_6C61_6605#);
       if V_Match /= 0 then
          goto G_Else_80;
       end if;
@@ -1688,7 +1741,8 @@ package body Wuffs.Std.Json is
       if V_Class /= CLASS_TRUE then
          goto G_Else_82;
       end if;
-      V_Match := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_R_Src, A => 16#65_7572_7404#);
+      G_T1 := G_R_Src;
+      V_Match := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_T1, A => 16#65_7572_7404#);
       if V_Match /= 0 then
          goto G_Else_84;
       end if;
@@ -1720,7 +1774,8 @@ package body Wuffs.Std.Json is
       if V_Class /= CLASS_NULL_NAN_INF then
          goto G_Else_86;
       end if;
-      V_Match := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_R_Src, A => 16#6C_6C75_6E04#);
+      G_T1 := G_R_Src;
+      V_Match := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_T1, A => 16#6C_6C75_6E04#);
       if V_Match /= 0 then
          goto G_Else_88;
       end if;

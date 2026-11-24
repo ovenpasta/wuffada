@@ -769,6 +769,44 @@ func rootVariable(e expr) *variable {
 	}
 }
 
+// distinctSelfArrays reports whether a and b (the arr of two array views)
+// are elements or wholes of two different components of the receiver whose
+// types are arrays (Self.F_X, or Self.F_X (i) (j) for an array of arrays):
+// storage that cannot overlap. Anything else, a slice handle's designated
+// array in particular, is not known to be disjoint.
+func (l *lowerer) distinctSelfArrays(a, b expr) bool {
+	fa, fb := l.selfArrayField(a), l.selfArrayField(b)
+	return fa != "" && fb != "" && fa != fb
+}
+
+// selfArrayField returns the receiver's array component that e is or is
+// an indexed element of, or "".
+func (l *lowerer) selfArrayField(e expr) string {
+	if l.f.self == nil || l.fi.recv == nil {
+		return ""
+	}
+	for {
+		c, ok := e.(eCall)
+		if !ok {
+			break
+		}
+		e = c.fn
+	}
+	sel, ok := e.(eSel)
+	if !ok {
+		return ""
+	}
+	if v, ok := sel.x.(eVar); !ok || v.v != l.f.self {
+		return ""
+	}
+	for _, f := range l.fi.recv.fields {
+		if f.name == sel.field && f.typ.kind == kArray {
+			return f.name
+		}
+	}
+	return ""
+}
+
 // otherOperand converts the source slice of a two-array operation whose
 // destination is (a part of) the array dst. If both are parts of one
 // variable (say, two fields of the receiver), the source goes through a
@@ -892,6 +930,15 @@ func (l *lowerer) sliceMethod(n *a.Expr, recv *a.Expr, name string, args []*a.No
 				"Data", dst.arr,
 				"Dst_First", first(dst), "Dst_Length", length(dst),
 				"Src_First", first(src), "Src_Length", length(src)), nil
+		}
+		if l.distinctSelfArrays(dst.arr, src.arr) {
+			// Parts of two different array components of the receiver:
+			// disjoint, so the base library's two-array form applies
+			// without the run-time shell's address comparison.
+			if src, err = l.toBytes(src, false); err != nil {
+				return val{}, err
+			}
+			return l.procResult(slicesPkg+".Copy_From_Slice", typU64, "N", "Dst", dst.e, "Src", src.e), nil
 		}
 		dstRoot := dst.arr
 		if dstRoot == nil {

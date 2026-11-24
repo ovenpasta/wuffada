@@ -199,12 +199,42 @@ Limits:
   so the sanitizer stage says nothing about those accesses. The checked
   profile's preconditions and, in release, the Wuffs checker's proof cover
   them.
-* The SIMD units need optimisation: two wrappers pass computed immediates
-  that GCC only accepts once folded, so `-O0` fails to compile them.
+* `-O0` is not supported. The SIMD units need optimisation (two wrappers
+  pass computed immediates that GCC only accepts once folded), and in the
+  checked profile the always-inlined base routines make two frames (json
+  `Decode_Tokens`, lzma `Decode_Bitstream_Fast`) exceed the 8 KiB limit when
+  nothing shares stack slots. `-O1`, `-Og` and above build in both profiles.
 * GNAT 16.1 miscompiles an `others` aggregate of a vector type with 8-bit
   lanes (zeroes); the wrappers do not use one.
-* PNG and JPEG decoding are still 1.5-3x slower than upstream's SIMD build:
-  the deflate core and the swizzlers are scalar.
+* JPEG is still 1.2-1.7x slower than upstream's SIMD build: upstream has an
+  AVX2 YCbCr conversion in its hand-written base and ours is the proved
+  scalar one, compiled at `-O3` so that GCC vectorises it with SSE2.
+
+## Speed
+
+Release profile, time relative to upstream's scalar C built with gcc -O2:
+gzip, bzip2, lzma, xz, the checksums, ordinary PNGs, JPEG, lossy WebP and
+JSON are within about 1.1x; GIF and lossless WebP about 1.2x; interlaced and
+16-bit PNG about 1.3x (Wuffs' per-pixel path calls the swizzler once per
+pixel, through the proved dispatcher). `ada/tests/bench/run.sh` produces the
+table. What made the difference, found by profiling:
+
+* Multi-byte peeks and pokes in the proved base read and write a
+  fixed-length slice, which GCC turns into one load or store.
+* The small proved routines called per byte or per symbol are
+  `Inline_Always`. Their preconditions are still evaluated at each call in
+  the checked profile.
+* The generator passes a copy of a cursor to any call that is not inlined
+  and copies it back, so that the cursor of a hot loop stays in registers.
+  A cursor is a local record of indices that no callee can reach otherwise.
+* A copy between two different array components of the receiver calls the
+  proved disjoint form directly: record components cannot overlap. Every
+  other two-array operation still goes through the shell's address check.
+* A checked `+` or `-` of u8..u32 operands used as an index is computed in
+  `Wuffs.Index`. Wuffs has proved that it does not wrap; in the checked
+  profile the result is index-checked as before.
+* Private Wuffs functions are declared in the package body, so that GCC
+  treats them like C's `static` functions.
 
 ## Milestones
 
@@ -249,7 +279,13 @@ From the review of generator milestone 4a; none affects generated `std` code.
   empty chunk inside an indefinite-length string ends the item early.
 * JSON/CBOR: the decoders make no progress below their minimum buffer sizes
   (json: 100 source bytes; cbor: 9 source bytes and 2 tokens), as upstream.
-  JSON tokenising is 1.8-3.8x slower than upstream's scalar C.
+* Mutation tests: 18 older mutants in `ada/tests/mutants.py` no longer apply
+  (their text went stale when generated files moved to `gen/scalar` and
+  `gen/simd`), among them the entry-validation and PNG `End_Limit` ones, so
+  that evidence needs re-establishing. Two generator rules have no test that
+  fails when they are broken: the direct copy must not be used for two rows
+  of one component, and the `Wuffs.Index` rewrite must not apply to `~mod`
+  operators.
 * JSON tests: a mutant that clears the continued bit of a string token of
   65532 bytes or more on the byte-at-a-time path survives the suite; a
   70000-byte string under random 1-12 byte source fills kills it. One shell

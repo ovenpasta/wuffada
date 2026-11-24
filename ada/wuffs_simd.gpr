@@ -47,6 +47,7 @@ abstract project Wuffs_Simd is
 
    package Compiler is
       for Default_Switches ("Ada") use Wuffs_Common.Switches;
+      for Switches ("wuffs-base-pixel_swizzler_ycck.adb") use Wuffs_Common.YCCK_Switches;
       case Simd is
          when "on" =>
             for Switches ("wuffs-runtime-x86-sse42.adb") use Wuffs_Common.Switches & SSE42_Switches;

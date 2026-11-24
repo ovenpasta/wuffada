@@ -771,10 +771,4 @@ private
      [16#D5#, 16#63#, 16#29#, 16#17#, 16#6C#, 16#46#, 16#3E#, 16#9C#, 16#85#, 16#1E#, 16#0E#,
       16#AF#, 16#2B#, 16#AF#, 16#D8#, 16#92#];
 
-   --  Wuffs: func ecma_hasher.up
-   procedure G_Choosy_Default_Up (Self : in out Ecma_Hasher; A_X : Wuffs.Bytes);
-
-   --  Wuffs: func ecma_hasher.up (the choice of implementation)
-   procedure Up (Self : in out Ecma_Hasher; A_X : Wuffs.Bytes);
-
 end Wuffs.Std.Crc64;

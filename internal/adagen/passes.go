@@ -9,10 +9,8 @@ import (
 )
 
 // This file holds the passes that run on a function's IR between lowering
-// and printing. For now there is one, countUses. The coroutine lowering of
-// the next milestone (flattening every construct that contains a suspension
-// point into labels and gotos, and saving the locals that are live across
-// one in the receiver) belongs here too: it is a []stmt to []stmt rewrite.
+// and printing: countUses, the checks of calls, and isolateCursors (which
+// lowerFunc runs on the finished body, coroutine or not).
 
 // countUses counts the reads and writes of each parameter and local
 // variable. The printer uses the counts to drop unused locals, to declare
@@ -282,4 +280,204 @@ func checkCalls(ss []stmt) error {
 		}
 	})
 	return err
+}
+
+// ---- Cursor isolation.
+
+// inlinedCursorProcs are the procedures of the proved base that take an I/O
+// or token cursor and are declared Inline_Always (wuffs-base-io.ads,
+// wuffs-base-tokens.ads): GCC inlines every call of them, so passing a
+// cursor to them does not take its address. TestInlinedCursorProcs checks
+// the list against the specs.
+var inlinedCursorProcs = func() map[string]bool {
+	m := map[string]bool{
+		ioPkg + ".Save":          true,
+		ioPkg + ".Reload":        true,
+		ioPkg + ".Skip_U32_Fast": true,
+		ioPkg + ".Undo_Byte":     true,
+		ioPkg + ".Read_U8":       true,
+		ioPkg + ".Write_U8_Fast": true,
+
+		tokensPkg + ".Save":                      true,
+		tokensPkg + ".Reload":                    true,
+		tokensPkg + ".Write_Simple_Token_Fast":   true,
+		tokensPkg + ".Write_Extended_Token_Fast": true,
+	}
+	for _, bits := range []string{"16", "24", "32", "40", "48", "56", "64"} {
+		for _, endian := range []string{"LE", "BE"} {
+			m[ioPkg+".Write_U"+bits+endian+"_Fast"] = true
+		}
+	}
+	return m
+}()
+
+// outOfLineCursorFuncs are the functions of the proved base that take a
+// cursor and are not expression functions (which GNAT inlines). Every other
+// function with a cursor parameter in those specs is an expression function:
+// TestInlinedCursorProcs checks that too.
+var outOfLineCursorFuncs = map[string]bool{
+	ioPkg + ".Match7":                    true,
+	"Wuffs.Base.UTF8.Valid_UTF_8_Length": true,
+}
+
+// isolateCursors gives every other procedure call that is passed a cursor a
+// copy of it: "G_Tn := C; P (..., G_Tn, ...); C := G_Tn;". So too for a
+// call of one of outOfLineCursorFuncs in the value of an assignment or in
+// the conditions of an if statement: "G_Tn := C;" before the statement.
+// (Its cursor parameter has mode "in": nothing to copy back. The conditions
+// of an if statement do not change the cursor, so one copy before the
+// statement serves all of them.)
+//
+// A cursor (Reader, Writer, Token_Writer) is a record that GNAT passes by
+// reference. Once one out-of-line call has its address, GCC must keep the
+// whole record in memory for the whole function, and reload and store its
+// fields around every store through the destination array, which might
+// alias it: the hot loops then pay a load and a store of the cursor per
+// byte written, where upstream's C keeps iop in a register. A copy confines
+// the address to the temporary. The effect is the same: the callee is
+// given the cursor's value and its result becomes the cursor's value, and
+// nothing else can see the cursor during the call (it is a local of the
+// function, not reachable from any argument).
+func (l *lowerer) isolateCursors(ss []stmt) []stmt {
+	out := make([]stmt, 0, len(ss))
+	for _, s := range ss {
+		switch s := s.(type) {
+		case sCall:
+			out = append(out, l.isolateCall(s)...)
+			continue
+		case sAssign:
+			var before []stmt
+			rhs := l.isolateFuncCalls(s.rhs, &before)
+			out = append(append(out, before...), sAssign{s.lhs, rhs})
+			continue
+		case sIf:
+			var before []stmt
+			brs := make([]ifBranch, len(s.branches))
+			for i, br := range s.branches {
+				brs[i] = ifBranch{cond: l.isolateFuncCalls(br.cond, &before), body: l.isolateCursors(br.body)}
+			}
+			out = append(append(out, before...), sIf{branches: brs, els: l.isolateCursors(s.els)})
+			continue
+		case sLoop:
+			out = append(out, sLoop{name: s.name, cond: s.cond, body: l.isolateCursors(s.body)})
+			continue
+		case sCase:
+			arms := make([]caseArm, len(s.arms))
+			for i, arm := range s.arms {
+				arms[i] = caseArm{value: arm.value, body: l.isolateCursors(arm.body)}
+			}
+			out = append(out, sCase{sel: s.sel, arms: arms, others: l.isolateCursors(s.others)})
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// isolateFuncCalls returns e with the cursor arguments of the calls of
+// outOfLineCursorFuncs in it replaced by copies, and appends the copying
+// assignments to before.
+func (l *lowerer) isolateFuncCalls(e expr, before *[]stmt) expr {
+	switch x := e.(type) {
+	case eCall:
+		args := make([]expr, len(x.args))
+		for i, o := range x.args {
+			args[i] = l.isolateFuncCalls(o, before)
+		}
+		if fn, ok := x.fn.(eRaw); ok && outOfLineCursorFuncs[fn.s] {
+			for i, o := range args {
+				name, y := "", o
+				if n, ok := o.(eNamed); ok {
+					name, y = n.name, n.x
+				}
+				v, ok := y.(eVar)
+				if !ok || v.v.typ.kind != kCursor || v.v.kind != varLocal {
+					continue
+				}
+				tmp := l.cursorCopy(v.v)
+				*before = append(*before, sAssign{eVar{tmp}, eVar{v.v}})
+				var arg expr = eVar{tmp}
+				if name != "" {
+					arg = eNamed{name, arg}
+				}
+				args[i] = arg
+			}
+		}
+		return eCall{fn: x.fn, args: args}
+	case eNamed:
+		return eNamed{x.name, l.isolateFuncCalls(x.x, before)}
+	case eBin:
+		args := make([]expr, len(x.args))
+		for i, o := range x.args {
+			args[i] = l.isolateFuncCalls(o, before)
+		}
+		return eBin{x.op, args}
+	case eRel:
+		return eRel{op: x.op, l: l.isolateFuncCalls(x.l, before), r: l.isolateFuncCalls(x.r, before),
+			li: x.li, ri: x.ri}
+	case eUn:
+		return eUn{x.op, l.isolateFuncCalls(x.x, before)}
+	}
+	return e
+}
+
+// isolateCall is isolateCursors for one call statement.
+func (l *lowerer) isolateCall(s sCall) []stmt {
+	c, ok := s.call.(eCall)
+	if !ok {
+		return []stmt{s}
+	}
+	fn, ok := c.fn.(eRaw)
+	if !ok || inlinedCursorProcs[fn.s] {
+		return []stmt{s}
+	}
+	before, after := []stmt(nil), []stmt(nil)
+	args := make([]expr, len(c.args))
+	for i, o := range c.args {
+		args[i] = o
+		name, x := "", o
+		if n, ok := o.(eNamed); ok {
+			name, x = n.name, n.x
+		}
+		out := false
+		if e, ok := x.(eOut); ok {
+			out, x = true, e.x
+		}
+		v, ok := x.(eVar)
+		if !ok || v.v.typ.kind != kCursor || v.v.kind != varLocal {
+			continue
+		}
+		tmp := l.cursorCopy(v.v)
+		before = append(before, sAssign{eVar{tmp}, eVar{v.v}})
+		// Copied back whatever the formal's mode: for an "in" formal it
+		// is a no-op.
+		after = append(after, sAssign{eVar{v.v}, eVar{tmp}})
+		var arg expr = eVar{tmp}
+		if out {
+			arg = eOut{arg}
+		}
+		if name != "" {
+			arg = eNamed{name, arg}
+		}
+		args[i] = arg
+	}
+	if before == nil {
+		return []stmt{s}
+	}
+	ret := append(before, sCall{eCall{fn: c.fn, args: args}})
+	return append(ret, after...)
+}
+
+// cursorCopy returns the temporary that isolateCursors copies cursor v to,
+// one per cursor and function.
+func (l *lowerer) cursorCopy(v *variable) *variable {
+	if l.cursorCopies == nil {
+		l.cursorCopies = map[*variable]*variable{}
+	}
+	if tmp := l.cursorCopies[v]; tmp != nil {
+		return tmp
+	}
+	tmp := l.newTemp(v.typ)
+	l.cursorCopies[v] = tmp
+	return tmp
 }

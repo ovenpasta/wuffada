@@ -122,37 +122,4 @@ private
       G_Choosy_Mix : Wuffs.U8 := 0;
    end record;
 
-   --  Wuffs: func widget.low3
-   function Low3 (Self : Widget; A_V : Wuffs.U32) return G_U32_Range_0_7;
-
-   --  Wuffs: func widget.add_small
-   function Add_Small (Self : in out Widget; A_D : G_U32_Range_0_7) return Wuffs.U32;
-
-   --  Wuffs: func widget.sum4
-   function Sum4 (Self : Widget; A_X : Wuffs.Bytes) return Wuffs.U32;
-
-   --  Wuffs: func widget.toggle
-   function Toggle (Self : in out Widget) return Boolean;
-
-   --  Wuffs: func widget.loop_1
-   function Loop_1 (Self : in out Widget) return Wuffs.U32;
-
-   --  Wuffs: func widget.g_loop_1
-   function W_G_Loop_1 (Self : in out Widget) return Wuffs.U32;
-
-   --  Wuffs: func widget.sum_buf
-   function Sum_Buf (Self : Widget) return Wuffs.U64;
-
-   --  Wuffs: func widget.mix
-   function G_Choosy_Default_Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
-
-   --  Wuffs: func widget.mix (the choice of implementation)
-   function Mix (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
-
-   --  Wuffs: func widget.mix_double
-   function Mix_Double (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
-
-   --  Wuffs: func widget.mix_square
-   function Mix_Square (Self : in out Widget; A_V : Wuffs.U32) return Wuffs.U32;
-
 end Wuffs.Std.M1test;

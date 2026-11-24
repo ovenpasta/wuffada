@@ -73,6 +73,58 @@ package body Wuffs.Std.Netpbm is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle_easy
+   function Swizzle_Easy
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle_hard
+   function Swizzle_Hard
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -87,6 +139,7 @@ package body Wuffs.Std.Netpbm is
    overriding function Set_Quirk
      (Self : in out Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -962,6 +1015,7 @@ package body Wuffs.Std.Netpbm is
       G_T2 : Wuffs.Index;
       G_T3 : Wuffs.Runtime.Slice_U8;
       G_T4 : Wuffs.U64;
+      G_T5 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       V_Dst_Pixfmt := Wuffs.Base.Pixel_Buffers.Get_Pixel_Format (A_Dst);
@@ -1030,6 +1084,7 @@ package body Wuffs.Std.Netpbm is
             end loop;
          else
             G_T3 := Wuffs.Runtime.Subslice_I (V_Dst, Wuffs.Index (V_I));
+            G_T5 := G_R_Src;
             Wuffs.Runtime.Swizzle_Interleaved_From_Reader
               (S => Self.F_Swizzler,
                Dst => G_T3.Base (G_T3.First .. Wuffs.Runtime.Last (G_T3)),
@@ -1041,8 +1096,9 @@ package body Wuffs.Std.Netpbm is
                                             Palette => A_Dst_Palette))
                                       - 1),
                Src_Data => A_Src,
-               R => G_R_Src,
+               R => G_T5,
                N => G_T4);
+            G_R_Src := G_T5;
             V_N := G_T4;
          end if;
          if V_N = 0 then

@@ -150,7 +150,7 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
 
    --  Wuffs `s[i] = v`.
    procedure Set (S : Slice_U8; I : Wuffs.Index; V : Wuffs.U8)
-   with Inline, Pre => I < S.Length;
+   with Inline_Always, Pre => I < S.Length;
 
    function Subslice_IJ (S : Slice_U8; I, J : Wuffs.Index) return Slice_U8
    is (Base => S.Base, First => S.First + I, Length => J - I)
@@ -282,7 +282,8 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
    ---------------------------------------------------------------------------
 
    --  True if A and B have an element in common.
-   function Share_An_Element (A, B : Wuffs.Bytes) return Boolean;
+   function Share_An_Element (A, B : Wuffs.Bytes) return Boolean
+   with Inline_Always;
 
    --  Wuffs `dst.copy_from_slice!(s: src)` on slices.
    --  Base: Slices.Copy_From_Slice or Slices.Copy_Within.
@@ -471,7 +472,8 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
       Dst         : in out Wuffs.Bytes;
       Dst_Palette : Wuffs.Bytes;
       Src         : Wuffs.Bytes;
-      N           : out Wuffs.U64);
+      N           : out Wuffs.U64)
+   with Inline_Always;
 
    --  Wuffs `swizzler.swizzle_interleaved_from_reader!(etc)`.
    procedure Swizzle_Interleaved_From_Reader

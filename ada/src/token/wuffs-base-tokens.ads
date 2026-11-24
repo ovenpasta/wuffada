@@ -296,12 +296,14 @@ package Wuffs.Base.Tokens with Pure, SPARK_Mode is
    --  Stores the cursor position back, at exit or before passing the
    --  buffer on: M.Wi := W.Iop.
    procedure Save (M : in out Token_Buffer_Meta; W : Token_Writer) with
+     Inline_Always,
      Pre  => M.Ri <= W.Iop,
      Post => M = (M'Old with delta Wi => W.Iop);
 
    --  After a callee was given (Data, M): the cursor continues where the
    --  callee stopped.  C: iop = data.ptr + meta.wi.
    procedure Reload (W : in out Token_Writer; M : Token_Buffer_Meta) with
+     Inline_Always,
      Pre  => M.Wi <= W.Io2,
      Post => W = (W'Old with delta Iop => M.Wi);
 
@@ -320,6 +322,7 @@ package Wuffs.Base.Tokens with Pure, SPARK_Mode is
       Continued   : Continued_Arg;
       Length      : Length_Arg)
    with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Tokens.Length (W) >= 1,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 1)
        and then (for all J in Data'Range =>
@@ -336,6 +339,7 @@ package Wuffs.Base.Tokens with Pure, SPARK_Mode is
       Continued       : Continued_Arg;
       Length          : Length_Arg)
    with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Tokens.Length (W) >= 1,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 1)
        and then (for all J in Data'Range =>
@@ -364,10 +368,12 @@ package Wuffs.Base.Tokens with Pure, SPARK_Mode is
      (Iop => M.Ri, Io2 => M.Wi);
 
    procedure Save (M : in out Token_Buffer_Meta; R : Token_Reader) with
+     Inline_Always,
      Pre  => R.Iop <= M.Wi,
      Post => M = (M'Old with delta Ri => R.Iop);
 
    procedure Reload (R : in out Token_Reader; M : Token_Buffer_Meta) with
+     Inline_Always,
      Pre  => M.Ri <= R.Io2,
      Post => R = (R'Old with delta Iop => M.Ri);
 

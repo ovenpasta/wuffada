@@ -266,6 +266,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
    --  Stores the cursor position back, at exit or before passing the
    --  buffer on: M.Ri := R.Iop.
    procedure Save (M : in out Buffer_Meta; R : Reader) with
+     Inline_Always,
      Pre  => R.Iop <= M.Wi,
      Post => M = (M'Old with delta Ri => R.Iop);
 
@@ -305,6 +306,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
    with Pre => Valid (Data, R) and then Can_Undo_Byte (R);
 
    procedure Undo_Byte (R : in out Reader) with
+     Inline_Always,
      Pre  => Can_Undo_Byte (R),
      Post => R = (R'Old with delta Iop => R'Old.Iop - 1);
 
@@ -399,6 +401,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
    --  worst_case, exists for the Wuffs compiler's proof only; it shows
    --  Actual <= worst_case <= length().)
    procedure Skip_U32_Fast (R : in out Reader; Actual : U32) with
+     Inline_Always,
      Pre  => U64 (Actual) <= Length (R),
      Post => R = (R'Old with delta Iop => R'Old.Iop + Index (Actual));
 
@@ -427,6 +430,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
    --  The inline C for read_u8?() once a byte is known to be available:
    --  V is the byte at the cursor, which advances by one.
    procedure Read_U8 (Data : Bytes; R : in out Reader; V : out U8) with
+     Inline_Always,
      Pre  => Valid (Data, R) and then Length (R) >= 1,
      Post => V = Peek_U8 (Data, R'Old)
        and then R = (R'Old with delta Iop => R'Old.Iop + 1);
@@ -498,6 +502,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
    --  After a callee was given (Data, M): the cursor continues where the
    --  callee stopped.  C: iop = data.ptr + meta.ri.
    procedure Reload (R : in out Reader; M : Buffer_Meta) with
+     Inline_Always,
      Pre  => R.Io1 <= M.Ri and then M.Ri <= R.Io2,
      Post => R = (R'Old with delta Iop => M.Ri);
 
@@ -571,6 +576,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
 
    --  Stores the cursor position back: M.Wi := W.Iop.
    procedure Save (M : in out Buffer_Meta; W : Writer) with
+     Inline_Always,
      Pre  => M.Ri <= W.Iop,
      Post => M = (M'Old with delta Wi => W.Iop);
 
@@ -612,12 +618,14 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
    with Pre => Valid (Data, W) and then Can_Undo_Byte (W);
 
    procedure Undo_Byte (W : in out Writer) with
+     Inline_Always,
      Pre  => Can_Undo_Byte (W),
      Post => W = (W'Old with delta Iop => W'Old.Iop - 1);
 
    --  After a callee was given (Data, M): the cursor continues where the
    --  callee stopped.  C: iop = data.ptr + meta.wi.
    procedure Reload (W : in out Writer; M : Buffer_Meta) with
+     Inline_Always,
      Pre  => W.Io1 <= M.Wi and then M.Wi <= W.Io2,
      Post => W = (W'Old with delta Iop => M.Wi);
 
@@ -721,90 +729,105 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
    --  known to be non-zero.
 
    procedure Write_U8_Fast (Data : in out Bytes; W : in out Writer; V : U8) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 1,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 1)
        and then Endian.Peek_U8 (Data, Data'First + W'Old.Iop) = V
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 1);
 
    procedure Write_U16BE_Fast (Data : in out Bytes; W : in out Writer; V : U16) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 2,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 2)
        and then Endian.Peek_U16BE (Data, Data'First + W'Old.Iop) = V
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 2);
 
    procedure Write_U16LE_Fast (Data : in out Bytes; W : in out Writer; V : U16) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 2,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 2)
        and then Endian.Peek_U16LE (Data, Data'First + W'Old.Iop) = V
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 2);
 
    procedure Write_U24BE_Fast (Data : in out Bytes; W : in out Writer; V : U32) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 3,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 3)
        and then Endian.Peek_U24BE (Data, Data'First + W'Old.Iop) = (V and 16#FF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 3);
 
    procedure Write_U24LE_Fast (Data : in out Bytes; W : in out Writer; V : U32) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 3,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 3)
        and then Endian.Peek_U24LE (Data, Data'First + W'Old.Iop) = (V and 16#FF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 3);
 
    procedure Write_U32BE_Fast (Data : in out Bytes; W : in out Writer; V : U32) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 4,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 4)
        and then Endian.Peek_U32BE (Data, Data'First + W'Old.Iop) = V
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 4);
 
    procedure Write_U32LE_Fast (Data : in out Bytes; W : in out Writer; V : U32) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 4,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 4)
        and then Endian.Peek_U32LE (Data, Data'First + W'Old.Iop) = V
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 4);
 
    procedure Write_U40BE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 5,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 5)
        and then Endian.Peek_U40BE (Data, Data'First + W'Old.Iop) = (V and 16#FF_FFFF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 5);
 
    procedure Write_U40LE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 5,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 5)
        and then Endian.Peek_U40LE (Data, Data'First + W'Old.Iop) = (V and 16#FF_FFFF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 5);
 
    procedure Write_U48BE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 6,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 6)
        and then Endian.Peek_U48BE (Data, Data'First + W'Old.Iop) = (V and 16#FFFF_FFFF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 6);
 
    procedure Write_U48LE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 6,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 6)
        and then Endian.Peek_U48LE (Data, Data'First + W'Old.Iop) = (V and 16#FFFF_FFFF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 6);
 
    procedure Write_U56BE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 7,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 7)
        and then Endian.Peek_U56BE (Data, Data'First + W'Old.Iop) = (V and 16#FF_FFFF_FFFF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 7);
 
    procedure Write_U56LE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 7,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 7)
        and then Endian.Peek_U56LE (Data, Data'First + W'Old.Iop) = (V and 16#FF_FFFF_FFFF_FFFF#)
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 7);
 
    procedure Write_U64BE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 8,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 8)
        and then Endian.Peek_U64BE (Data, Data'First + W'Old.Iop) = V
        and then Endian.Same_Outside (Data'Old, Data, Data'First + W'Old.Iop, 8);
 
    procedure Write_U64LE_Fast (Data : in out Bytes; W : in out Writer; V : U64) with
+     Inline_Always,
      Pre  => Valid (Data, W) and then Length (W) >= 8,
      Post => W = (W'Old with delta Iop => W'Old.Iop + 8)
        and then Endian.Peek_U64LE (Data, Data'First + W'Old.Iop) = V
@@ -1071,6 +1094,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
       Distance : U32;
       N        : out U32)
    with
+     Inline,
      Pre  => Valid (Data, W) and then Can_Copy_From_History_Fast (W, Up_To, Distance),
      Post => N = Up_To
        and then W = (W'Old with delta Iop => W'Old.Iop + Index (Up_To))
@@ -1086,6 +1110,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
       Distance : U32;
       Cusp     : out U32)
    with
+     Inline,
      Pre  => Valid (Data, W) and then Can_Copy_From_History_Fast (W, Up_To, Distance),
      Post => Cusp <= 16#FFFF#
        and then Cusp = Cusp_At (Data, W'Old.Iop, Up_To, Distance)
@@ -1118,6 +1143,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
       Distance : U32;
       N        : out U32)
    with
+     Inline,
      Pre  => Valid (Data, W)
        and then Can_Copy_From_History_8_Byte_Chunks_Fast (W, Up_To, Distance)
        and then Distance >= 8,
@@ -1135,6 +1161,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
       Distance : U32;
       Cusp     : out U32)
    with
+     Inline,
      Pre  => Valid (Data, W)
        and then Can_Copy_From_History_8_Byte_Chunks_Fast (W, Up_To, Distance)
        and then Distance >= 8,
@@ -1154,6 +1181,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
       Distance : U32;
       N        : out U32)
    with
+     Inline,
      Pre  => Valid (Data, W)
        and then Can_Copy_From_History_8_Byte_Chunks_Fast (W, Up_To, Distance)
        and then Distance = 1,
@@ -1170,6 +1198,7 @@ package Wuffs.Base.IO with Pure, SPARK_Mode is
       Distance : U32;
       Cusp     : out U32)
    with
+     Inline,
      Pre  => Valid (Data, W)
        and then Can_Copy_From_History_8_Byte_Chunks_Fast (W, Up_To, Distance)
        and then Distance = 1,

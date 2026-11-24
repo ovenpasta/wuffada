@@ -279,6 +279,56 @@ package body Wuffs.Std.Thumbhash is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.from_src_to_coeffs
+   function From_Src_To_Coeffs
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.from_coeffs_to_pixels
+   procedure From_Coeffs_To_Pixels (Self : in out Decoder);
+
+   --  Wuffs: func decoder.from_pixels_to_dst
+   function From_Pixels_To_Dst
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized
@@ -408,6 +458,7 @@ package body Wuffs.Std.Thumbhash is
       G_T8 : Boolean;
       G_T9 : Wuffs.U64;
       G_T10 : Wuffs.U8;
+      G_T11 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_4_Do_Decode_Image_Config;
@@ -447,12 +498,14 @@ package body Wuffs.Std.Thumbhash is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T11 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T11,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 16,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T11;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
@@ -481,12 +534,14 @@ package body Wuffs.Std.Thumbhash is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T11 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T11,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 16,
                                      Done => G_T5,
                                      Value => G_T6);
+         G_R_Src := G_T11;
          exit when G_T5;
       end loop;
       G_T4 := Wuffs.U32 (G_T6);
@@ -516,12 +571,14 @@ package body Wuffs.Std.Thumbhash is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T11 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T11,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T8,
                                      Value => G_T9);
+         G_R_Src := G_T11;
          exit when G_T8;
       end loop;
       G_T7 := Wuffs.U16 (G_T9);
@@ -1240,22 +1297,22 @@ package body Wuffs.Std.Thumbhash is
            Wuffs.U32 (CUMULATIVE_DIMENSIONS (Wuffs.Index (Self.F_H_Dimension_Code)));
          V_Fy (1) :=
            Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-             (COSINES (Wuffs.Index (V_Cosines_Base_Y + V_Y)) (0));
+             (COSINES (Wuffs.Index (V_Cosines_Base_Y) + Wuffs.Index (V_Y)) (0));
          V_Fy (2) :=
            Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-             (COSINES (Wuffs.Index (V_Cosines_Base_Y + V_Y)) (1));
+             (COSINES (Wuffs.Index (V_Cosines_Base_Y) + Wuffs.Index (V_Y)) (1));
          V_Fy (3) :=
            Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-             (COSINES (Wuffs.Index (V_Cosines_Base_Y + V_Y)) (2));
+             (COSINES (Wuffs.Index (V_Cosines_Base_Y) + Wuffs.Index (V_Y)) (2));
          V_Fy (4) :=
            Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-             (COSINES (Wuffs.Index (V_Cosines_Base_Y + V_Y)) (3));
+             (COSINES (Wuffs.Index (V_Cosines_Base_Y) + Wuffs.Index (V_Y)) (3));
          V_Fy (5) :=
            Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-             (COSINES (Wuffs.Index (V_Cosines_Base_Y + V_Y)) (4));
+             (COSINES (Wuffs.Index (V_Cosines_Base_Y) + Wuffs.Index (V_Y)) (4));
          V_Fy (6) :=
            Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-             (COSINES (Wuffs.Index (V_Cosines_Base_Y + V_Y)) (5));
+             (COSINES (Wuffs.Index (V_Cosines_Base_Y) + Wuffs.Index (V_Y)) (5));
          V_X := 0;
          while V_X < V_W loop
             pragma Warnings ("C");
@@ -1266,22 +1323,22 @@ package body Wuffs.Std.Thumbhash is
               Wuffs.U32 (CUMULATIVE_DIMENSIONS (Wuffs.Index (Self.F_W_Dimension_Code)));
             V_Fx (1) :=
               Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-                (COSINES (Wuffs.Index (V_Cosines_Base_X + V_X)) (0));
+                (COSINES (Wuffs.Index (V_Cosines_Base_X) + Wuffs.Index (V_X)) (0));
             V_Fx (2) :=
               Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-                (COSINES (Wuffs.Index (V_Cosines_Base_X + V_X)) (1));
+                (COSINES (Wuffs.Index (V_Cosines_Base_X) + Wuffs.Index (V_X)) (1));
             V_Fx (3) :=
               Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-                (COSINES (Wuffs.Index (V_Cosines_Base_X + V_X)) (2));
+                (COSINES (Wuffs.Index (V_Cosines_Base_X) + Wuffs.Index (V_X)) (2));
             V_Fx (4) :=
               Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-                (COSINES (Wuffs.Index (V_Cosines_Base_X + V_X)) (3));
+                (COSINES (Wuffs.Index (V_Cosines_Base_X) + Wuffs.Index (V_X)) (3));
             V_Fx (5) :=
               Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-                (COSINES (Wuffs.Index (V_Cosines_Base_X + V_X)) (4));
+                (COSINES (Wuffs.Index (V_Cosines_Base_X) + Wuffs.Index (V_X)) (4));
             V_Fx (6) :=
               Wuffs.Base.Ints.Sign_Extend_Convert_U16_U32
-                (COSINES (Wuffs.Index (V_Cosines_Base_X + V_X)) (5));
+                (COSINES (Wuffs.Index (V_Cosines_Base_X) + Wuffs.Index (V_X)) (5));
             V_L := Self.F_L_Dc;
             V_I := 0;
             V_Cy := 0;
@@ -1435,13 +1492,13 @@ package body Wuffs.Std.Thumbhash is
                   V_A := V_A / 258708618300;
                end if;
             end if;
-            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 0)) :=
+            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 0) :=
               Wuffs.U8 (V_B and 16#FF#);
-            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 1)) :=
+            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 1) :=
               Wuffs.U8 (V_G and 16#FF#);
-            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 2)) :=
+            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 2) :=
               Wuffs.U8 (V_R and 16#FF#);
-            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X + 3)) :=
+            Self.F_Pixels (Wuffs.Index (V_Y)) (Wuffs.Index (4 * V_X) + 3) :=
               Wuffs.U8 (V_A and 16#FF#);
             V_X := V_X + 1;
          end loop;

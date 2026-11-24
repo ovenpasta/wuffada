@@ -59,6 +59,14 @@ cd "$copy"
 
 tokens_only="${MUTATION_TOKENS:-}"
 simd_only="${MUTATION_SIMD:-}"
+# Outside the SIMD mode the traces come from upstream's SCALAR C, so the Ada
+# tests must run their scalar implementations too: on a CPU with AVX2 the
+# SIMD JPEG IDCT differs from the scalar one on damaged files, and every
+# mutant would then look "killed by test_image(trace-vs-C)".
+if [ "$simd_only" != 1 ]; then
+    WUFFS_TEST_CPU_DISABLE=all
+    export WUFFS_TEST_CPU_DISABLE
+fi
 if [ "$simd_only" = 1 ]; then
     mkdir "$scratch/corpus" "$scratch/webpref" "$scratch/dcorpus"
     "${CC:-cc}" -std=c99 -O2 -Wall -o "$scratch/webpref.bin" ada/tests/crosscheck/webpref.c -lwebpdemux -lwebp

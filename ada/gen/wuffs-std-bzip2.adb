@@ -218,6 +218,67 @@ package body Wuffs.Std.Bzip2 is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_transform_io
+   function Do_Transform_Io
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Workbuf : in out Wuffs.Bytes)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.prepare_block
+   function Prepare_Block
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.read_code_lengths
+   function Read_Code_Lengths
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.build_huffman_tree
+   function Build_Huffman_Tree
+     (Self : in out Decoder; A_Which : G_U32_Range_0_5) return Wuffs.Status;
+
+   --  Wuffs: func decoder.build_huffman_table
+   procedure Build_Huffman_Table (Self : in out Decoder; A_Which : G_U32_Range_0_5);
+
+   --  Wuffs: func decoder.invert_bwt
+   procedure Invert_Bwt (Self : in out Decoder);
+
+   --  Wuffs: func decoder.flush_fast
+   procedure Flush_Fast
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta);
+
+   --  Wuffs: func decoder.flush_slow
+   function Flush_Slow
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_huffman_fast
+   function Decode_Huffman_Fast
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_huffman_slow
+   function Decode_Huffman_Slow
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized
@@ -1015,7 +1076,7 @@ package body Wuffs.Std.Bzip2 is
          V_Movee := Self.F_Mtft (Wuffs.Index (V_Sel_Ff));
          Wuffs.Base.Slices.Copy_Within (Data => Self.F_Mtft,
                                         Dst_First => 1,
-                                        Dst_Length => Wuffs.Index (1 + V_Sel_Ff) - 1,
+                                        Dst_Length => (1 + Wuffs.Index (V_Sel_Ff)) - 1,
                                         Src_First => 0,
                                         Src_Length => Wuffs.Index (V_Sel_Ff),
                                         N => G_T9);
@@ -1286,7 +1347,7 @@ package body Wuffs.Std.Bzip2 is
                pragma Warnings ("C");
                pragma Assert (V_Stack_Height < 20);
                pragma Warnings ("c");
-               V_Node_Index := V_Stack_Values (Wuffs.Index (V_Stack_Height - 1));
+               V_Node_Index := V_Stack_Values (Wuffs.Index (V_Stack_Height) - 1);
                if Self.F_Huffman_Trees (Wuffs.Index (A_Which)) (Wuffs.Index (V_Node_Index)) (0) = 0
                then
                   Self.F_Huffman_Trees (Wuffs.Index (A_Which)) (Wuffs.Index (V_Node_Index)) (0) :=
@@ -1313,7 +1374,7 @@ package body Wuffs.Std.Bzip2 is
             pragma Assert (V_Symbol_Index < 258);
             pragma Assert (V_Stack_Height > 0);
             pragma Warnings ("c");
-            V_Node_Index := V_Stack_Values (Wuffs.Index (V_Stack_Height - 1));
+            V_Node_Index := V_Stack_Values (Wuffs.Index (V_Stack_Height) - 1);
             if V_Symbol_Index < 2 then
                V_Leaf_Value := Wuffs.U16 (16#301# + V_Symbol_Index);
             elsif V_Symbol_Index + 1 < Self.F_Num_Symbols then
@@ -1335,7 +1396,7 @@ package body Wuffs.Std.Bzip2 is
                   pragma Loop_Invariant (V_Code_Length <= 20);
                   pragma Loop_Invariant (V_Symbol_Index < 258);
                   pragma Warnings ("c");
-                  V_Node_Index := V_Stack_Values (Wuffs.Index (V_Stack_Height - 1));
+                  V_Node_Index := V_Stack_Values (Wuffs.Index (V_Stack_Height) - 1);
                   if Self.F_Huffman_Trees (Wuffs.Index (A_Which)) (Wuffs.Index (V_Node_Index)) (1)
                        = 0
                   then
@@ -1714,7 +1775,7 @@ package body Wuffs.Std.Bzip2 is
             V_Output := Wuffs.U32 (Self.F_Mtft (Wuffs.Index (V_Child_Ff)));
             Wuffs.Base.Slices.Copy_Within (Data => Self.F_Mtft,
                                            Dst_First => 1,
-                                           Dst_Length => Wuffs.Index (1 + V_Child_Ff) - 1,
+                                           Dst_Length => (1 + Wuffs.Index (V_Child_Ff)) - 1,
                                            Src_First => 0,
                                            Src_Length => Wuffs.Index (V_Child_Ff),
                                            N => G_T1);
@@ -1867,7 +1928,7 @@ package body Wuffs.Std.Bzip2 is
          V_Output := Wuffs.U32 (Self.F_Mtft (Wuffs.Index (V_Child_Ff)));
          Wuffs.Base.Slices.Copy_Within (Data => Self.F_Mtft,
                                         Dst_First => 1,
-                                        Dst_Length => Wuffs.Index (1 + V_Child_Ff) - 1,
+                                        Dst_Length => (1 + Wuffs.Index (V_Child_Ff)) - 1,
                                         Src_First => 0,
                                         Src_Length => Wuffs.Index (V_Child_Ff),
                                         N => G_T2);

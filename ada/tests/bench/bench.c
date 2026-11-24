@@ -3,6 +3,7 @@
 
 // The C side of the benchmark: the same measurements as
 // ada/tests/bench_main.adb, with upstream's C decoders. See run.sh.
+// Output: KIND PATH BYTES BEST-NS CHECKSUM MEDIAN-NS.
 
 #define _POSIX_C_SOURCE 200809L
 #include <inttypes.h>
@@ -15,6 +16,7 @@
 #define WUFFS_CONFIG__MODULES
 #define WUFFS_CONFIG__MODULE__BASE
 #define WUFFS_CONFIG__MODULE__ADLER32
+#define WUFFS_CONFIG__MODULE__BZIP2
 #define WUFFS_CONFIG__MODULE__CRC32
 #define WUFFS_CONFIG__MODULE__CRC64
 #define WUFFS_CONFIG__MODULE__DEFLATE
@@ -23,8 +25,11 @@
 #define WUFFS_CONFIG__MODULE__PNG
 #define WUFFS_CONFIG__MODULE__JPEG
 #define WUFFS_CONFIG__MODULE__JSON
+#define WUFFS_CONFIG__MODULE__LZMA
+#define WUFFS_CONFIG__MODULE__SHA256
 #define WUFFS_CONFIG__MODULE__VP8
 #define WUFFS_CONFIG__MODULE__WEBP
+#define WUFFS_CONFIG__MODULE__XZ
 #define WUFFS_CONFIG__MODULE__ZLIB
 #include "wuffs-unsupported-snapshot.c"
 
@@ -41,6 +46,9 @@ static wuffs_adler32__hasher g_adler;
 static wuffs_crc64__ecma_hasher g_crc64;
 static wuffs_crc32__ieee_hasher g_crc;
 static wuffs_gzip__decoder g_gzip;
+static wuffs_bzip2__decoder g_bzip2;
+static wuffs_lzma__decoder g_lzma;
+static wuffs_xz__decoder g_xz;
 static wuffs_png__decoder g_png;
 static wuffs_jpeg__decoder g_jpeg;
 static wuffs_gif__decoder g_gif;
@@ -97,6 +105,19 @@ static void decode_image(wuffs_base__image_decoder* d) {
   g_result = n * 1000 + frames;
 }
 
+// Decompresses g_file into g_pix in one call, with all of g_work as the
+// work buffer (more than any of these decoders asks for).
+static void transform(wuffs_base__io_transformer* t) {
+  wuffs_base__io_buffer src = wuffs_base__ptr_u8__reader(g_file, g_len, true);
+  wuffs_base__io_buffer dst = wuffs_base__ptr_u8__writer(g_pix, CAP_PIX);
+  wuffs_base__status st = wuffs_base__io_transformer__transform_io(
+      t, &dst, &src, wuffs_base__make_slice_u8(g_work, CAP_PIX));
+  if (st.repr) {
+    g_failed = 1;
+  }
+  g_result = dst.meta.wi;
+}
+
 static void once(const char* kind) {
   wuffs_base__slice_u8 s = wuffs_base__make_slice_u8(g_file, g_len);
   if (!strcmp(kind, "crc32")) {
@@ -127,6 +148,21 @@ static void once(const char* kind) {
       g_failed = 1;
     }
     g_result = dst.meta.wi;
+  } else if (!strcmp(kind, "bzip2")) {
+    if (wuffs_bzip2__decoder__initialize(&g_bzip2, sizeof g_bzip2, WUFFS_VERSION, 0).repr) {
+      g_failed = 1;
+    }
+    transform(wuffs_bzip2__decoder__upcast_as__wuffs_base__io_transformer(&g_bzip2));
+  } else if (!strcmp(kind, "lzma")) {
+    if (wuffs_lzma__decoder__initialize(&g_lzma, sizeof g_lzma, WUFFS_VERSION, 0).repr) {
+      g_failed = 1;
+    }
+    transform(wuffs_lzma__decoder__upcast_as__wuffs_base__io_transformer(&g_lzma));
+  } else if (!strcmp(kind, "xz")) {
+    if (wuffs_xz__decoder__initialize(&g_xz, sizeof g_xz, WUFFS_VERSION, 0).repr) {
+      g_failed = 1;
+    }
+    transform(wuffs_xz__decoder__upcast_as__wuffs_base__io_transformer(&g_xz));
   } else if (!strcmp(kind, "png")) {
     if (wuffs_png__decoder__initialize(&g_png, sizeof g_png, WUFFS_VERSION, 0).repr) {
       g_failed = 1;
@@ -179,6 +215,10 @@ int main(void) {
     g_len = fread(g_file, 1, CAP_FILE, f);
     fclose(f);
     int64_t best = INT64_MAX;
+    int64_t times[200];
+    if (reps > 200) {
+      reps = 200;
+    }
     for (int r = 0; r < reps; r++) {
       struct timespec t0, t1;
       clock_gettime(CLOCK_MONOTONIC, &t0);
@@ -188,9 +228,20 @@ int main(void) {
       if (ns < best) {
         best = ns;
       }
+      times[r] = ns;
     }
+    // The median, for the spread of the measurements.
+    for (int i = 1; i < reps; i++) {
+      for (int j = i; j > 0 && times[j - 1] > times[j]; j--) {
+        int64_t x = times[j];
+        times[j] = times[j - 1];
+        times[j - 1] = x;
+      }
+    }
+    int64_t median = times[reps / 2];
     uint64_t check = 0xCBF29CE484222325ull;
-    if (!strcmp(kind, "gzip")) {
+    if (!strcmp(kind, "gzip") || !strcmp(kind, "bzip2") || !strcmp(kind, "lzma") ||
+        !strcmp(kind, "xz")) {
       check = fnv(check, g_pix, (size_t)g_result);
     } else if (!strcmp(kind, "json")) {
       check = fnv(check, (const uint8_t*)g_tok, (size_t)g_result * 8);
@@ -200,7 +251,8 @@ int main(void) {
     } else {
       check = g_result;
     }
-    printf("%s %s %zu %" PRId64 " %" PRIu64 "\n", kind, path, g_len, best, check);
+    printf("%s %s %zu %" PRId64 " %" PRIu64 " %" PRId64 "\n", kind, path, g_len, best, check,
+           median);
   }
   if (g_failed) {
     fprintf(stderr, "bench: a decoder failed\n");

@@ -53,7 +53,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Ecma_Hasher)
    is null;
 
-   --  Wuffs: func ecma_hasher.up
-   procedure Up (Self : in out Ecma_Hasher; A_X : Wuffs.Bytes);
-
 end Wuffs.Std.Crc64;

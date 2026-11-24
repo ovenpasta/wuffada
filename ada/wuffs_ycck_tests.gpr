@@ -14,5 +14,6 @@ project Wuffs_YCCK_Tests is
    for Main use ("ycck_tests.adb", "ycck_fuzz.adb");
    package Compiler is
       for Default_Switches ("Ada") use Wuffs_Common.Switches;
+      for Switches ("wuffs-base-pixel_swizzler_ycck.adb") use Wuffs_Common.YCCK_Switches;
    end Compiler;
 end Wuffs_YCCK_Tests;

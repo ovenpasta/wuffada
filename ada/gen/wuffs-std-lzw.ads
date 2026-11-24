@@ -128,15 +128,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Decoder)
    is null;
 
-   --  Wuffs: func decoder.read_from
-   procedure Read_From
-     (Self : in out Decoder; A_Src : Wuffs.Bytes; A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta);
-
-   --  Wuffs: func decoder.write_to
-   function Write_To
-     (Self : in out Decoder;
-      A_Dst : in out Wuffs.Bytes;
-      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta)
-      return Wuffs.Status;
-
 end Wuffs.Std.Lzw;

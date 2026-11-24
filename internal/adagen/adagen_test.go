@@ -1792,9 +1792,11 @@ func TestTokenWriter(tt *testing.T) {
 		"Length => 16#FFFF#",
 		"Value_Extension => 16#3FFF_FFFF_FFFF#",
 		"Wuffs.Base.Tokens.Save (A_Dst_Meta, G_TW_Dst);\n      Put (Self, A_Dst => A_Dst, A_Dst_Meta => A_Dst_Meta, A_V => 1);\n      Wuffs.Base.Tokens.Reload (G_TW_Dst, A_Dst_Meta);",
-		"Wuffs.Base.IO.Match7 (Data => A_Src, R => G_R_Src, A => 16#61_6202#)",
+		// The two functions with a cursor parameter that GNAT does not
+		// inline get a copy of the cursor (isolateCursors).
+		"G_T1 := G_R_Src;\n         V_M := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_T1, A => 16#61_6202#)",
 		"Wuffs.Base.IO.Peek_U64LE_At (Data => A_Src, R => G_R_Src, Offset => 4)",
-		"Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => 12)",
+		"G_T1 := G_R_Src;\n         V_N := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_T1, Up_To => 12)",
 		"return Wuffs.Base.Ranges.Empty_Range_II_U64;",
 	)
 	if n := strings.Count(got, "Wuffs.Base.Tokens.Write_Simple_Token_Fast\n"); n != 1 {

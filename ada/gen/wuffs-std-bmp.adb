@@ -151,6 +151,99 @@ package body Wuffs.Std.Bmp is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func decoder.do_decode_image_config
+   function Do_Decode_Image_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Image_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame_config
+   function Do_Decode_Frame_Config
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
+      A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_decode_frame
+   function Do_Decode_Frame
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Blend : Wuffs.Base.Pixel_Formats.Pixel_Blend;
+      A_Workbuf : in out Wuffs.Bytes;
+      A_Opts : in out Wuffs.Runtime.Decode_Frame_Options;
+      A_Opts_Null : Boolean)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle_none
+   function Swizzle_None
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle_rle
+   function Swizzle_Rle
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle_bitfields
+   function Swizzle_Bitfields
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.swizzle_low_bit_depth
+   function Swizzle_Low_Bit_Depth
+     (Self : in out Decoder;
+      A_Dst : Wuffs.Base.Pixel_Buffers.Pixel_Buffer;
+      A_Dst_Pixels : in out Wuffs.Bytes;
+      A_Dst_Palette : in out Wuffs.Bytes;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.do_tell_me_more
+   function Do_Tell_Me_More
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_Minfo : in out Wuffs.Runtime.More_Information;
+      A_Minfo_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.read_palette
+   function Read_Palette
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.process_masks
+   function Process_Masks (Self : in out Decoder) return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -165,6 +258,7 @@ package body Wuffs.Std.Bmp is
    overriding function Set_Quirk
      (Self : in out Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -335,6 +429,7 @@ package body Wuffs.Std.Bmp is
       G_T62 : Wuffs.U64;
       G_T63 : Boolean;
       G_T64 : Boolean;
+      G_T65 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_4_Do_Decode_Image_Config;
@@ -420,12 +515,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T65;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U16 (G_T3);
@@ -438,9 +535,11 @@ package body Wuffs.Std.Bmp is
       Self.G_Scratch_4_Do_Decode_Image_Config := 8;
       G_Susp := 2;
       <<G_Resume_2>>
-      Wuffs.Base.IO.Skip (R => G_R_Src,
+      G_T65 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T65,
                           Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                           Done => G_T4);
+      G_R_Src := G_T65;
       if not G_T4 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -460,12 +559,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T6,
                                      Value => G_T7);
+         G_R_Src := G_T65;
          exit when G_T6;
       end loop;
       G_T5 := Wuffs.U32 (G_T7);
@@ -494,12 +595,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T9,
                                      Value => G_T10);
+         G_R_Src := G_T65;
          exit when G_T9;
       end loop;
       G_T8 := Wuffs.U32 (G_T10);
@@ -528,12 +631,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T12,
                                      Value => G_T13);
+         G_R_Src := G_T65;
          exit when G_T12;
       end loop;
       G_T11 := Wuffs.U16 (G_T13);
@@ -554,12 +659,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T15,
                                      Value => G_T16);
+         G_R_Src := G_T65;
          exit when G_T15;
       end loop;
       G_T14 := Wuffs.U16 (G_T16);
@@ -580,12 +687,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T18,
                                      Value => G_T19);
+         G_R_Src := G_T65;
          exit when G_T18;
       end loop;
       G_T17 := Wuffs.U16 (G_T19);
@@ -610,12 +719,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T21,
                                      Value => G_T22);
+         G_R_Src := G_T65;
          exit when G_T21;
       end loop;
       G_T20 := Wuffs.U16 (G_T22);
@@ -641,12 +752,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T24,
                                      Value => G_T25);
+         G_R_Src := G_T65;
          exit when G_T24;
       end loop;
       G_T23 := Wuffs.U32 (G_T25);
@@ -675,12 +788,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T27,
                                      Value => G_T28);
+         G_R_Src := G_T65;
          exit when G_T27;
       end loop;
       G_T26 := Wuffs.U32 (G_T28);
@@ -709,12 +824,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T30,
                                      Value => G_T31);
+         G_R_Src := G_T65;
          exit when G_T30;
       end loop;
       G_T29 := Wuffs.U16 (G_T31);
@@ -739,12 +856,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T33,
                                      Value => G_T34);
+         G_R_Src := G_T65;
          exit when G_T33;
       end loop;
       G_T32 := Wuffs.U16 (G_T34);
@@ -767,12 +886,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T36,
                                      Value => G_T37);
+         G_R_Src := G_T65;
          exit when G_T36;
       end loop;
       G_T35 := Wuffs.U32 (G_T37);
@@ -801,12 +922,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T39,
                                      Value => G_T40);
+         G_R_Src := G_T65;
          exit when G_T39;
       end loop;
       G_T38 := Wuffs.U32 (G_T40);
@@ -844,12 +967,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T42,
                                      Value => G_T43);
+         G_R_Src := G_T65;
          exit when G_T42;
       end loop;
       G_T41 := Wuffs.U16 (G_T43);
@@ -874,12 +999,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 8,
                                      Done => G_T45,
                                      Value => G_T46);
+         G_R_Src := G_T65;
          exit when G_T45;
       end loop;
       G_T44 := Wuffs.U16 (G_T46);
@@ -900,12 +1027,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T48,
                                      Value => G_T49);
+         G_R_Src := G_T65;
          exit when G_T48;
       end loop;
       G_T47 := Wuffs.U32 (G_T49);
@@ -927,9 +1056,11 @@ package body Wuffs.Std.Bmp is
       Self.G_Scratch_4_Do_Decode_Image_Config := 20;
       G_Susp := 18;
       <<G_Resume_18>>
-      Wuffs.Base.IO.Skip (R => G_R_Src,
+      G_T65 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T65,
                           Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                           Done => G_T50);
+      G_R_Src := G_T65;
       if not G_T50 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -977,12 +1108,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T52,
                                      Value => G_T53);
+         G_R_Src := G_T65;
          exit when G_T52;
       end loop;
       G_T51 := Wuffs.U32 (G_T53);
@@ -1003,12 +1136,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T55,
                                      Value => G_T56);
+         G_R_Src := G_T65;
          exit when G_T55;
       end loop;
       G_T54 := Wuffs.U32 (G_T56);
@@ -1029,12 +1164,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T58,
                                      Value => G_T59);
+         G_R_Src := G_T65;
          exit when G_T58;
       end loop;
       G_T57 := Wuffs.U32 (G_T59);
@@ -1058,12 +1195,14 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T65 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T65,
                                      Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                                      Last_Shift => 24,
                                      Done => G_T61,
                                      Value => G_T62);
+         G_R_Src := G_T65;
          exit when G_T61;
       end loop;
       G_T60 := Wuffs.U32 (G_T62);
@@ -1072,9 +1211,11 @@ package body Wuffs.Std.Bmp is
       Self.G_Scratch_4_Do_Decode_Image_Config := Wuffs.U64 (Self.F_Bitmap_Info_Len - 56);
       G_Susp := 23;
       <<G_Resume_23>>
-      Wuffs.Base.IO.Skip (R => G_R_Src,
+      G_T65 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T65,
                           Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                           Done => G_T63);
+      G_R_Src := G_T65;
       if not G_T63 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -1114,9 +1255,11 @@ package body Wuffs.Std.Bmp is
       Self.G_Scratch_4_Do_Decode_Image_Config := Wuffs.U64 (V_N);
       G_Susp := 25;
       <<G_Resume_25>>
-      Wuffs.Base.IO.Skip (R => G_R_Src,
+      G_T65 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T65,
                           Scratch => Self.G_Scratch_4_Do_Decode_Image_Config,
                           Done => G_T64);
+      G_R_Src := G_T65;
       if not G_T64 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -1615,6 +1758,7 @@ package body Wuffs.Std.Bmp is
       G_T4 : Wuffs.Runtime.RO_Slice_U8;
       G_T5 : Wuffs.Status;
       G_T6 : Boolean;
+      G_T7 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_8_Do_Decode_Frame;
@@ -1661,7 +1805,9 @@ package body Wuffs.Std.Bmp is
       Self.G_Scratch_8_Do_Decode_Frame := Wuffs.U64 (Self.F_Padding);
       G_Susp := 2;
       <<G_Resume_2>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_8_Do_Decode_Frame, Done => G_T2);
+      G_T7 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T7, Scratch => Self.G_Scratch_8_Do_Decode_Frame, Done => G_T2);
+      G_R_Src := G_T7;
       if not G_T2 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -1783,7 +1929,9 @@ package body Wuffs.Std.Bmp is
       Self.G_Scratch_8_Do_Decode_Frame := Wuffs.U64 (Self.F_Pending_Pad);
       G_Susp := 4;
       <<G_Resume_4>>
-      Wuffs.Base.IO.Skip (R => G_R_Src, Scratch => Self.G_Scratch_8_Do_Decode_Frame, Done => G_T6);
+      G_T7 := G_R_Src;
+      Wuffs.Base.IO.Skip (R => G_T7, Scratch => Self.G_Scratch_8_Do_Decode_Frame, Done => G_T6);
+      G_R_Src := G_T7;
       if not G_T6 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -1831,6 +1979,7 @@ package body Wuffs.Std.Bmp is
       G_T3 : Wuffs.Index;
       G_T4 : Wuffs.Runtime.Slice_U8;
       G_T5 : Wuffs.U64;
+      G_T6 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       V_Dst_Pixfmt := Wuffs.Base.Pixel_Buffers.Get_Pixel_Format (A_Dst);
@@ -1929,6 +2078,7 @@ package body Wuffs.Std.Bmp is
                end loop;
             else
                G_T4 := Wuffs.Runtime.Subslice_I (V_Dst, Wuffs.Index (V_I));
+               G_T6 := G_R_Src;
                Wuffs.Runtime.Swizzle_Interleaved_From_Reader
                  (S => Self.F_Swizzler,
                   Dst => G_T4.Base (G_T4.First .. Wuffs.Runtime.Last (G_T4)),
@@ -1936,8 +2086,9 @@ package body Wuffs.Std.Bmp is
                                    (V_Dst_Palette.First
                                     .. Wuffs.Runtime.Last (V_Dst_Palette)),
                   Src_Data => A_Src,
-                  R => G_R_Src,
+                  R => G_T6,
                   N => G_T5);
+               G_R_Src := G_T6;
                V_N := G_T5;
             end if;
             if V_N = 0 then
@@ -2006,6 +2157,7 @@ package body Wuffs.Std.Bmp is
       G_T16 : Wuffs.Index;
       G_T17 : Wuffs.U64;
       pragma Warnings (Off, G_T17);
+      G_T18 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       V_Dst_Pixfmt := Wuffs.Base.Pixel_Buffers.Get_Pixel_Format (A_Dst);
@@ -2098,8 +2250,8 @@ package body Wuffs.Std.Bmp is
                         pragma Warnings ("C");
                         pragma Assert (V_P0 < 255);
                         pragma Warnings ("c");
-                        Self.F_Scratch (Wuffs.Index (V_P0 + 0)) := V_Indexes (0);
-                        Self.F_Scratch (Wuffs.Index (V_P0 + 1)) := V_Indexes (1);
+                        Self.F_Scratch (Wuffs.Index (V_P0) + 0) := V_Indexes (0);
+                        Self.F_Scratch (Wuffs.Index (V_P0) + 1) := V_Indexes (1);
                         V_P0 := V_P0 + 2;
                      end loop;
                   end if;
@@ -2156,6 +2308,7 @@ package body Wuffs.Std.Bmp is
                   goto G_Continue_3_Inner;
                elsif V_Rle_State = RLE_STATE_LITERAL then
                   if Self.F_Bits_Per_Pixel = 8 then
+                     G_T18 := G_R_Src;
                      Wuffs.Runtime.Limited_Swizzle_U32_Interleaved_From_Reader
                        (S => Self.F_Swizzler,
                         Up_To_Num_Pixels => Self.F_Rle_Length,
@@ -2164,8 +2317,9 @@ package body Wuffs.Std.Bmp is
                                          (V_Dst_Palette.First
                                           .. Wuffs.Runtime.Last (V_Dst_Palette)),
                         Src_Data => A_Src,
-                        R => G_R_Src,
+                        R => G_T18,
                         N => G_T7);
+                     G_R_Src := G_T18;
                      V_N := G_T7;
                      Self.F_Dst_X :=
                        Wuffs.Base.Ints.Sat_Add_U32
@@ -2181,13 +2335,13 @@ package body Wuffs.Std.Bmp is
                      while V_Chunk_Count > 0 and then Wuffs.Base.IO.Length (G_R_Src) >= 2 loop
                         V_Chunk_Bits := Wuffs.U32 (Wuffs.Base.IO.Peek_U16BE (A_Src, G_R_Src));
                         Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 2);
-                        Self.F_Scratch (Wuffs.Index (V_P0 + 16#00#)) :=
+                        Self.F_Scratch (Wuffs.Index (V_P0) + 16#00#) :=
                           Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0C#));
-                        Self.F_Scratch (Wuffs.Index (V_P0 + 16#01#)) :=
+                        Self.F_Scratch (Wuffs.Index (V_P0) + 16#01#) :=
                           Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#08#));
-                        Self.F_Scratch (Wuffs.Index (V_P0 + 16#02#)) :=
+                        Self.F_Scratch (Wuffs.Index (V_P0) + 16#02#) :=
                           Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#04#));
-                        Self.F_Scratch (Wuffs.Index (V_P0 + 16#03#)) :=
+                        Self.F_Scratch (Wuffs.Index (V_P0) + 16#03#) :=
                           Wuffs.U8 (16#0F# and V_Chunk_Bits);
                         V_P0 := (V_P0 and 255) + 16#04#;
                         V_Chunk_Count := V_Chunk_Count - 1;
@@ -2672,69 +2826,69 @@ package body Wuffs.Std.Bmp is
             while V_Chunk_Count > 0 and then Wuffs.Base.IO.Length (G_R_Src) >= 4 loop
                V_Chunk_Bits := Wuffs.Base.IO.Peek_U32BE (A_Src, G_R_Src);
                Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#00#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#00#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1F#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#01#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#01#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1E#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#02#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#02#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1D#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#03#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#03#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1C#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#04#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#04#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1B#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#05#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#05#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1A#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#06#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#06#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#19#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#07#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#07#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#18#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#08#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#08#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#17#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#09#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#09#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#16#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0A#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0A#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#15#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0B#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0B#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#14#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0C#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0C#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#13#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0D#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0D#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#12#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0E#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0E#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#11#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0F#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0F#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#10#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#10#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#10#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0F#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#11#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#11#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0E#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#12#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#12#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0D#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#13#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#13#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0C#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#14#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#14#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0B#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#15#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#15#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0A#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#16#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#16#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#09#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#17#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#17#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#08#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#18#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#18#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#07#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#19#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#19#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#06#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#1A#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#1A#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#05#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#1B#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#1B#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#04#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#1C#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#1C#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#03#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#1D#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#1D#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#02#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#1E#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#1E#) :=
                  Wuffs.U8 (16#01# and Interfaces.Shift_Right (V_Chunk_Bits, 16#01#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#1F#)) := Wuffs.U8 (16#01# and V_Chunk_Bits);
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#1F#) := Wuffs.U8 (16#01# and V_Chunk_Bits);
                V_P0 := (V_P0 and 511) + 16#20#;
                V_Chunk_Count := V_Chunk_Count - 1;
             end loop;
@@ -2745,37 +2899,37 @@ package body Wuffs.Std.Bmp is
             while V_Chunk_Count > 0 and then Wuffs.Base.IO.Length (G_R_Src) >= 4 loop
                V_Chunk_Bits := Wuffs.Base.IO.Peek_U32BE (A_Src, G_R_Src);
                Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#00#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#00#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1E#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#01#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#01#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1C#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#02#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#02#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1A#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#03#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#03#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#18#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#04#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#04#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#16#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#05#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#05#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#14#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#06#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#06#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#12#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#07#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#07#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#10#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#08#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#08#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0E#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#09#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#09#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0C#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0A#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0A#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0A#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0B#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0B#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#08#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0C#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0C#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#06#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0D#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0D#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#04#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0E#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0E#) :=
                  Wuffs.U8 (16#03# and Interfaces.Shift_Right (V_Chunk_Bits, 16#02#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#0F#)) := Wuffs.U8 (16#03# and V_Chunk_Bits);
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#0F#) := Wuffs.U8 (16#03# and V_Chunk_Bits);
                V_P0 := (V_P0 and 511) + 16#10#;
                V_Chunk_Count := V_Chunk_Count - 1;
             end loop;
@@ -2786,21 +2940,21 @@ package body Wuffs.Std.Bmp is
             while V_Chunk_Count > 0 and then Wuffs.Base.IO.Length (G_R_Src) >= 4 loop
                V_Chunk_Bits := Wuffs.Base.IO.Peek_U32BE (A_Src, G_R_Src);
                Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#00#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#00#) :=
                  Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#1C#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#01#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#01#) :=
                  Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#18#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#02#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#02#) :=
                  Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#14#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#03#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#03#) :=
                  Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#10#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#04#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#04#) :=
                  Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#0C#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#05#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#05#) :=
                  Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#08#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#06#)) :=
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#06#) :=
                  Wuffs.U8 (16#0F# and Interfaces.Shift_Right (V_Chunk_Bits, 16#04#));
-               Self.F_Scratch (Wuffs.Index (V_P0 + 16#07#)) := Wuffs.U8 (16#0F# and V_Chunk_Bits);
+               Self.F_Scratch (Wuffs.Index (V_P0) + 16#07#) := Wuffs.U8 (16#0F# and V_Chunk_Bits);
                V_P0 := (V_P0 and 511) + 16#08#;
                V_Chunk_Count := V_Chunk_Count - 1;
             end loop;
@@ -3067,6 +3221,7 @@ package body Wuffs.Std.Bmp is
       G_T4 : Wuffs.U32;
       G_T5 : Boolean;
       G_T6 : Wuffs.U64;
+      G_T7 : Wuffs.Base.IO.Reader;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_22_Read_Palette;
@@ -3106,24 +3261,26 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T7 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T7,
                                      Scratch => Self.G_Scratch_22_Read_Palette,
                                      Last_Shift => 16,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T7;
          exit when G_T2;
       end loop;
       G_T1 := Wuffs.U32 (G_T3);
       <<G_Fi_5>>
       V_Argb := G_T1;
       V_Argb := V_Argb or 16#FF00_0000#;
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 0)) := Wuffs.U8 (V_Argb and 16#FF#);
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 1)) :=
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 0) := Wuffs.U8 (V_Argb and 16#FF#);
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 1) :=
         Wuffs.U8 (Interfaces.Shift_Right (V_Argb, 8) and 16#FF#);
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 2)) :=
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 2) :=
         Wuffs.U8 (Interfaces.Shift_Right (V_Argb, 16) and 16#FF#);
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 3)) :=
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 3) :=
         Wuffs.U8 (Interfaces.Shift_Right (V_Argb, 24) and 16#FF#);
       V_I := V_I + 1;
       goto G_Head_3;
@@ -3151,24 +3308,26 @@ package body Wuffs.Std.Bmp is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T7 := G_R_Src;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T7,
                                      Scratch => Self.G_Scratch_22_Read_Palette,
                                      Last_Shift => 24,
                                      Done => G_T5,
                                      Value => G_T6);
+         G_R_Src := G_T7;
          exit when G_T5;
       end loop;
       G_T4 := Wuffs.U32 (G_T6);
       <<G_Fi_9>>
       V_Argb := G_T4;
       V_Argb := V_Argb or 16#FF00_0000#;
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 0)) := Wuffs.U8 (V_Argb and 16#FF#);
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 1)) :=
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 0) := Wuffs.U8 (V_Argb and 16#FF#);
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 1) :=
         Wuffs.U8 (Interfaces.Shift_Right (V_Argb, 8) and 16#FF#);
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 2)) :=
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 2) :=
         Wuffs.U8 (Interfaces.Shift_Right (V_Argb, 16) and 16#FF#);
-      Self.F_Src_Palette (Wuffs.Index (4 * V_I + 3)) :=
+      Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 3) :=
         Wuffs.U8 (Interfaces.Shift_Right (V_Argb, 24) and 16#FF#);
       V_I := V_I + 1;
       goto G_Head_7;
@@ -3176,10 +3335,10 @@ package body Wuffs.Std.Bmp is
       null;
       <<G_Fi_1>>
       while V_I < 256 loop
-         Self.F_Src_Palette (Wuffs.Index (4 * V_I + 0)) := 16#00#;
-         Self.F_Src_Palette (Wuffs.Index (4 * V_I + 1)) := 16#00#;
-         Self.F_Src_Palette (Wuffs.Index (4 * V_I + 2)) := 16#00#;
-         Self.F_Src_Palette (Wuffs.Index (4 * V_I + 3)) := 16#FF#;
+         Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 0) := 16#00#;
+         Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 1) := 16#00#;
+         Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 2) := 16#00#;
+         Self.F_Src_Palette (Wuffs.Index (4 * V_I) + 3) := 16#FF#;
          V_I := V_I + 1;
       end loop;
       Self.G_P_22_Read_Palette := 0;

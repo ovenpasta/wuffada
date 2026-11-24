@@ -62,7 +62,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Hasher)
    is null;
 
-   --  Wuffs: func hasher.up
-   procedure Up (Self : in out Hasher; A_X : Wuffs.Bytes);
-
 end Wuffs.Std.Xxhash64;

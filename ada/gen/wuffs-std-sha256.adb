@@ -51,6 +51,9 @@ package body Wuffs.Std.Sha256 is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func hasher.up
+   procedure Up (Self : in out Hasher; A_X : Wuffs.Bytes);
+
    overriding function Get_Quirk (Self : Hasher; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -65,6 +68,7 @@ package body Wuffs.Std.Sha256 is
    overriding function Set_Quirk
      (Self : in out Hasher; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -262,18 +266,18 @@ package body Wuffs.Std.Sha256 is
             pragma Warnings ("C");
             pragma Loop_Invariant (V_I >= 16);
             pragma Warnings ("c");
-            V_W2 := V_W (Wuffs.Index (V_I - 2));
+            V_W2 := V_W (Wuffs.Index (V_I) - 2);
             V_S1 :=
               Interfaces.Shift_Right (V_W2, 10)
                 xor (Interfaces.Shift_Left (V_W2, 15) or Interfaces.Shift_Right (V_W2, 17))
                 xor (Interfaces.Shift_Left (V_W2, 13) or Interfaces.Shift_Right (V_W2, 19));
-            V_W15 := V_W (Wuffs.Index (V_I - 15));
+            V_W15 := V_W (Wuffs.Index (V_I) - 15);
             V_S0 :=
               Interfaces.Shift_Right (V_W15, 3)
                 xor (Interfaces.Shift_Left (V_W15, 25) or Interfaces.Shift_Right (V_W15, 7))
                 xor (Interfaces.Shift_Left (V_W15, 14) or Interfaces.Shift_Right (V_W15, 18));
             V_W (Wuffs.Index (V_I)) :=
-              V_S1 + V_W (Wuffs.Index (V_I - 7)) + V_S0 + V_W (Wuffs.Index (V_I - 16));
+              V_S1 + V_W (Wuffs.Index (V_I) - 7) + V_S0 + V_W (Wuffs.Index (V_I) - 16);
             V_I := V_I + 1;
          end loop;
          pragma Warnings ("C");
@@ -508,18 +512,18 @@ package body Wuffs.Std.Sha256 is
             pragma Warnings ("C");
             pragma Loop_Invariant (V_I >= 16);
             pragma Warnings ("c");
-            V_W2 := V_W (Wuffs.Index (V_I - 2));
+            V_W2 := V_W (Wuffs.Index (V_I) - 2);
             V_S1 :=
               Interfaces.Shift_Right (V_W2, 10)
                 xor (Interfaces.Shift_Left (V_W2, 15) or Interfaces.Shift_Right (V_W2, 17))
                 xor (Interfaces.Shift_Left (V_W2, 13) or Interfaces.Shift_Right (V_W2, 19));
-            V_W15 := V_W (Wuffs.Index (V_I - 15));
+            V_W15 := V_W (Wuffs.Index (V_I) - 15);
             V_S0 :=
               Interfaces.Shift_Right (V_W15, 3)
                 xor (Interfaces.Shift_Left (V_W15, 25) or Interfaces.Shift_Right (V_W15, 7))
                 xor (Interfaces.Shift_Left (V_W15, 14) or Interfaces.Shift_Right (V_W15, 18));
             V_W (Wuffs.Index (V_I)) :=
-              V_S1 + V_W (Wuffs.Index (V_I - 7)) + V_S0 + V_W (Wuffs.Index (V_I - 16));
+              V_S1 + V_W (Wuffs.Index (V_I) - 7) + V_S0 + V_W (Wuffs.Index (V_I) - 16);
             V_I := V_I + 1;
          end loop;
          pragma Warnings ("C");

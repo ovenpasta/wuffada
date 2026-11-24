@@ -1,5 +1,9 @@
 package body Wuffs.Base.Endian with SPARK_Mode is
 
+   --  Each poke builds its bytes in B and stores them with one slice
+   --  assignment, which GCC compiles to one store (plus a byte swap for big
+   --  endian).
+
    pragma Assertion_Policy (Ignore);
 
    -------------
@@ -16,9 +20,12 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U16BE (Data : in out Bytes; Pos : Array_Index; V : U16) is
+      B : constant Bytes_2 :=
+        [U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (V and 16#FF#)];
    begin
-      Data (Pos) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 1) := U8 (V and 16#FF#);
+      pragma Assert (Combine_U16BE (B) = V);
+      Data (Pos .. Pos + 1) := B;
    end Poke_U16BE;
 
    ----------------
@@ -26,9 +33,12 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U16LE (Data : in out Bytes; Pos : Array_Index; V : U16) is
+      B : constant Bytes_2 :=
+        [U8 (V and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#)];
    begin
-      Data (Pos) := U8 (V and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
+      pragma Assert (Combine_U16LE (B) = V);
+      Data (Pos .. Pos + 1) := B;
    end Poke_U16LE;
 
    ----------------
@@ -36,10 +46,13 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U24BE (Data : in out Bytes; Pos : Array_Index; V : U32) is
+      B : constant Bytes_3 :=
+        [U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (V and 16#FF#)];
    begin
-      Data (Pos) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 2) := U8 (V and 16#FF#);
+      pragma Assert (Combine_U24BE (B) = (V and 16#FF_FFFF#));
+      Data (Pos .. Pos + 2) := B;
    end Poke_U24BE;
 
    ----------------
@@ -47,10 +60,13 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U24LE (Data : in out Bytes; Pos : Array_Index; V : U32) is
+      B : constant Bytes_3 :=
+        [U8 (V and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#)];
    begin
-      Data (Pos) := U8 (V and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
+      pragma Assert (Combine_U24LE (B) = (V and 16#FF_FFFF#));
+      Data (Pos .. Pos + 2) := B;
    end Poke_U24LE;
 
    ----------------
@@ -58,11 +74,14 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U32BE (Data : in out Bytes; Pos : Array_Index; V : U32) is
+      B : constant Bytes_4 :=
+        [U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (V and 16#FF#)];
    begin
-      Data (Pos) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 3) := U8 (V and 16#FF#);
+      pragma Assert (Combine_U32BE (B) = V);
+      Data (Pos .. Pos + 3) := B;
    end Poke_U32BE;
 
    ----------------
@@ -70,11 +89,14 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U32LE (Data : in out Bytes; Pos : Array_Index; V : U32) is
+      B : constant Bytes_4 :=
+        [U8 (V and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#)];
    begin
-      Data (Pos) := U8 (V and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
+      pragma Assert (Combine_U32LE (B) = V);
+      Data (Pos .. Pos + 3) := B;
    end Poke_U32LE;
 
    ----------------
@@ -82,12 +104,15 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U40BE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_5 :=
+        [U8 (Interfaces.Shift_Right (V, 32) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (V and 16#FF#)];
    begin
-      Data (Pos) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 4) := U8 (V and 16#FF#);
+      pragma Assert (Combine_U40BE (B) = (V and 16#FF_FFFF_FFFF#));
+      Data (Pos .. Pos + 4) := B;
    end Poke_U40BE;
 
    ----------------
@@ -95,12 +120,15 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U40LE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_5 :=
+        [U8 (V and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 32) and 16#FF#)];
    begin
-      Data (Pos) := U8 (V and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 4) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
+      pragma Assert (Combine_U40LE (B) = (V and 16#FF_FFFF_FFFF#));
+      Data (Pos .. Pos + 4) := B;
    end Poke_U40LE;
 
    ----------------
@@ -108,13 +136,16 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U48BE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_6 :=
+        [U8 (Interfaces.Shift_Right (V, 40) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 32) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (V and 16#FF#)];
    begin
-      Data (Pos) := U8 (Interfaces.Shift_Right (V, 40) and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 4) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 5) := U8 (V and 16#FF#);
+      pragma Assert (Combine_U48BE (B) = (V and 16#FFFF_FFFF_FFFF#));
+      Data (Pos .. Pos + 5) := B;
    end Poke_U48BE;
 
    ----------------
@@ -122,13 +153,16 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U48LE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_6 :=
+        [U8 (V and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 32) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 40) and 16#FF#)];
    begin
-      Data (Pos) := U8 (V and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 4) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
-      Data (Pos + 5) := U8 (Interfaces.Shift_Right (V, 40) and 16#FF#);
+      pragma Assert (Combine_U48LE (B) = (V and 16#FFFF_FFFF_FFFF#));
+      Data (Pos .. Pos + 5) := B;
    end Poke_U48LE;
 
    ----------------
@@ -136,14 +170,17 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U56BE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_7 :=
+        [U8 (Interfaces.Shift_Right (V, 48) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 40) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 32) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (V and 16#FF#)];
    begin
-      Data (Pos) := U8 (Interfaces.Shift_Right (V, 48) and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 40) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 4) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 5) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 6) := U8 (V and 16#FF#);
+      pragma Assert (Combine_U56BE (B) = (V and 16#FF_FFFF_FFFF_FFFF#));
+      Data (Pos .. Pos + 6) := B;
    end Poke_U56BE;
 
    ----------------
@@ -151,14 +188,17 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U56LE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_7 :=
+        [U8 (V and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 32) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 40) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 48) and 16#FF#)];
    begin
-      Data (Pos) := U8 (V and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 4) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
-      Data (Pos + 5) := U8 (Interfaces.Shift_Right (V, 40) and 16#FF#);
-      Data (Pos + 6) := U8 (Interfaces.Shift_Right (V, 48) and 16#FF#);
+      pragma Assert (Combine_U56LE (B) = (V and 16#FF_FFFF_FFFF_FFFF#));
+      Data (Pos .. Pos + 6) := B;
    end Poke_U56LE;
 
    ----------------
@@ -166,15 +206,18 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U64BE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_8 :=
+        [U8 (Interfaces.Shift_Right (V, 56) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 48) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 40) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 32) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (V and 16#FF#)];
    begin
-      Data (Pos) := U8 (Interfaces.Shift_Right (V, 56) and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 48) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 40) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
-      Data (Pos + 4) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 5) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 6) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 7) := U8 (V and 16#FF#);
+      pragma Assert (Combine_U64BE (B) = V);
+      Data (Pos .. Pos + 7) := B;
    end Poke_U64BE;
 
    ----------------
@@ -182,15 +225,18 @@ package body Wuffs.Base.Endian with SPARK_Mode is
    ----------------
 
    procedure Poke_U64LE (Data : in out Bytes; Pos : Array_Index; V : U64) is
+      B : constant Bytes_8 :=
+        [U8 (V and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 8) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 16) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 24) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 32) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 40) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 48) and 16#FF#),
+         U8 (Interfaces.Shift_Right (V, 56) and 16#FF#)];
    begin
-      Data (Pos) := U8 (V and 16#FF#);
-      Data (Pos + 1) := U8 (Interfaces.Shift_Right (V, 8) and 16#FF#);
-      Data (Pos + 2) := U8 (Interfaces.Shift_Right (V, 16) and 16#FF#);
-      Data (Pos + 3) := U8 (Interfaces.Shift_Right (V, 24) and 16#FF#);
-      Data (Pos + 4) := U8 (Interfaces.Shift_Right (V, 32) and 16#FF#);
-      Data (Pos + 5) := U8 (Interfaces.Shift_Right (V, 40) and 16#FF#);
-      Data (Pos + 6) := U8 (Interfaces.Shift_Right (V, 48) and 16#FF#);
-      Data (Pos + 7) := U8 (Interfaces.Shift_Right (V, 56) and 16#FF#);
+      pragma Assert (Combine_U64LE (B) = V);
+      Data (Pos .. Pos + 7) := B;
    end Poke_U64LE;
 
 end Wuffs.Base.Endian;

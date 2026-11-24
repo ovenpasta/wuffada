@@ -69,6 +69,42 @@ package body Wuffs.Std.Tokadv is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func thing.emit
+   function Emit
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
+      A_N : G_U32_Range_0_31)
+      return Wuffs.Status;
+
+   --  Wuffs: func thing.put
+   function Put
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_V : Wuffs.U32)
+      return Wuffs.U32;
+
+   --  Wuffs: func thing.inner2
+   function Inner2
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func thing.outer2
+   function Outer2
+     (Self : in out Thing;
+      A_Dst : in out Wuffs.U64_Array;
+      A_Dst_Meta : in out Wuffs.Base.Tokens.Token_Buffer_Meta;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
    overriding function Get_Quirk (Self : Thing; A_Key : Wuffs.U32) return Wuffs.U64 is
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized
@@ -729,6 +765,7 @@ package body Wuffs.Std.Tokadv is
       V_X : Wuffs.U64 := 0;
       V_Wrote : Wuffs.U32 := 0;
       G_Susp : Wuffs.U32;
+      G_T1 : Wuffs.Base.IO.Reader;
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
@@ -796,9 +833,11 @@ package body Wuffs.Std.Tokadv is
       <<G_Resume_1>>
       goto G_Continue_1;
       <<G_Else_4>>
-      V_M := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_R_Src, A => 16#62_6102#);
+      G_T1 := G_R_Src;
+      V_M := Wuffs.Base.IO.Match7 (Data => A_Src, R => G_T1, A => 16#62_6102#);
       V_X := Wuffs.Base.IO.Peek_U64LE_At (Data => A_Src, R => G_R_Src, Offset => 4);
-      V_N := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => 12);
+      G_T1 := G_R_Src;
+      V_N := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_T1, Up_To => 12);
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
       Wuffs.Base.Tokens.Save (A_Dst_Meta, G_TW_Dst);
       V_Wrote :=
@@ -873,6 +912,7 @@ package body Wuffs.Std.Tokadv is
       G_T3 : Wuffs.U64;
       G_Susp : Wuffs.U32;
       G_T4 : Wuffs.U8;
+      G_T5 : Wuffs.Base.IO.Reader;
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
@@ -945,12 +985,14 @@ package body Wuffs.Std.Tokadv is
             G_Status := Wuffs.Base.Suspension_Short_Read;
             goto G_Suspend;
          end if;
+         G_T5 := G_R_Src;
          Wuffs.Base.IO.Read_Step_BE (Data => A_Src,
-                                     R => G_R_Src,
+                                     R => G_T5,
                                      Scratch => Self.G_Scratch_11_K4,
                                      Last_Shift => 56,
                                      Done => G_T2,
                                      Value => G_T3);
+         G_R_Src := G_T5;
          exit when G_T2;
       end loop;
       G_T1 := G_T3;

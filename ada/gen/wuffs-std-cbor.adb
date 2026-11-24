@@ -91,6 +91,7 @@ package body Wuffs.Std.Cbor is
    overriding function Set_Quirk
      (Self : in out Decoder; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin
@@ -142,6 +143,7 @@ package body Wuffs.Std.Cbor is
       V_Tagged : Boolean := False;
       V_Indefinite_String_Major_Type : G_U8_Range_0_3 := 0;
       G_Susp : Wuffs.U32;
+      G_T1 : Wuffs.Base.IO.Reader;
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized then
          return
@@ -533,7 +535,8 @@ package body Wuffs.Std.Cbor is
       goto G_Continue_6;
       <<G_Else_32>>
       V_N64 := Wuffs.Base.Ints.Min_U64 (X => V_String_Length, Y => 16#FFFF#);
-      V_N64 := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => V_N64);
+      G_T1 := G_R_Src;
+      V_N64 := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_T1, Up_To => V_N64);
       V_Token_Length := Wuffs.U32 (V_N64 and 16#FFFF#);
       if V_Token_Length > 0 then
          goto G_Else_34;
@@ -846,12 +849,12 @@ package body Wuffs.Std.Cbor is
       then
          goto G_Continue_1_Outer;
       end if;
-      if Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth - 1)) = 0 then
+      if Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth) - 1) = 0 then
          goto G_Continue_1_Outer;
       end if;
-      Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth - 1)) :=
-        Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth - 1)) - 1;
-      if Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth - 1)) > 0 then
+      Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth) - 1) :=
+        Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth) - 1) - 1;
+      if Self.F_Container_Num_Remaining (Wuffs.Index (V_Depth) - 1) > 0 then
          goto G_Continue_1_Outer;
       end if;
       <<G_Head_41>>

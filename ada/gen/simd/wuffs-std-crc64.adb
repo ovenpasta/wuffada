@@ -26,6 +26,12 @@ package body Wuffs.Std.Crc64 is
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
+   --  Wuffs: func ecma_hasher.up
+   procedure G_Choosy_Default_Up (Self : in out Ecma_Hasher; A_X : Wuffs.Bytes);
+
+   --  Wuffs: func ecma_hasher.up (the choice of implementation)
+   procedure Up (Self : in out Ecma_Hasher; A_X : Wuffs.Bytes);
+
    overriding function Get_Quirk (Self : Ecma_Hasher; A_Key : Wuffs.U32) return Wuffs.U64 is
       pragma Unreferenced (A_Key);
    begin
@@ -40,6 +46,7 @@ package body Wuffs.Std.Crc64 is
    overriding function Set_Quirk
      (Self : in out Ecma_Hasher; A_Key : Wuffs.U32; A_Value : Wuffs.U64) return Wuffs.Status
    is
+      pragma Unmodified (Self);
       pragma Unreferenced (A_Key);
       pragma Unreferenced (A_Value);
    begin

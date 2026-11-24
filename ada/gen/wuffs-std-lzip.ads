@@ -96,14 +96,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Decoder)
    is null;
 
-   --  Wuffs: func decoder.do_transform_io
-   function Do_Transform_Io
-     (Self : in out Decoder;
-      A_Dst : in out Wuffs.Bytes;
-      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta;
-      A_Src : Wuffs.Bytes;
-      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta;
-      A_Workbuf : in out Wuffs.Bytes)
-      return Wuffs.Status;
-
 end Wuffs.Std.Lzip;

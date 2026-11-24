@@ -5,6 +5,7 @@
 --    wuffs/std/lzw/decode_quirks.wuffs
 
 with Interfaces;
+with Wuffs.Base.Slices;
 
 package body Wuffs.Std.Lzw is
 
@@ -75,6 +76,17 @@ package body Wuffs.Std.Lzw is
       Self.G_P_7_Write_To := 0;
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
+
+   --  Wuffs: func decoder.read_from
+   procedure Read_From
+     (Self : in out Decoder; A_Src : Wuffs.Bytes; A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta);
+
+   --  Wuffs: func decoder.write_to
+   function Write_To
+     (Self : in out Decoder;
+      A_Dst : in out Wuffs.Bytes;
+      A_Dst_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
 
    overriding function Get_Quirk (Self : Decoder; A_Key : Wuffs.U32) return Wuffs.U64 is
    begin
@@ -290,9 +302,8 @@ package body Wuffs.Std.Lzw is
       V_First_Byte : Wuffs.U8 := 0;
       V_Lm1_B : G_U16_Range_0_4095 := 0;
       V_Lm1_A : G_U16_Range_0_4095 := 0;
-      G_T1 : Wuffs.Runtime.RO_Slice_U8;
-      G_T2 : Wuffs.U64;
-      pragma Warnings (Off, G_T2);
+      G_T1 : Wuffs.U64;
+      pragma Warnings (Off, G_T1);
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       V_Clear_Code := Self.F_Clear_Code;
@@ -415,19 +426,10 @@ package body Wuffs.Std.Lzw is
                pragma Warnings ("C");
                pragma Assert (V_O <= V_O + 8);
                pragma Warnings ("c");
-               G_T1 :=
-                 Wuffs.Runtime.Subslice_J ((Base => Self.F_Suffixes
-                                                      (Wuffs.Index (V_C))'Unrestricted_Access,
-                                            First => Self.F_Suffixes (Wuffs.Index (V_C))'First,
-                                            Length => Self.F_Suffixes (Wuffs.Index (V_C))'Length),
-                                           8);
-               Wuffs.Runtime.Copy_From_Slice (Dst => Self.F_Output
-                                                       (Wuffs.Index (V_O)
-                                                        .. Wuffs.Index (V_O + 8) - 1),
-                                              Src => G_T1.Base
-                                                       (G_T1.First
-                                                        .. Wuffs.Runtime.Last (G_T1)),
-                                              N => G_T2);
+               Wuffs.Base.Slices.Copy_From_Slice
+                 (Dst => Self.F_Output (Wuffs.Index (V_O) .. (Wuffs.Index (V_O) + 8) - 1),
+                  Src => Self.F_Suffixes (Wuffs.Index (V_C)) (0 .. 7),
+                  N => G_T1);
                if V_Steps = 0 then
                   exit G_Loop_2;
                end if;
@@ -503,6 +505,7 @@ package body Wuffs.Std.Lzw is
       V_N : Wuffs.U64 := 0;
       G_T1 : Wuffs.U64;
       G_Susp : Wuffs.U32;
+      G_T2 : Wuffs.Base.IO.Writer;
    begin
       G_W_Dst := Wuffs.Base.IO.To_Writer (M => A_Dst_Meta, Data_Length => A_Dst'Length);
       G_Susp := Self.G_P_7_Write_To;
@@ -528,10 +531,12 @@ package body Wuffs.Std.Lzw is
                                          Length => Self.F_Output'Length),
                                    I => Wuffs.Index (Self.F_Output_Ri),
                                    J => Wuffs.Index (Self.F_Output_Wi));
+      G_T2 := G_W_Dst;
       Wuffs.Runtime.Writer_Copy_From_Slice (Data => A_Dst,
-                                            W => G_W_Dst,
+                                            W => G_T2,
                                             Src => V_S.Base (V_S.First .. Wuffs.Runtime.Last (V_S)),
                                             N => G_T1);
+      G_W_Dst := G_T2;
       V_N := G_T1;
       if V_N = Wuffs.U64 (V_S.Length) then
          Self.F_Output_Ri := 0;

@@ -4,15 +4,15 @@
 --  A benchmark of generated decoders, for ada/tests/bench/run.sh (it is not
 --  a test and not part of test.sh).  Standard input has one line per
 --  measurement, "KIND REPETITIONS PATH", with KIND one of crc32, adler32, crc64
---  (hash the file), gzip (decompress it), png, gif (decode every frame to
---  BGRA_PREMUL), json (tokenise the whole file in one call).  For each it
---  prints
+--  (hash the file), gzip, bzip2, lzma, xz (decompress it), png, gif, jpeg,
+--  webp (decode every frame to BGRA_PREMUL), json (tokenise the whole file in
+--  one call).  For each it prints
 --
---    KIND PATH BYTES NANOSECONDS RESULT
+--    KIND PATH BYTES NANOSECONDS RESULT MEDIAN
 --
 --  where BYTES is the size of the file, NANOSECONDS the fastest of the
---  repetitions and RESULT a checksum of what was computed, to compare with
---  ada/tests/bench/bench.c's.
+--  repetitions, RESULT a checksum of what was computed, to compare with
+--  ada/tests/bench/bench.c's, and MEDIAN the median of the repetitions.
 
 with Ada.Real_Time;
 with Ada.Streams.Stream_IO;
@@ -26,6 +26,9 @@ with Wuffs.Base.Pixel_Formats;
 with Wuffs.Base.Tokens;
 with Wuffs.Runtime;
 with Wuffs.Std.Adler32;
+with Wuffs.Std.Bzip2;
+with Wuffs.Std.Lzma;
+with Wuffs.Std.Xz;
 with Wuffs.Std.Crc64;
 with Wuffs.Std.Crc32;
 with Wuffs.Std.Gif;
@@ -72,6 +75,10 @@ procedure Bench_Main is
    procedure Decode_Gzip;
 
    procedure Decode_Image (D : in out Wuffs.Runtime.Image_Decoder'Class);
+
+   --  Decompresses the file into IMS.Pix in one call, with all of IMS.Work
+   --  as the work buffer (more than any of these decoders asks for).
+   procedure Transform (T : in out Wuffs.Runtime.IO_Transformer'Class);
 
    procedure Decode_Json;
 
@@ -159,6 +166,22 @@ procedure Bench_Main is
       Failed := Failed or else St /= Wuffs.Ok_Status;
       Result := Wuffs.U64 (Dst_Meta.Wi);
    end Decode_Gzip;
+
+   procedure Transform (T : in out Wuffs.Runtime.IO_Transformer'Class) is
+      Src_Meta : IO.Buffer_Meta := (Wi => Len, Ri => 0, Pos => 0, Closed => True);
+      Dst_Meta : IO.Buffer_Meta := IO.Empty_Meta;
+      St       : Wuffs.Status;
+   begin
+      St :=
+        T.Transform_Io
+          (A_Dst      => IMS.Pix (IMS.Pix_First .. IMS.Pix_First + IMS.Cap_Pix - 1),
+           A_Dst_Meta => Dst_Meta,
+           A_Src      => IMS.File (0 .. Len - 1),
+           A_Src_Meta => Src_Meta,
+           A_Workbuf  => IMS.Work);
+      Failed := Failed or else St /= Wuffs.Ok_Status;
+      Result := Wuffs.U64 (Dst_Meta.Wi);
+   end Transform;
 
    --  Result is the number of tokens (in Token_Support.Tok_Work).
    procedure Decode_Json is
@@ -254,6 +277,9 @@ procedure Bench_Main is
       Reps     : Natural := 0;
       OK       : Boolean;
       Best     : Ada.Real_Time.Time_Span := Ada.Real_Time.Time_Span_Last;
+      Max_Reps : constant := 200;
+      Times    : array (1 .. Max_Reps) of Ada.Real_Time.Time_Span;
+      Median   : Ada.Real_Time.Time_Span;
       Start    : Ada.Real_Time.Time;
       Elapsed  : Ada.Real_Time.Time_Span;
       Check    : Wuffs.U64 := 16#CBF2_9CE4_8422_2325#;
@@ -273,6 +299,7 @@ procedure Bench_Main is
       for C of Line (Sp1 + 1 .. Sp2 - 1) loop
          Reps := Reps * 10 + (Character'Pos (C) - Character'Pos ('0'));
       end loop;
+      Reps := Natural'Min (Reps, Max_Reps);
       Load (Line (Sp2 + 1 .. Line'Last), OK);
       if not OK then
          Ada.Text_IO.Put_Line (Ada.Text_IO.Standard_Error, "bench_main: cannot read a file");
@@ -292,6 +319,15 @@ procedure Bench_Main is
                Hash_Crc64;
             elsif Kind = "gzip" then
                Decode_Gzip;
+            elsif Kind = "bzip2" then
+               Wuffs.Std.Bzip2.Initialize (Decode_Support.Bzip2_Decoder);
+               Transform (Decode_Support.Bzip2_Decoder);
+            elsif Kind = "lzma" then
+               Wuffs.Std.Lzma.Initialize (Decode_Support.Lzma_Decoder);
+               Transform (Decode_Support.Lzma_Decoder);
+            elsif Kind = "xz" then
+               Wuffs.Std.Xz.Initialize (Decode_Support.Xz_Decoder);
+               Transform (Decode_Support.Xz_Decoder);
             elsif Kind = "png" then
                Wuffs.Std.Png.Initialize (IMS.Png_Decoder);
                Decode_Image (IMS.Png_Decoder);
@@ -311,9 +347,20 @@ procedure Bench_Main is
             if Elapsed < Best then
                Best := Elapsed;
             end if;
+            Times (R) := Elapsed;
          end loop;
+         --  The median, for the spread of the measurements.
+         for I in 2 .. Reps loop
+            for J in reverse 2 .. I loop
+               exit when Times (J - 1) <= Times (J);
+               Median := Times (J);
+               Times (J) := Times (J - 1);
+               Times (J - 1) := Median;
+            end loop;
+         end loop;
+         Median := (if Reps = 0 then Best else Times (Reps / 2 + 1));
          --  What was computed: the checksum, or the bytes produced.
-         if Kind = "gzip" then
+         if Kind = "gzip" or else Kind = "bzip2" or else Kind = "lzma" or else Kind = "xz" then
             Fnv (Check, IMS.Pix (IMS.Pix_First .. IMS.Pix_First + Wuffs.Index (Result) - 1));
          elsif Kind = "json" then
             --  The tokens' bytes (little-endian, as on the machine).
@@ -338,6 +385,8 @@ procedure Bench_Main is
       Put_Number (Wuffs.U64 (Best / Ada.Real_Time.Nanoseconds (1)));
       Ada.Text_IO.Put (" ");
       Put_Number (Check);
+      Ada.Text_IO.Put (" ");
+      Put_Number (Wuffs.U64 (Median / Ada.Real_Time.Nanoseconds (1)));
       Ada.Text_IO.New_Line;
    end Measure;
 

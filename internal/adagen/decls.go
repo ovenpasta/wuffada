@@ -216,23 +216,67 @@ func (g *gen) genSpec() string {
 			g.printConst(p, c)
 		}
 	}
-	for _, fi := range g.funcList {
-		if !fi.ir.public && fi.simd == "" {
-			p.line("")
-			p.comment("Wuffs: func " + fi.ir.wuffsName)
-			p.fnSpec(fi.ir)
-		}
-		if fi.dispatch != nil {
-			p.line("")
-			p.comment("Wuffs: func " + fi.dispatch.wuffsName)
-			p.fnSpec(fi.dispatch)
-		}
+	inSpec, _ := g.privateFuncPlaces()
+	for _, f := range inSpec {
+		p.line("")
+		p.comment("Wuffs: func " + f.wuffsName)
+		p.fnSpec(f)
 	}
 
 	p.indent -= indentStep
 	p.line("")
 	p.line("end " + g.adaPkgName + ";")
 	return p.b.String()
+}
+
+// privateFuncPlaces returns the private subprograms (Wuffs' private
+// functions and the dispatchers of choosy functions) that are declared in
+// the private part of the package's spec, and those declared at the start
+// of the package body, in order.
+//
+// The spec's private part is for those that a SIMD implementation calls:
+// its child unit sees the parent's spec but not its body. Every other one
+// that the package calls is declared in the body: GNAT then gives it local
+// linkage (C: static), so that GCC can inline a function called once and
+// specialise its calling convention, as it does for upstream's static C
+// functions. One that nothing calls stays in the spec, where GNAT does not
+// warn about it.
+func (g *gen) privateFuncPlaces() (inSpec []*fn, inBody []*fn) {
+	fromSIMD, fromAny := map[string]bool{}, map[string]bool{}
+	note := func(f *fn, simd bool) {
+		walkStmts(f.body, func(e expr) {
+			if c, ok := e.(eCall); ok {
+				if r, ok := c.fn.(eRaw); ok {
+					fromAny[r.s] = true
+					if simd {
+						fromSIMD[r.s] = true
+					}
+				}
+			}
+		})
+	}
+	for _, fi := range g.funcList {
+		note(fi.ir, fi.simd != "")
+		if fi.dispatch != nil {
+			note(fi.dispatch, false)
+		}
+	}
+	place := func(f *fn) {
+		if fromSIMD[f.name] || !fromAny[f.name] {
+			inSpec = append(inSpec, f)
+		} else {
+			inBody = append(inBody, f)
+		}
+	}
+	for _, fi := range g.funcList {
+		if !fi.ir.public && fi.simd == "" {
+			place(fi.ir)
+		}
+		if fi.dispatch != nil {
+			place(fi.dispatch)
+		}
+	}
+	return inSpec, inBody
 }
 
 func (g *gen) genBody() string {
@@ -271,6 +315,12 @@ func (g *gen) genBody() string {
 	for _, s := range g.structList {
 		p.line("")
 		g.printInitialize(p, s)
+	}
+	_, inBody := g.privateFuncPlaces()
+	for _, f := range inBody {
+		p.line("")
+		p.comment("Wuffs: func " + f.wuffsName)
+		p.fnSpec(f)
 	}
 	for _, fi := range g.funcList {
 		if fi.simd != "" {

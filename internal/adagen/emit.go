@@ -644,6 +644,12 @@ func (p *printer) fnBody(f *fn) {
 		}
 	}
 	unref(f.self)
+	if f.self != nil && f.selfInOut && f.self.writes == 0 && f.self.reads != 0 {
+		// An "in out" receiver (a Wuffs "!" function) that this body does
+		// not write to. GNAT says so for a subprogram declared in a package
+		// body (privateFuncPlaces).
+		p.line("pragma Unmodified (" + f.self.name + ");")
+	}
 	for _, o := range f.params {
 		unref(o)
 		// A writable slice or an I/O buffer is "in out" because of its

@@ -750,10 +750,4 @@ private
        16#D00A_3709#, 16#7E62_A698#, 16#F088_C1A2#, 16#5EE0_5033#, 16#7728_E4C1#, 16#D940_7550#,
        16#24B9_8D25#, 16#8AD1_1CB4#, 16#A319_A846#, 16#0D71_39D7#]];
 
-   --  Wuffs: func ieee_hasher.up
-   procedure G_Choosy_Default_Up (Self : in out Ieee_Hasher; A_X : Wuffs.Bytes);
-
-   --  Wuffs: func ieee_hasher.up (the choice of implementation)
-   procedure Up (Self : in out Ieee_Hasher; A_X : Wuffs.Bytes);
-
 end Wuffs.Std.Crc32;

@@ -55,7 +55,4 @@ private
      (Buffer : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; Arg : Ieee_Hasher)
    is null;
 
-   --  Wuffs: func ieee_hasher.up
-   procedure Up (Self : in out Ieee_Hasher; A_X : Wuffs.Bytes);
-
 end Wuffs.Std.Crc32;

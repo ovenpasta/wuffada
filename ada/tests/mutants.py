@@ -21,7 +21,9 @@ both profiles, with MUTATION_TOKENS=1: see mutation.sh); T18 is T01's
 fault in a form that the Ada build cannot see, and T19 is T09's (which,
 in the release profile, GNAT's -gnatwc reports as a condition that is
 always False). S01 to S16 are for the SIMD milestone (run them in both
-profiles, with MUTATION_SIMD=1: see mutation.sh).
+profiles, with MUTATION_SIMD=1: see mutation.sh). P01 to P05 are for the
+performance milestone (cursor isolation, index arithmetic, copies between
+array fields of the receiver).
 """
 
 import glob
@@ -511,9 +513,9 @@ MUTANTS = {
         GEN + "json.adb", "F_Quirks (20)", "F_Quirks (19)", count=7)),
     "T07-cbor-text-not-checked-for-utf8": ("gen", "checked", lambda: rep(
         GEN + "cbor.adb",
-        "V_N64 := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => V_N64);",
+        "V_N64 := Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_T1, Up_To => V_N64);",
         "V_N64 := Wuffs.U64'Min (V_N64, Wuffs.Base.IO.Length (G_R_Src))\n"
-        "        + 0 * Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_R_Src, Up_To => V_N64);")),
+        "        + 0 * Wuffs.Base.UTF8.Valid_UTF_8_Length (Data => A_Src, R => G_T1, Up_To => V_N64);")),
     "T08-json-depth-limit-1023": ("gen", "checked", lambda: rep(
         GEN + "json.adb", "if V_Depth = 1024 then", "if V_Depth = 1023 then", count=2)),
     "T09-cbor-additional-info-26-branch": ("gen", "checked", lambda: rep(
@@ -593,6 +595,22 @@ MUTANTS = {
         SSE42, "is (From_U32x4 ([A, 0, 0, 0]));", "is (From_U32x4 ([0, A, 0, 0]));")),
     "S16-deflate-bmi2-bits-constant": ("gen", "checked", lambda: rep(
         GENS + "deflate-x86_bmi2.adb", "V_N_Bits := V_N_Bits or 56;", "V_N_Bits := V_N_Bits or 48;")),
+    # The performance milestone: cursor copies around out-of-line calls,
+    # index arithmetic in Wuffs.Index, and copies between two array fields.
+    "P01-isolated-cursor-not-copied-back": ("src", "checked", lambda: rep(
+        G + "passes.go", "after = append(after, sAssign{eVar{v.v}, eVar{tmp}})",
+        "after = append(after, sComment{\"no copy back\"})")),
+    "P02-isolated-cursor-copy-not-made": ("src", "checked", lambda: rep(
+        G + "passes.go", "before = append(before, sAssign{eVar{tmp}, eVar{v.v}})",
+        "before = append(before, sComment{\"no copy\"})")),
+    "P03-index-minus-as-plus": ("src", "checked", lambda: rep(
+        G + "lower_expr.go", 'return bin("-", li, ri), nil', 'return bin("+", li, ri), nil')),
+    "P04-func-call-cursor-copy-stale": ("src", "checked", lambda: rep(
+        G + "passes.go", "*before = append(*before, sAssign{eVar{tmp}, eVar{v.v}})",
+        "*before = append(*before, sComment{\"no copy\"})")),
+    "P05-self-arrays-copy-length-off-by-one": ("gen", "release", lambda: rep(
+        GEN + "gif.adb", "Src => Self.F_Lzw_Suffixes (Wuffs.Index (V_C)) (0 .. 7),",
+        "Src => Self.F_Lzw_Suffixes (Wuffs.Index (V_C)) (1 .. 7),")),
 }
 
 

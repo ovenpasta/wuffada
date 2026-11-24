@@ -31,6 +31,7 @@ package body Wuffs.Std.Jpeg.X86_AVX2 is
       A_Dst_Stride : Wuffs.U64;
       A_Q : G_U32_Range_0_3)
    is
+      pragma Unmodified (Self);
       pragma Unmodified (A_Dst_Buffer);
       M_Dst_Buffer : Wuffs.Runtime.Slice_U8 :=
         (Base => A_Dst_Buffer'Unrestricted_Access,
