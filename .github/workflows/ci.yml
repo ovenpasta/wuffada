@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 env:
-  WUFFS_COMMIT: a87f0bb85b9406d29f48a1c03b6f42c4585145f6
+  WUFFS_COMMIT: 4b527a3d5affb776b0f95b5b8ff196830aaf5bc7
 
 jobs:
   #  The library as a user gets it: every build variant, the example, and
@@ -53,7 +53,7 @@ jobs:
           go-version-file: go.mod
       - name: Wuffs at the pinned commit
         run: |
-          git clone https://github.com/google/wuffs
+          git clone https://github.com/ovenpasta/wuffs
           git -C wuffs checkout "$WUFFS_COMMIT"
       - run: go build ./... && go vet ./...
       - run: go test ./...

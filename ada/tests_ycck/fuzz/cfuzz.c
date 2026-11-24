@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
     wuffs_base__pixel_swizzler sw;
     memset(&sw, 0, sizeof sw);
     wuffs_base__status st = wuffs_base__pixel_swizzler__swizzle_ycck(
-        &sw, &pb, wuffs_base__make_slice_u8(pal, 1024), x0, x1, y0, y1,
+        &sw, &pb, wuffs_base__make_slice_u8(pal, 1024), 0, 0, x0, x1, y0, y1,
         wuffs_base__make_slice_u8(src[0], len[0]), wuffs_base__make_slice_u8(src[1], len[1]),
         wuffs_base__make_slice_u8(src[2], len[2]), wuffs_base__make_slice_u8(src[3], len[3]),
         w[0], w[1], w[2], w[3], h[0], h[1], h[2], h[3], s[0], s[1], s[2], s[3],

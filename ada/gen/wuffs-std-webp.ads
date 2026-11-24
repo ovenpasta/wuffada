@@ -22,44 +22,53 @@ package Wuffs.Std.Webp with Preelaborate is
    --  Wuffs: status "#bad ALPH+VP8L combination"
    Error_Bad_ALPH_VP8L_Combination : constant Wuffs.Status := (Error, 16#001C_0001#);
 
+   --  Wuffs: status "#bad ANIM chunk"
+   Error_Bad_ANIM_Chunk : constant Wuffs.Status := (Error, 16#001C_0002#);
+
+   --  Wuffs: status "#bad ANMF chunk"
+   Error_Bad_ANMF_Chunk : constant Wuffs.Status := (Error, 16#001C_0003#);
+
    --  Wuffs: status "#bad Huffman code (over-subscribed)"
-   Error_Bad_Huffman_Code_Over_Subscribed : constant Wuffs.Status := (Error, 16#001C_0002#);
+   Error_Bad_Huffman_Code_Over_Subscribed : constant Wuffs.Status := (Error, 16#001C_0004#);
 
    --  Wuffs: status "#bad Huffman code (under-subscribed)"
-   Error_Bad_Huffman_Code_Under_Subscribed : constant Wuffs.Status := (Error, 16#001C_0003#);
+   Error_Bad_Huffman_Code_Under_Subscribed : constant Wuffs.Status := (Error, 16#001C_0005#);
 
    --  Wuffs: status "#bad Huffman code"
-   Error_Bad_Huffman_Code : constant Wuffs.Status := (Error, 16#001C_0004#);
+   Error_Bad_Huffman_Code : constant Wuffs.Status := (Error, 16#001C_0006#);
 
    --  Wuffs: status "#bad VP8X chunk"
-   Error_Bad_VP8X_Chunk : constant Wuffs.Status := (Error, 16#001C_0005#);
+   Error_Bad_VP8X_Chunk : constant Wuffs.Status := (Error, 16#001C_0007#);
 
    --  Wuffs: status "#bad back-reference"
-   Error_Bad_Back_Reference : constant Wuffs.Status := (Error, 16#001C_0006#);
+   Error_Bad_Back_Reference : constant Wuffs.Status := (Error, 16#001C_0008#);
 
    --  Wuffs: status "#bad chunk order"
-   Error_Bad_Chunk_Order : constant Wuffs.Status := (Error, 16#001C_0007#);
+   Error_Bad_Chunk_Order : constant Wuffs.Status := (Error, 16#001C_0009#);
 
    --  Wuffs: status "#bad color cache"
-   Error_Bad_Color_Cache : constant Wuffs.Status := (Error, 16#001C_0008#);
+   Error_Bad_Color_Cache : constant Wuffs.Status := (Error, 16#001C_000A#);
 
    --  Wuffs: status "#bad header"
-   Error_Bad_Header : constant Wuffs.Status := (Error, 16#001C_0009#);
+   Error_Bad_Header : constant Wuffs.Status := (Error, 16#001C_000B#);
 
    --  Wuffs: status "#bad transform"
-   Error_Bad_Transform : constant Wuffs.Status := (Error, 16#001C_000A#);
+   Error_Bad_Transform : constant Wuffs.Status := (Error, 16#001C_000C#);
+
+   --  Wuffs: status "#inconsistent width and height"
+   Error_Inconsistent_Width_And_Height : constant Wuffs.Status := (Error, 16#001C_000D#);
 
    --  Wuffs: status "#short chunk"
-   Error_Short_Chunk : constant Wuffs.Status := (Error, 16#001C_000B#);
+   Error_Short_Chunk : constant Wuffs.Status := (Error, 16#001C_000E#);
 
    --  Wuffs: status "#truncated input"
-   Error_Truncated_Input : constant Wuffs.Status := (Error, 16#001C_000C#);
+   Error_Truncated_Input : constant Wuffs.Status := (Error, 16#001C_000F#);
 
    --  Wuffs: status "#unsupported WebP file"
-   Error_Unsupported_WebP_File : constant Wuffs.Status := (Error, 16#001C_000D#);
+   Error_Unsupported_WebP_File : constant Wuffs.Status := (Error, 16#001C_0010#);
 
    --  Wuffs: status "#unsupported number of Huffman groups"
-   Error_Unsupported_Number_Of_Huffman_Groups : constant Wuffs.Status := (Error, 16#001C_000E#);
+   Error_Unsupported_Number_Of_Huffman_Groups : constant Wuffs.Status := (Error, 16#001C_0011#);
 
    --  The message of a status of this package (a public or a private one), as
    --  the base library's Get_Message gives it for a base status: the C
@@ -160,6 +169,10 @@ private
 
    subtype G_U8_Range_0_7 is Wuffs.U8 range 0 .. 7;
 
+   subtype G_U32_Range_0_16382 is Wuffs.U32 range 0 .. 16382;
+
+   subtype G_U64_Range_0_11838002904000 is Wuffs.U64 range 0 .. 11838002904000;
+
    subtype G_U32_Range_0_31 is Wuffs.U32 range 0 .. 31;
 
    type G_Array_4_Of_Boolean is array (Wuffs.Index range 0 .. 3) of Boolean;
@@ -250,13 +263,13 @@ private
    subtype G_U32_Range_0_67108864 is Wuffs.U32 range 0 .. 67108864;
 
    --  Wuffs: status "#internal error: inconsistent Huffman code"
-   Error_Internal_Error_Inconsistent_Huffman_Code : constant Wuffs.Status := (Error, 16#001C_000F#);
+   Error_Internal_Error_Inconsistent_Huffman_Code : constant Wuffs.Status := (Error, 16#001C_0012#);
 
    --  Wuffs: status "#internal error: inconsistent dst buffer"
-   Error_Internal_Error_Inconsistent_Dst_Buffer : constant Wuffs.Status := (Error, 16#001C_0010#);
+   Error_Internal_Error_Inconsistent_Dst_Buffer : constant Wuffs.Status := (Error, 16#001C_0013#);
 
    --  Wuffs: status "#internal error: inconsistent n_bits"
-   Error_Internal_Error_Inconsistent_N_Bits : constant Wuffs.Status := (Error, 16#001C_0011#);
+   Error_Internal_Error_Inconsistent_N_Bits : constant Wuffs.Status := (Error, 16#001C_0014#);
 
    type Decoder is limited new Wuffs.Runtime.Image_Decoder with record
       --  Whether Initialize has been called (C: private_impl.magic).
@@ -265,6 +278,8 @@ private
       G_Active_Coroutine : Wuffs.U32 := 0;
       F_Width : G_U32_Range_0_16384 := 0;
       F_Height : G_U32_Range_0_16384 := 0;
+      F_Frame_Width : G_U32_Range_0_16384 := 0;
+      F_Frame_Height : G_U32_Range_0_16384 := 0;
       F_Call_Sequence : Wuffs.U8 := 0;
       F_Code_Length_Code_Lengths : Wuffs.Bytes (0 .. 18);
       F_Sub_Chunk_Has_Padding : Boolean := False;
@@ -272,10 +287,22 @@ private
       F_Vp8x_Header_Flags : Wuffs.U8 := 0;
       F_Vp8x_Alph_Flags : Wuffs.U8 := 0;
       F_Frame_Config_Io_Position : Wuffs.U64 := 0;
+      F_Frame_Rect_X0 : G_U32_Range_0_16382 := 0;
+      F_Frame_Rect_Y0 : G_U32_Range_0_16382 := 0;
+      F_Frame_Duration : G_U64_Range_0_11838002904000 := 0;
+      F_Frame_Disposal : Wuffs.U8 := 0;
+      F_Frame_Overwrite_Instead_Of_Blend : Boolean := False;
+      F_Num_Animation_Loops_Value : Wuffs.U32 := 0;
+      F_Num_Decoded_Frame_Configs_Value : Wuffs.U64 := 0;
+      F_Num_Decoded_Frames_Value : Wuffs.U64 := 0;
+      F_Riff_End_Io_Position : Wuffs.U64 := 0;
+      F_Frame_End_Io_Position : Wuffs.U64 := 0;
+      F_Vp8x_Workbuf_Len : Wuffs.U64 := 0;
       F_Riff_Chunk_Length : Wuffs.U32 := 0;
       F_Rcl_Remaining : Wuffs.U32 := 0;
       F_Sub_Chunk_Length : Wuffs.U32 := 0;
       F_Sub_Chunk_Type : Wuffs.U32 := 0;
+      F_Frame_Sub_Chunk_Length : Wuffs.U32 := 0;
       F_Bits : Wuffs.U32 := 0;
       F_N_Bits : G_U32_Range_0_31 := 0;
       F_Seen_Transform : G_Array_4_Of_Boolean;
@@ -302,6 +329,8 @@ private
       F_Huffman_Nodes : G_Array_256_Of_Array_6267_Of_U16;
       G_P_1_Decode_Alph : Wuffs.U32 := 0;
       G_P_2_Decode_Alph_Limited : Wuffs.U32 := 0;
+      G_S_2_Decode_Alph_Limited_I : Wuffs.U64 := 0;
+      G_S_2_Decode_Alph_Limited_J : Wuffs.U64 := 0;
       G_P_7_Decode_Huffman_Groups : Wuffs.U32 := 0;
       G_S_7_Decode_Huffman_Groups_Hg : Wuffs.U32 := 0;
       G_S_7_Decode_Huffman_Groups_Ht : Wuffs.U32 := 0;
@@ -351,15 +380,22 @@ private
       G_P_31_Do_Decode_Image_Config : Wuffs.U32 := 0;
       G_Scratch_32_Do_Decode_Image_Config_Limited : Wuffs.U64 := 0;
       G_P_32_Do_Decode_Image_Config_Limited : Wuffs.U32 := 0;
-      G_Scratch_33_Do_Decode_Image_Config_Limited_Vp8l : Wuffs.U64 := 0;
-      G_P_33_Do_Decode_Image_Config_Limited_Vp8l : Wuffs.U32 := 0;
-      G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x : Wuffs.U64 := 0;
-      G_P_34_Do_Decode_Image_Config_Limited_Vp8x : Wuffs.U32 := 0;
-      G_P_35_Decode_Frame_Config : Wuffs.U32 := 0;
-      G_P_36_Do_Decode_Frame_Config : Wuffs.U32 := 0;
-      G_P_37_Decode_Frame : Wuffs.U32 := 0;
-      G_Scratch_38_Do_Decode_Frame : Wuffs.U64 := 0;
-      G_P_38_Do_Decode_Frame : Wuffs.U32 := 0;
+      G_Scratch_33_Do_Decode_Image_Config_Limited_Anim : Wuffs.U64 := 0;
+      G_P_33_Do_Decode_Image_Config_Limited_Anim : Wuffs.U32 := 0;
+      G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8l : Wuffs.U64 := 0;
+      G_P_34_Do_Decode_Image_Config_Limited_Vp8l : Wuffs.U32 := 0;
+      G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x : Wuffs.U64 := 0;
+      G_P_35_Do_Decode_Image_Config_Limited_Vp8x : Wuffs.U32 := 0;
+      G_P_36_Decode_Frame_Config : Wuffs.U32 := 0;
+      G_P_37_Do_Decode_Frame_Config : Wuffs.U32 := 0;
+      G_Scratch_38_Decode_Anmf_Header : Wuffs.U64 := 0;
+      G_P_38_Decode_Anmf_Header : Wuffs.U32 := 0;
+      G_S_38_Decode_Anmf_Header_X0 : G_U32_Range_0_16382 := 0;
+      G_S_38_Decode_Anmf_Header_Y0 : G_U32_Range_0_16382 := 0;
+      G_S_38_Decode_Anmf_Header_W : G_U32_Range_0_16384 := 0;
+      G_P_39_Decode_Frame : Wuffs.U32 := 0;
+      G_Scratch_40_Do_Decode_Frame : Wuffs.U64 := 0;
+      G_P_40_Do_Decode_Frame : Wuffs.U32 := 0;
    end record
    with Put_Image => G_Put_Image;
 
@@ -569,6 +605,13 @@ private
       A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
       return Wuffs.Status;
 
+   --  Wuffs: func decoder.do_decode_image_config_limited_anim
+   function Do_Decode_Image_Config_Limited_Anim
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
    --  Wuffs: func decoder.do_decode_image_config_limited_vp8l
    function Do_Decode_Image_Config_Limited_Vp8l
      (Self : in out Decoder;
@@ -588,6 +631,13 @@ private
      (Self : in out Decoder;
       A_Dst : in out Wuffs.Base.Pixel_Formats.Frame_Config;
       A_Dst_Null : Boolean;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status;
+
+   --  Wuffs: func decoder.decode_anmf_header
+   function Decode_Anmf_Header
+     (Self : in out Decoder;
       A_Src : Wuffs.Bytes;
       A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
       return Wuffs.Status;

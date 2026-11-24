@@ -1,4 +1,4 @@
-github.com/google/wuffs v0.4.0-alpha.12.0.20261118111255-a87f0bb85b94 h1:CVGdzdnklp80exk5JavySX6gBu+UfCw7XSF+SmkYmPs=
-github.com/google/wuffs v0.4.0-alpha.12.0.20261118111255-a87f0bb85b94/go.mod h1:oJu7h83d8RWUHe7Rj/CwQONO3c1zzpN7/7c1a5jIjFo=
+github.com/ovenpasta/wuffs v0.4.0-alpha.12.0.20261123235348-4b527a3d5aff h1:W1y2C9KEql4titvPQ36seU8WoRJNWAARitEg8uRSwSU=
+github.com/ovenpasta/wuffs v0.4.0-alpha.12.0.20261123235348-4b527a3d5aff/go.mod h1:oJu7h83d8RWUHe7Rj/CwQONO3c1zzpN7/7c1a5jIjFo=
 golang.org/x/image v0.41.0 h1:8wS72eGJMJaBxK6okTzd4WaXumUlTVlb753MlsSvTCo=
 golang.org/x/image v0.41.0/go.mod h1:uIc348UZMSvS5Z65CVZ7iDPaNobNFEPeJ4kbqTOszmA=

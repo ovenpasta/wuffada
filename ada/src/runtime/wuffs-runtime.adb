@@ -209,6 +209,8 @@ package body Wuffs.Runtime is
       Pixels            : in out Wuffs.Bytes;
       Palette           : Wuffs.Bytes;
       Dst_Palette       : Wuffs.Bytes;
+      Dst_X_Offset      : Wuffs.U32;
+      Dst_Y_Offset      : Wuffs.U32;
       X_Min_Incl        : Wuffs.U32;
       X_Max_Excl        : Wuffs.U32;
       Y_Min_Incl        : Wuffs.U32;
@@ -265,6 +267,8 @@ package body Wuffs.Runtime is
          Pixels            => Pixels,
          Palette           => Palette,
          Dst_Palette       => Dst_Palette,
+         Dst_X_Offset      => Dst_X_Offset,
+         Dst_Y_Offset      => Dst_Y_Offset,
          X_Min_Incl        => X_Min_Incl,
          X_Max_Excl        => X_Max_Excl,
          Y_Min_Incl        => Y_Min_Incl,

@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     clock_gettime(CLOCK_MONOTONIC, &t0);
     for (int i = 0; i < REPEATS; i++) {
       wuffs_base__status st = wuffs_base__pixel_swizzler__swizzle_ycck(
-          &sw, &pb, wuffs_base__empty_slice_u8(), 0, W, 0, H,
+          &sw, &pb, wuffs_base__empty_slice_u8(), 0, 0, 0, W, 0, H,
           wuffs_base__make_slice_u8(y, W * H),
           wuffs_base__make_slice_u8(cb, W * H / 4),
           wuffs_base__make_slice_u8(cr, W * H / 4),

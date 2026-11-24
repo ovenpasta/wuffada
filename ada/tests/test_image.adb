@@ -30,11 +30,17 @@
 --  channel, not exactly, and count the comparison in category NAME: for
 --  JPEG, whose decoders legitimately differ in rounding and upsampling), aN
 --  (also require the mean of the per-channel differences to be at most N
---  hundredths).
+--  hundredths), A (an animation: EXPECTED is libwebp's WebPAnimDecoder
+--  output, the canvas after each frame; the run composites the frames as
+--  a caller would, from the frame configs, the way WebPAnimDecoder does,
+--  and compares after each frame: Ada only, for a BGRA_NONPREMUL run with
+--  blend SRC and the script I*).
 --  SCRIPT is the calls to make: I and C (decode_image_config and
 --  decode_frame_config; i and c: with a null destination), F (decode_frame),
 --  * (C and F until one fails), R and r (restart_frame, with good and with
---  bad arguments), T (tell_me_more).
+--  bad arguments), L (restart_frame at the last frame config's frame), B
+--  (restart_frame at a bogus position: index 2, inside the first frame's
+--  header), T (tell_me_more).
 --
 --  One more flag, xN, makes a "chaos" run with seed N: whenever a call is
 --  suspended, the next call may get other arguments than the first: another
@@ -109,6 +115,7 @@ procedure Test_Image is
       Values     : Quirk_Values := [others => 1];
       Num_Quirks : Natural := 0;
       Chaos      : Boolean := False;
+      Anim       : Boolean := False;
       Has_Expect : Boolean := False;
       Exp_Length : Wuffs.Index := 0;
       Tolerance  : Natural := 0;
@@ -136,7 +143,19 @@ procedure Test_Image is
    Have_PB  : Boolean := False;
    Pix_Len  : Wuffs.Index := 0;    --  Of the pixel array given to the decoder.
    Ffio     : Wuffs.U64 := 0;
+   --  The index and I/O position of the last frame config (script op L).
+   Last_Index : Wuffs.U64 := 0;
+   Last_IO    : Wuffs.U64 := 0;
    Compared : Boolean := False;
+
+   --  For an animation run (flag A): the last frame config, and what the
+   --  compositing needs to know of the previous frame.
+   Last_FC      : PF.Frame_Config;
+   Anim_Frame   : Natural := 0;
+   Prev_Key     : Boolean := False;
+   Prev_Dispose : Boolean := False;
+   Prev_Rect    : Wuffs.Base.Ranges.Rect_IE_U32;
+   Anim_Differed : Boolean := False;
 
    --  For a chaos run: its random numbers, the image's size, and where the
    --  arrays of the next decode_frame call are (in IMS.Pix, IMS.Chaos_Pal
@@ -144,6 +163,11 @@ procedure Test_Image is
    --  pixels).
    Seed            : Wuffs.U32 := 1;
    Orig_W, Orig_H  : Wuffs.U32 := 16;
+   --  Whether the image's size is known (decode_image_config succeeded),
+   --  and whether the decoder is std/webp's or std/vp8's: then every frame
+   --  dirty rectangle must lie within the image, even after an error.
+   Image_Known     : Boolean := False;
+   Check_Dirty     : Boolean := False;
    Pix_Lo          : Wuffs.Index := IMS.Pix_First;
    Pal_Lo          : Wuffs.Index := 0;
    Pal_Len         : Wuffs.Index := 0;
@@ -529,6 +553,193 @@ procedure Test_Image is
       Test_Support.Check (Bad = 0, "pixels differ from the reference decoder's, case", Run.Id);
    end Compare_With_Expected;
 
+   --  For an animation run: composites the frame just decoded (from the
+   --  pixel buffer, in Last_FC's bounds) onto IMS.Canvas the way libwebp's
+   --  WebPAnimDecoder does (src/demux/anim_decode.c: its key frames, its
+   --  non-premultiplied blending, disposal to transparent black), then
+   --  compares the canvas with the reference's canvas after that frame.
+   procedure Composite_And_Compare;
+
+   procedure Composite_And_Compare is
+      use type Wuffs.Base.Ranges.Rect_IE_U32;
+      use type PF.Animation_Disposal;
+      subtype U32 is Wuffs.U32;
+
+      function U32_At (I : Wuffs.Index) return U32 is
+        (U32 (IMS.Expected (I))
+         + U32 (IMS.Expected (I + 1)) * 2**8
+         + U32 (IMS.Expected (I + 2)) * 2**16
+         + U32 (IMS.Expected (I + 3)) * 2**24);
+
+      --  libwebp's BlendPixelNonPremult, one channel at a time.
+      function Blend (Src, Dst : U32) return U32;
+
+      function Blend (Src, Dst : U32) return U32 is
+         Src_A, Dst_A, Dst_F, Blend_A, Scale, Result, Sc, Dc : U32;
+      begin
+         Src_A := Interfaces.Shift_Right (Src, 24);
+         if Src_A = 0 then
+            return Dst;
+         end if;
+         Dst_A := Interfaces.Shift_Right (Dst, 24);
+         Dst_F := Interfaces.Shift_Right (Dst_A * (256 - Src_A), 8) and 16#FF#;
+         Blend_A := (Src_A + Dst_F) and 16#FF#;
+         Scale := 2**24 / Blend_A;
+         Result := Interfaces.Shift_Left (Blend_A, 24);
+         for Shift in 0 .. 2 loop
+            Sc := Interfaces.Shift_Right (Src, 8 * Shift) and 16#FF#;
+            Dc := Interfaces.Shift_Right (Dst, 8 * Shift) and 16#FF#;
+            Result :=
+              Result
+              or Interfaces.Shift_Left
+                   (Interfaces.Shift_Right ((Sc * Src_A + Dc * Dst_F) * Scale, 24) and 16#FF#,
+                    8 * Shift);
+         end loop;
+         return Result;
+      end Blend;
+
+      function Get (A : Wuffs.Bytes; I : Wuffs.Index) return U32 is
+        (U32 (A (I)) + U32 (A (I + 1)) * 2**8 + U32 (A (I + 2)) * 2**16 + U32 (A (I + 3)) * 2**24);
+
+      procedure Put (A : in out Wuffs.Bytes; I : Wuffs.Index; V : U32);
+
+      procedure Put (A : in out Wuffs.Bytes; I : Wuffs.Index; V : U32) is
+      begin
+         for K in 0 .. 3 loop
+            A (I + Wuffs.Index (K)) := Wuffs.U8 (Interfaces.Shift_Right (V, 8 * K) and 16#FF#);
+         end loop;
+      end Put;
+
+      T          : constant PB.Table := Plane_0;
+      W, H, N    : Wuffs.Index;
+      Size       : Wuffs.Index;
+      B          : constant Wuffs.Base.Ranges.Rect_IE_U32 := Last_FC.Bounds;
+      Whole      : Wuffs.Base.Ranges.Rect_IE_U32;
+      Do_Blend   : constant Boolean := not PF.Overwrite_Instead_Of_Blend (Last_FC);
+      Key        : Boolean;
+      S          : U32;
+      In_Prev    : Boolean;
+      E, I       : Wuffs.Index;
+      Bad        : Natural := 0;
+      Diff       : Natural;
+      Largest    : Natural := 0;
+      Total      : Long_Long_Integer := 0;
+      Channels   : Long_Long_Integer := 0;
+      Mean       : Natural := 0;
+   begin
+      if Run.Exp_Length < 12 then
+         Test_Support.Check (False, "short animation reference file, case", Run.Id);
+         return;
+      end if;
+      W := Wuffs.Index (U32_At (0));
+      H := Wuffs.Index (U32_At (4));
+      N := Wuffs.Index (U32_At (8));
+      Size := W * H * 4;
+      if W * 4 > T.Width or else H > T.Height or else Size > IMS.Cap_Canvas
+        or else Run.Exp_Length /= 12 + N * Size
+        or else Wuffs.Index (B.Max_Excl_X) > W or else Wuffs.Index (B.Max_Excl_Y) > H
+      then
+         Test_Support.Check
+           (False, "animation reference file does not fit the image, case", Run.Id);
+         return;
+      end if;
+      if Wuffs.Index (Anim_Frame) >= N then
+         Test_Support.Check (False, "more frames than the animation reference's, case", Run.Id);
+         return;
+      end if;
+      Whole := (Min_Incl_X => 0, Min_Incl_Y => 0, Max_Excl_X => U32 (W), Max_Excl_Y => U32 (H));
+
+      --  A caller does not know whether a frame has alpha (std/webp reports
+      --  no frame as opaque within its bounds) and so takes it to have.
+      Key :=
+        Anim_Frame = 0
+        or else (B = Whole and then not (Do_Blend and then not PF.Opaque_Within_Bounds (Last_FC)))
+        or else (Prev_Dispose and then (Prev_Rect = Whole or else Prev_Key));
+      if Key then
+         IMS.Canvas (0 .. Size - 1) := [others => 0];
+      else
+         IMS.Canvas (0 .. Size - 1) := IMS.Prev_Canvas (0 .. Size - 1);
+      end if;
+      for Y in Wuffs.Index (B.Min_Incl_Y) .. Wuffs.Index (B.Max_Excl_Y) - 1 loop
+         for X in Wuffs.Index (B.Min_Incl_X) .. Wuffs.Index (B.Max_Excl_X) - 1 loop
+            S := Get (IMS.Pix, IMS.Pix_First + T.Offset + Y * T.Stride + X * 4);
+            I := (Y * W + X) * 4;
+            if Anim_Frame > 0 and then Do_Blend and then not Key then
+               In_Prev :=
+                 Prev_Dispose
+                 and then X >= Wuffs.Index (Prev_Rect.Min_Incl_X)
+                 and then X < Wuffs.Index (Prev_Rect.Max_Excl_X)
+                 and then Y >= Wuffs.Index (Prev_Rect.Min_Incl_Y)
+                 and then Y < Wuffs.Index (Prev_Rect.Max_Excl_Y);
+               if not In_Prev and then Interfaces.Shift_Right (S, 24) /= 16#FF# then
+                  S := Blend (S, Get (IMS.Prev_Canvas, I));
+               end if;
+            end if;
+            Put (IMS.Canvas, I, S);
+         end loop;
+      end loop;
+
+      E := 12 + Wuffs.Index (Anim_Frame) * Size;
+      for K in 0 .. Size - 1 loop
+         Diff := abs (Natural (IMS.Canvas (K)) - Natural (IMS.Expected (E + K)));
+         Largest := Natural'Max (Largest, Diff);
+         Total := Total + Long_Long_Integer (Diff);
+         Channels := Channels + 1;
+         if Diff > Run.Tolerance then
+            Bad := Bad + 1;
+         end if;
+      end loop;
+      --  A run counts once, as a run with one reference, whatever its
+      --  number of frames; and as differing if any frame does.
+      if Anim_Frame = 0 then
+         References := References + 1;
+      end if;
+      if Channels > 0 then
+         Mean := Natural ((100 * Total + Channels - 1) / Channels);
+      end if;
+      if Run.Category /= 0 then
+         declare
+            C : Category_Stats renames Categories (Run.Category);
+         begin
+            if Anim_Frame = 0 then
+               C.Runs := C.Runs + 1;
+            end if;
+            C.Tolerance := Natural'Max (C.Tolerance, Run.Tolerance);
+            C.Largest := Natural'Max (C.Largest, Largest);
+            if Largest > 0 and then not Anim_Differed then
+               C.Differing := C.Differing + 1;
+               Anim_Differed := True;
+            end if;
+            C.Mean := Natural'Max (C.Mean, Mean);
+         end;
+      end if;
+      Test_Support.Check
+        (Mean <= Run.Mean_Limit,
+         "the mean difference from the animation reference is too large, case", Run.Id);
+      Test_Support.Check
+        (Bad = 0, "a canvas differs from libwebp's WebPAnimDecoder's, case", Run.Id);
+
+      --  Dispose of the frame: a caller fills the frame's rectangle with
+      --  the frame config's background colour, which std/webp reports as
+      --  transparent black (the ANIM chunk's colour is only a hint), as
+      --  WebPAnimDecoder does.
+      Test_Support.Check
+        (PF.Background_Color (Last_FC) = 0,
+         "an animation frame's background colour is not transparent black, case", Run.Id);
+      IMS.Prev_Canvas (0 .. Size - 1) := IMS.Canvas (0 .. Size - 1);
+      Prev_Dispose := PF.Disposal (Last_FC) = PF.Disposal_Restore_Background;
+      if Prev_Dispose then
+         for Y in Wuffs.Index (B.Min_Incl_Y) .. Wuffs.Index (B.Max_Excl_Y) - 1 loop
+            IMS.Prev_Canvas
+              ((Y * W + Wuffs.Index (B.Min_Incl_X)) * 4
+               .. (Y * W + Wuffs.Index (B.Max_Excl_X)) * 4 - 1) := [others => 0];
+         end loop;
+      end if;
+      Prev_Rect := B;
+      Prev_Key := Key;
+      Anim_Frame := Anim_Frame + 1;
+   end Composite_And_Compare;
+
    ---------------------------------------------------------------------------
    --  The calls.
    ---------------------------------------------------------------------------
@@ -540,6 +751,12 @@ procedure Test_Image is
    procedure Put_Counts (D : Decoder) is
       R : constant Wuffs.Base.Ranges.Rect_IE_U32 := D.Frame_Dirty_Rect;
    begin
+      if Check_Dirty and then Image_Known then
+         Test_Support.Check
+           (R.Min_Incl_X <= R.Max_Excl_X and then R.Min_Incl_Y <= R.Max_Excl_Y
+            and then R.Max_Excl_X <= Orig_W and then R.Max_Excl_Y <= Orig_H,
+            "frame_dirty_rect is not within the image, case", Run.Id);
+      end if;
       KV ("nfc", D.Num_Decoded_Frame_Configs);
       KV ("nf", D.Num_Decoded_Frames);
       KV ("loops", Wuffs.U64 (D.Num_Animation_Loops));
@@ -924,6 +1141,9 @@ procedure Test_Image is
          KV ("wlmin", WL.Min_Incl);
          KV ("wlmax", WL.Max_Incl);
       elsif Op = 'C' and then Wuffs.Is_Ok (St) then
+         Last_FC := FC;
+         Last_Index := PF.Get_Index (FC);
+         Last_IO := PF.IO_Position (FC);
          KV ("x0", Wuffs.U64 (FC.Bounds.Min_Incl_X));
          KV ("y0", Wuffs.U64 (FC.Bounds.Min_Incl_Y));
          KV ("x1", Wuffs.U64 (FC.Bounds.Max_Excl_X));
@@ -945,11 +1165,17 @@ procedure Test_Image is
          Ffio := PF.First_Frame_IO_Position (IC);
          Orig_W := IC.Pixcfg.Width;
          Orig_H := IC.Pixcfg.Height;
+         Image_Known := True;
          if not Have_PB then
             Setup_PB (IC.Pixcfg.Width, IC.Pixcfg.Height);
          end if;
       end if;
-      if Op = 'F' and then Wuffs.Is_Ok (St) and then Run.Has_Expect and then not Compared
+      if Op = 'F' and then Wuffs.Is_Ok (St) and then Run.Has_Expect and then Run.Anim
+        and then not Run.Chaos
+      then
+         Compared := True;
+         Composite_And_Compare;
+      elsif Op = 'F' and then Wuffs.Is_Ok (St) and then Run.Has_Expect and then not Compared
         and then not Run.Chaos
       then
          Compared := True;
@@ -984,6 +1210,20 @@ procedure Test_Image is
                if Op = 'R' and then Wuffs.Is_Ok (St) then
                   Src_Seek (Ffio);
                end if;
+            when 'L' | 'B' =>
+               declare
+                  Index : constant Wuffs.U64 := (if Op = 'L' then Last_Index else 2);
+                  IO    : constant Wuffs.U64 := (if Op = 'L' then Last_IO else Ffio + 7);
+               begin
+                  St := D.Restart_Frame (A_Index => Index, A_Io_Position => IO);
+                  Begin_Line ([1 => Op]);
+                  Put_Status (St);
+                  Put_Counts (D);
+                  Ada.Text_IO.New_Line;
+                  if Wuffs.Is_Ok (St) then
+                     Src_Seek (IO);
+                  end if;
+               end;
             when 'T' =>
                Tell_More (D);
             when others =>
@@ -999,9 +1239,16 @@ procedure Test_Image is
    begin
       Have_PB := False;
       Ffio := 0;
+      Last_Index := 0;
+      Last_IO := 0;
       Compared := False;
+      Anim_Frame := 0;
+      Prev_Key := False;
+      Prev_Dispose := False;
+      Anim_Differed := False;
       Orig_W := 16;
       Orig_H := 16;
+      Image_Known := False;
       Pix_Lo := IMS.Pix_First;
       Pal_Lo := 0;
       Pal_Len := 1024;
@@ -1104,6 +1351,7 @@ procedure Test_Image is
          end loop;
          case Line (I) is
             when 'm' => Run.Meta := True;
+            when 'A' => Run.Anim := True;
             when 'p' => Run.Small_Pix := True;
             when 'w' => Run.Small_Work := True;
             when 'l' => Run.Layout := True;
@@ -1132,6 +1380,12 @@ procedure Test_Image is
                      Categories (Num_Categories).Name_Last := Name'Length;
                      Run.Category := Num_Categories;
                   end if;
+                  --  A category that does not fit would have its statistics
+                  --  silently dropped: a test failure instead.
+                  Test_Support.Check
+                    (Run.Category /= 0,
+                     "too many tolerance categories (or a name over 40 characters), case",
+                     Run.Id, Name);
                end;
             when 'v' =>
                --  vK:V sets quirk K to V (both decimal).
@@ -1175,6 +1429,7 @@ procedure Test_Image is
          Run.Has_Expect := True;
       end if;
 
+      Check_Dirty := False;
       if Line (F1 .. L1) = "netpbm" then
          Wuffs.Std.Netpbm.Initialize (IMS.Netpbm_Decoder);
          Run_Decoder (IMS.Netpbm_Decoder, Line (F6 .. L6));
@@ -1212,9 +1467,11 @@ procedure Test_Image is
          Wuffs.Std.Jpeg.Initialize (IMS.Jpeg_Decoder);
          Run_Decoder (IMS.Jpeg_Decoder, Line (F6 .. L6));
       elsif Line (F1 .. L1) = "vp8" then
+         Check_Dirty := True;
          Wuffs.Std.Vp8.Initialize (IMS.Vp8_Decoder);
          Run_Decoder (IMS.Vp8_Decoder, Line (F6 .. L6));
       elsif Line (F1 .. L1) = "webp" then
+         Check_Dirty := True;
          Wuffs.Std.Webp.Initialize (IMS.Webp_Decoder);
          Run_Decoder (IMS.Webp_Decoder, Line (F6 .. L6));
       else

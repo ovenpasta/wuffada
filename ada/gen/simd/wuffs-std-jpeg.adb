@@ -6139,6 +6139,8 @@ package body Wuffs.Std.Jpeg is
                                   Dst_Palette => G_T1.Base
                                                    (G_T1.First
                                                     .. Wuffs.Runtime.Last (G_T1)),
+                                  Dst_X_Offset => 0,
+                                  Dst_Y_Offset => 0,
                                   X_Min_Incl => A_X0 and 16#FFFF#,
                                   X_Max_Excl => Wuffs.Base.Ints.Min_U32
                                                   (X => A_X1,

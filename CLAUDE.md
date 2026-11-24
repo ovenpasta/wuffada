@@ -31,7 +31,7 @@ read it before changing anything.
 | `ada/tests/`, `ada/tests_base/`, `ada/tests_pixel/`, `ada/tests_ycck/`, `ada/tests_token/` | generator tests; proved-library tests + C oracles |
 | `examples/` | `decode_image`: image file to PPM/PAM with the Ada library only |
 | `cmd/wuffs-ada/`, `internal/adagen/` | the generator (Go) |
-| `wuffs/` | upstream checkout, pinned at `a87f0bb`, git-ignored, read-only |
+| `wuffs/` | checkout of our fork `ovenpasta/wuffs`, branch `wuffada` (git-ignored here). Upstream is `google/wuffs`; the fork adds decoder features and fixes in the Wuffs language, kept in upstream's style so they can be offered back |
 
 ## Commands
 
@@ -57,7 +57,10 @@ tests_ycck/run_all.sh                                # generator checks, tests a
 ./test.sh                 # WUFFS_ASAN=1 ./test.sh adds a release build under AddressSanitizer
 ```
 
-If `wuffs/` is missing: `git clone https://github.com/google/wuffs && git -C wuffs checkout a87f0bb`.
+If `wuffs/` is missing: `git clone -b wuffada https://github.com/ovenpasta/wuffs`.
+The commit that the generated Ada corresponds to is `WUFFS_COMMIT` in
+`.github/workflows/*.yml`. The same rules apply in `wuffs/` as here: ask
+before every commit, no attribution lines.
 
 ## Hard rules for the code
 

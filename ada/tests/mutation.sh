@@ -61,7 +61,7 @@ tokens_only="${MUTATION_TOKENS:-}"
 simd_only="${MUTATION_SIMD:-}"
 if [ "$simd_only" = 1 ]; then
     mkdir "$scratch/corpus" "$scratch/webpref" "$scratch/dcorpus"
-    "${CC:-cc}" -std=c99 -O2 -Wall -o "$scratch/webpref.bin" ada/tests/crosscheck/webpref.c -lwebp
+    "${CC:-cc}" -std=c99 -O2 -Wall -o "$scratch/webpref.bin" ada/tests/crosscheck/webpref.c -lwebpdemux -lwebp
     find wuffs/test/data ada/tests/webpcorpus -name '*.webp' | LC_ALL=C sort |
         "$scratch/webpref.bin" "$scratch/webpref" > "$scratch/webpref/list.out"
     go run ./ada/tests/imgcorpus -data wuffs/test/data -out "$scratch/corpus" -chaos "$scratch/chaos.manifest" \
@@ -84,7 +84,7 @@ ada/tests/crosscheck/run_adv.sh > "$scratch/adv.c.trace"
 echo "$(wc -l < "$scratch/tokens.manifest" | tr -d ' ') token decoder cases per mutant"
 if [ "$tokens_only" != 1 ]; then
 mkdir "$scratch/corpus" "$scratch/webpref"
-"${CC:-cc}" -std=c99 -O2 -Wall -o "$scratch/webpref.bin" ada/tests/crosscheck/webpref.c -lwebp
+"${CC:-cc}" -std=c99 -O2 -Wall -o "$scratch/webpref.bin" ada/tests/crosscheck/webpref.c -lwebpdemux -lwebp
 find wuffs/test/data ada/tests/webpcorpus -name '*.webp' | LC_ALL=C sort |
     "$scratch/webpref.bin" "$scratch/webpref" > "$scratch/webpref/list.out"
 go run ./ada/tests/imgcorpus -data wuffs/test/data -out "$scratch/corpus" -chaos "$scratch/chaos.all" \

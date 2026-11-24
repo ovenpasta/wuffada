@@ -15,7 +15,7 @@ All 30 packages of Wuffs' standard library, as `Wuffs.Std.<Name>`:
 
 | Kind | Packages |
 |---|---|
-| Images | `Png` (with APNG), `Jpeg` (baseline and progressive), `Gif`, `Webp` (lossy and lossless stills), `Bmp`, `Netpbm`, `Qoi`, `Targa`, `Wbmp`, `Nie`, `Etc2`, `Thumbhash`, `Handsum`, and `Vp8` |
+| Images | `Png` (with APNG), `Jpeg` (baseline and progressive), `Gif`, `Webp` (lossy and lossless, still and animated), `Bmp`, `Netpbm`, `Qoi`, `Targa`, `Wbmp`, `Nie`, `Etc2`, `Thumbhash`, `Handsum`, and `Vp8` |
 | Compression | `Deflate`, `Zlib`, `Gzip`, `Bzip2`, `Lzma`, `Lzip`, `Xz`, `Lzw` |
 | Checksums | `Crc32`, `Crc64`, `Adler32`, `Sha256`, `Xxhash32`, `Xxhash64` |
 | Tokenisers | `Json`, `Cbor` |
@@ -113,9 +113,14 @@ Things to know as a caller:
 
 ## Limits
 
-- Follows upstream as it is: animated WebP and lossless WebP inside an
-  extended (VP8X) container are not decoded; there is no AVIF, ICO, TIFF or
-  JPEG XL decoder.
+- There is no AVIF, ICO, TIFF or JPEG XL decoder. An animated WebP's
+  frames are decoded one by one, as for GIF and APNG: the caller composites
+  them (blending, disposal). Its frame configs' background colour is
+  transparent black: the ANIM chunk's colour is only a hint.
+- A WebP file in the extended format (VP8X), including every animation,
+  asks for a work buffer about as long as the file (the RIFF chunk length
+  bounds every VP8 chunk, whose data is copied into it), and one whose RIFF
+  chunk is longer than about 144 MiB is rejected as unsupported.
 - The decoders report ICC profiles and other metadata but do not apply
   colour management.
 - Speed: the checksums match upstream's SIMD build. PNG and JPEG decoding
@@ -139,11 +144,15 @@ alone.
 
 ## Working on it
 
-Regenerating and testing need Go, a C compiler, libwebp's development files,
-`xz` and `bzip2`, and Wuffs at the pinned commit:
+Regenerating and testing need Go, a C compiler, libwebp's development files
+(libwebp and libwebpdemux), `xz` and `bzip2`, and our Wuffs fork (upstream
+Wuffs with decoder fixes and features, kept in upstream's style) at the
+pinned commit, `WUFFS_COMMIT` in `.github/workflows/*.yml`. The generator
+builds with the fork's Wuffs compiler (`go.mod` replaces
+`github.com/google/wuffs` with the fork at that commit):
 
 ```sh
-git clone https://github.com/google/wuffs && git -C wuffs checkout a87f0bb
+git clone -b wuffada https://github.com/ovenpasta/wuffs && git -C wuffs checkout 4b527a3d
 ./gen.sh          # regenerate ada/gen
 ./test.sh         # everything, both profiles (WUFFS_ASAN=1 adds a sanitizer stage)
 ```

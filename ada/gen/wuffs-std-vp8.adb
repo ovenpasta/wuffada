@@ -537,7 +537,9 @@ package body Wuffs.Std.Vp8 is
 
    function Message_Length (S : Wuffs.Status) return Natural is
    begin
-      if S = Error_Bad_QUIRK_SOURCE_LENGTH then
+      if S = Error_Bad_QUIRK_DST_X_AND_Y then
+         return 26;
+      elsif S = Error_Bad_QUIRK_SOURCE_LENGTH then
          return 28;
       elsif S = Error_Bad_QUIRK_WIDTH_AND_HEIGHT then
          return 31;
@@ -560,7 +562,11 @@ package body Wuffs.Std.Vp8 is
 
    procedure Get_Message (S : Wuffs.Status; Buffer : out String; Length : out Natural) is
    begin
-      if S = Error_Bad_QUIRK_SOURCE_LENGTH then
+      if S = Error_Bad_QUIRK_DST_X_AND_Y then
+         Wuffs.Runtime.Copy_Message (Text => "vp8: bad QUIRK_DST_X_AND_Y",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_QUIRK_SOURCE_LENGTH then
          Wuffs.Runtime.Copy_Message (Text => "vp8: bad QUIRK_SOURCE_LENGTH",
                                      Buffer => Buffer,
                                      Length => Length);
@@ -608,6 +614,8 @@ package body Wuffs.Std.Vp8 is
       Self.F_Frame_Config_Io_Position := 0;
       Self.F_Quirk_Source_Length := 0;
       Self.F_Quirk_Width_And_Height := 0;
+      Self.F_Quirk_Dst_X := 0;
+      Self.F_Quirk_Dst_Y := 0;
       Self.F_Partitioned_Data_Length := 0;
       Self.F_Workbuf_Yuv_Y_Stride := 0;
       Self.F_Workbuf_Yuv_Uv_Stride := 0;
@@ -1699,7 +1707,7 @@ package body Wuffs.Std.Vp8 is
    function Clip_M16_P15 (Self : Decoder; A_A : Wuffs.U32) return Wuffs.U32 is
       pragma Unreferenced (Self);
    begin
-      if A_A + 16#10# <= 16#20# then
+      if A_A + 16#10# <= 16#1F# then
          return A_A;
       elsif A_A < 16#8000_0000# then
          return 16#0F#;
@@ -1991,7 +1999,7 @@ package body Wuffs.Std.Vp8 is
             V_Level := Wuffs.U32 (Self.F_Filt_Level);
             if not Self.F_Seg_Enabled then
                null;
-            elsif not Self.F_Filt_Deltas_Enabled then
+            elsif Self.F_Seg_Absolute then
                V_Level :=
                  Wuffs.Base.Ints.Sign_Extend_Convert_U8_U32
                    (Self.F_Seg_Strengths (Wuffs.Index (V_Seg)));
@@ -2010,7 +2018,7 @@ package body Wuffs.Std.Vp8 is
                       + Wuffs.Base.Ints.Sign_Extend_Convert_U8_U32 (Self.F_Filt_Deltas (1) (0));
                end if;
             end if;
-            if V_Level >= 16#8000_0000# then
+            if V_Level = 0 or else V_Level >= 16#8000_0000# then
                Self.F_Loop_Filters (Wuffs.Index (2 * V_Seg + V_Inner)) := 0;
                V_Inner := V_Inner + 1;
                goto G_Continue_2;
@@ -2025,7 +2033,7 @@ package body Wuffs.Std.Vp8 is
                   V_Ilevel := Interfaces.Shift_Right (V_Ilevel, 2);
                end if;
                V_Ilevel :=
-                 Wuffs.Base.Ints.Max_U32 (X => V_Ilevel,
+                 Wuffs.Base.Ints.Min_U32 (X => V_Ilevel,
                                           Y => Wuffs.U32 (9 - Self.F_Filt_Sharpness));
             end if;
             if V_Ilevel < 1 or else 16#8000_0000# <= V_Ilevel then
@@ -3199,6 +3207,8 @@ package body Wuffs.Std.Vp8 is
                                                               (PB => A_Dst,
                                                                Palette => A_Dst_Palette))
                                                          - 1),
+                                  Dst_X_Offset => Self.F_Quirk_Dst_X,
+                                  Dst_Y_Offset => Self.F_Quirk_Dst_Y,
                                   X_Min_Incl => 0,
                                   X_Max_Excl => Self.F_Width,
                                   Y_Min_Incl => 0,
@@ -4269,6 +4279,10 @@ package body Wuffs.Std.Vp8 is
          end if;
       elsif A_Key = QUIRK_WIDTH_AND_HEIGHT then
          return Self.F_Quirk_Width_And_Height;
+      elsif A_Key = QUIRK_DST_X_AND_Y then
+         return
+           Wuffs.U64 (Self.F_Quirk_Dst_X)
+             or Interfaces.Shift_Left (Wuffs.U64 (Self.F_Quirk_Dst_Y), 32);
       end if;
       return 0;
    end Get_Quirk;
@@ -4314,6 +4328,15 @@ package body Wuffs.Std.Vp8 is
          Self.F_Width := V_W;
          Self.F_Height := V_H;
          Calculate_Mbw_Mbh (Self);
+         return Wuffs.Ok_Status;
+      elsif A_Key = QUIRK_DST_X_AND_Y then
+         V_W := Wuffs.U32 (A_Value and 16#FFFF_FFFF#);
+         V_H := Wuffs.U32 (Interfaces.Shift_Right (A_Value, 32));
+         if 16#3FFF# < V_W or else 16#3FFF# < V_H then
+            return Error_Bad_QUIRK_DST_X_AND_Y;
+         end if;
+         Self.F_Quirk_Dst_X := V_W;
+         Self.F_Quirk_Dst_Y := V_H;
          return Wuffs.Ok_Status;
       end if;
       return Wuffs.Base.Error_Unsupported_Option;
@@ -5063,10 +5086,10 @@ package body Wuffs.Std.Vp8 is
          return Wuffs.Base.Ranges.Empty_Rect_IE_U32;
       end if;
       return
-        Wuffs.Base.Ranges.Make_Rect_IE_U32 (Min_Incl_X => 0,
-                                            Min_Incl_Y => 0,
-                                            Max_Excl_X => Self.F_Width,
-                                            Max_Excl_Y => Self.F_Height);
+        Wuffs.Base.Ranges.Make_Rect_IE_U32 (Min_Incl_X => Self.F_Quirk_Dst_X,
+                                            Min_Incl_Y => Self.F_Quirk_Dst_Y,
+                                            Max_Excl_X => Self.F_Quirk_Dst_X + Self.F_Width,
+                                            Max_Excl_Y => Self.F_Quirk_Dst_Y + Self.F_Height);
    end Frame_Dirty_Rect;
 
    overriding function Num_Animation_Loops (Self : Decoder) return Wuffs.U32 is
@@ -5086,7 +5109,7 @@ package body Wuffs.Std.Vp8 is
       then
          return 0;
       end if;
-      if Self.F_Call_Sequence > 16#20# then
+      if Self.F_Call_Sequence > 16#28# then
          return 1;
       end if;
       return 0;

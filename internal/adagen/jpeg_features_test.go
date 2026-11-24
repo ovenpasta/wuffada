@@ -181,6 +181,7 @@ func TestSwizzleYCCK(tt *testing.T) {
 			st = this.swizzler.swizzle_ycck!(
 				dst: args.dst,
 				dst_palette: args.dst.palette_or_else(fallback: this.pal[..]),
+				dst_x_offset: 2, dst_y_offset: 5,
 				x_min_incl: 0, x_max_excl: 8, y_min_incl: 0, y_max_excl: 8,
 				src0: s0, src1: s0, src2: s0, src3: this.scratch[.. 0],
 				width0: 8, width1: 8, width2: 8, width3: 0,
@@ -197,6 +198,8 @@ func TestSwizzleYCCK(tt *testing.T) {
 		"(PB => A_Dst,",
 		"Pixels => A_Dst_Pixels,",
 		"Palette => A_Dst_Palette,",
+		"Dst_X_Offset => 2,",
+		"Dst_Y_Offset => 5,",
 		"Src0 => V_S0.Base (V_S0.First .. Wuffs.Runtime.Last (V_S0)),",
 		"Width0 => 8,",
 		"V3 => 0,",

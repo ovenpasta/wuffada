@@ -130,6 +130,8 @@ procedure YCCK_Fuzz is
          Pixels            => Dst (Dst'First .. Dst'First + DLen - 1),
          Palette           => Palette,
          Dst_Palette       => Palette,
+         Dst_X_Offset      => 0,
+         Dst_Y_Offset      => 0,
          X_Min_Incl        => U32 (V (5)),
          X_Max_Excl        => U32 (V (6)),
          Y_Min_Incl        => U32 (V (7)),

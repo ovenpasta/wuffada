@@ -50,7 +50,7 @@ package Image_Support is
 
    --  The comparisons of test_image.adb with a tolerance, by category: how
    --  many, and the largest per-channel and mean differences seen.
-   Max_Categories : constant := 16;
+   Max_Categories : constant := 48;
    type Category_Stats is record
       Name      : String (1 .. 40) := [others => ' '];
       Name_Last : Natural := 0;
@@ -62,6 +62,15 @@ package Image_Support is
    end record;
    type Category_Table is array (1 .. Max_Categories) of Category_Stats;
    Categories : Category_Table;
+
+   --  For an animation run of test_image.adb (flag A): the canvas after
+   --  the current frame and after the previous frame's disposal, as BGRA
+   --  (not premultiplied), composited the way libwebp's WebPAnimDecoder
+   --  does it.
+   Cap_Canvas  : constant := 4 * 1024 * 1024;
+   Canvas_Last : constant := Cap_Canvas - 1;
+   Canvas      : Wuffs.Bytes (0 .. Canvas_Last);
+   Prev_Canvas : Wuffs.Bytes (0 .. Canvas_Last);
 
    --  For test_hostile.adb.
    Arena : Wuffs.Bytes (100 .. 8291);

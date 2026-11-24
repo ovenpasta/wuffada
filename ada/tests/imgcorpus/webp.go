@@ -21,9 +21,16 @@ package main
 //     comparison has a small tolerance (category webp-lossy-go).
 //   - libwebp (the reference implementation, through the program
 //     ada/tests/crosscheck/webpref.c that test.sh builds): exact for
-//     lossless, a small tolerance for lossy (category webp-lossy-libwebp:
-//     std/vp8 claims libwebp's upsampling, and on most files the two agree
-//     exactly; on a few, a handful of pixels round differently).
+//     lossless, and exact for lossy too (category webp-lossy-libwebp):
+//     std/vp8 follows libwebp's arithmetic, its loop filters and its
+//     "fancy" upsampling. (Before the fork fixed std/vp8's clip_m16_p15,
+//     which let a loop filter adjustment of 16 through where libwebp
+//     clamps to 15, pixels next to filtered sub-block edges differed by 1
+//     or more on a few files; it was not the upsampling.) For an
+//     animation, libwebp's WebPAnimDecoder: the canvas after each frame,
+//     which test_image.adb (flag A) composites from Wuffs' frames and frame
+//     configs as a caller would (categories webp-anim-lossless-libwebp and
+//     webp-anim-lossy-libwebp, both exact).
 
 import (
 	"bufio"
@@ -44,14 +51,14 @@ import (
 )
 
 // The tolerances (largest per-channel difference) and mean limits (in
-// hundredths) of the lossy comparisons, a little above what was measured
-// (Go's conversion here: 3 and 0.30; libwebp: 3 and 0.01, on a few files
-// with segments or an automatic filter). Lossless ones are exact.
+// hundredths) of the lossy comparisons with Go's decoder, a little above
+// what was measured (Go's conversion here: 3 and 0.30). The comparisons with
+// libwebp, lossy or lossless, are exact.
 const (
 	webpLossyGoTol       = 4
 	webpLossyGoMean      = 40
-	webpLossyLibwebpTol  = 3
-	webpLossyLibwebpMean = 5
+	webpLossyLibwebpTol  = 0
+	webpLossyLibwebpMean = 0
 
 	quirkSourceLength = 3
 	quirkVP8Alpha     = 0x6D7BF800
@@ -65,16 +72,19 @@ type webpRef struct {
 	cat      string
 	tol      int
 	mean     int
+	anim     bool // An animation: test_image.adb's flag A.
 }
 
 var (
-	webpRefs     []webpRef
-	libwebpPaths map[string]string // File path to libwebp reference file.
+	webpRefs         []webpRef
+	libwebpPaths     map[string]string // File path to libwebp reference file.
+	libwebpAnimPaths map[string]string // The same, for animations.
 )
 
 // loadLibwebpRefs reads the listing that webpref printed into dir/list.out.
 func loadLibwebpRefs(dir string) {
 	libwebpPaths = map[string]string{}
+	libwebpAnimPaths = map[string]string{}
 	if dir == "" {
 		return
 	}
@@ -88,6 +98,8 @@ func loadLibwebpRefs(dir string) {
 		fields := strings.Fields(s.Text())
 		if len(fields) == 3 && fields[2] == "ok" {
 			libwebpPaths[fields[1]] = filepath.Join(dir, fields[0]+".libwebp")
+		} else if len(fields) == 3 && fields[2] == "anim" {
+			libwebpAnimPaths[fields[1]] = filepath.Join(dir, fields[0]+".libwebpanim")
 		}
 	}
 }
@@ -140,169 +152,97 @@ func webpChunks(data []byte) (fourccs []string, offsets []int, payloads [][]byte
 	return
 }
 
-// Which files are compared with the reference decoders. The others are
-// compared with upstream's C only: there, std/webp legitimately rejects
-// what libwebp or Go accept (it is stricter about chunk order and VP8X
-// flags), or upstream's behaviour differs from libwebp's (see
-// webpReferencePolicy).
-var webpContainerRefs = map[string]bool{
-	"container-vp8-simple-odd-pad": true, "container-vp8l-simple-odd-pad": true,
-	"container-vp8x-vp8": true, "container-vp8x-vp8-meta": true, "container-vp8x-vp8-meta-before": true,
-	"container-vp8x-vp8-unknown": true, "container-vp8-trailing": true, "container-vp8l-trailing": true,
-	"container-alph-after-iccp": true, "container-alph-flag-noalph": true, "container-alph-long": true,
-	"container-alph-preprocessing": true,
+// webpCOnly lists the files that are compared with upstream's C only (not
+// with Go's or libwebp's pixels), and why: legitimate differences between
+// decoders, mostly in how they treat invalid files that they all accept.
+// (A file that a reference decoder rejects, or that Wuffs rejects, needs no
+// entry: there is nothing to compare.)
+var webpCOnly = map[string]string{
+	// The VP8 chunk is three bytes shorter than its partitions say: the
+	// decoders fill the missing bytes differently.
+	"container-vp8-chunk-short": "truncated partition",
+	// The VP8L frame's alpha_is_used bit is 0, yet its pixels are not all
+	// opaque. libwebp's WebPAnimDecoder believes the bit (the frame is a
+	// "key frame", drawn without blending); std/webp follows the VP8L
+	// spec ("a hint only") and its frame_config does not carry the bit.
+	"container-anim-2frames": "alpha_is_used hint",
+
+	// std/webp is stricter than libwebp or Go (or both) about these: it
+	// requires the VP8X flags of the ICCP, EXIF, XMP and ALPH chunks and no
+	// reserved flags, the chunk order of the container specification, a
+	// canvas size that the image (or an ANMF chunk's header) matches, an
+	// ANIM chunk of at least 6 bytes, an image in every ANMF chunk and no
+	// ANMF inside one; and it rejects (as libwebp does) a VP8 frame of zero
+	// width, a VP8X canvas over 16383 pixels wide or high, a RIFF size that
+	// exceeds the file and an odd one. Go decodes them; libwebp some.
+	"container-vp8x-vp8-noexifflag":      "VP8X flags",
+	"container-vp8x-vp8-noiccflag":       "VP8X flags",
+	"container-vp8x-vp8-noxmpflag":       "VP8X flags",
+	"container-vp8x-vp8l-noexifflag":     "VP8X flags",
+	"container-vp8x-vp8l-noiccflag":      "VP8X flags",
+	"container-vp8x-vp8l-noxmpflag":      "VP8X flags",
+	"container-vp8x-flags-reserved":      "VP8X flags",
+	"container-vp8x-vp8-iccp-late":       "chunk order",
+	"container-vp8x-vp8l-iccp-late":      "chunk order",
+	"container-alph-before-iccp":         "chunk order",
+	"container-vp8x-vp8-bigger-canvas":   "canvas size",
+	"container-vp8x-vp8-smaller-canvas":  "canvas size",
+	"container-vp8x-vp8l-bigger-canvas":  "canvas size",
+	"container-vp8x-vp8l-smaller-canvas": "canvas size",
+	"container-vp8x-huge":                "canvas size",
+	"container-vp8-zerowidth":            "zero width",
+	"container-vp8l-riff-long":           "RIFF size",
+	"container-vp8-riff-odd":             "RIFF size",
+	"anim-bad-too-wide":                  "ANMF size",
+	"anim-bad-size-mismatch":             "ANMF size",
+	"anim-bad-size-mismatch-lossy":       "ANMF size",
+	"anim-bad-anim-short":                "ANIM size",
+	"anim-bad-nested-anmf":               "ANMF contents",
+	"anim-bad-alph-noflag":               "VP8X flags",
 }
 
-// vp8FrameHeader decodes the start of a VP8 key frame's first partition
-// (RFC 6386, sections 7 and 9.2 to 9.6) far enough to return the loop
-// filter's level and sharpness.
-func vp8FrameHeader(d []byte) (level int, sharpness int, ok bool) {
-	if len(d) < 12 || d[0]&1 != 0 {
-		return 0, 0, false
-	}
-	p := d[10:]
-	value, rng, count, pos := uint32(p[0])<<8|uint32(p[1]), uint32(255), 0, 2
-	bit := func(prob uint32) int {
-		split := 1 + ((rng-1)*prob)>>8
-		ret := 0
-		if value >= split<<8 {
-			ret, rng, value = 1, rng-split, value-split<<8
-		} else {
-			rng = split
-		}
-		for rng < 128 {
-			value, rng = value<<1, rng<<1
-			if count++; count == 8 {
-				count = 0
-				if pos < len(p) {
-					value |= uint32(p[pos])
-				}
-				pos++
-			}
-		}
-		return ret
-	}
-	lit := func(n int) int {
-		v := 0
-		for i := 0; i < n; i++ {
-			v = v<<1 | bit(128)
-		}
-		return v
-	}
-	lit(2) // Colour space, clamping type.
-	if lit(1) == 1 {
-		// Segmentation.
-		updateMap, updateData := lit(1), lit(1)
-		if updateData == 1 {
-			lit(1)
-			for i := 0; i < 4; i++ {
-				if lit(1) == 1 {
-					lit(8)
-				}
-			}
-			for i := 0; i < 4; i++ {
-				if lit(1) == 1 {
-					lit(7)
-				}
-			}
-		}
-		if updateMap == 1 {
-			for i := 0; i < 3; i++ {
-				if lit(1) == 1 {
-					lit(8)
-				}
-			}
-		}
-	}
-	lit(1) // Filter type.
-	level = lit(6)
-	sharpness = lit(3)
-	return level, sharpness, pos <= len(p)
-}
-
-// webpReferencePolicy says whether the file at path, whose chunks are
-// given, is compared with Go's and with libwebp's pixels.
-func webpReferencePolicy(path string, data []byte, fourccs []string, payloads [][]byte) (goRef, libwebpRef bool) {
+// webpReferencePolicy says whether the file at path is compared with Go's
+// and with libwebp's pixels.
+func webpReferencePolicy(path string, data []byte) (goRef, libwebpRef bool) {
 	name := strings.TrimSuffix(filepath.Base(path), ".webp")
-	vp8x, vp8l, alph := false, false, false
-	var vp8 []byte
-	for j, fc := range fourccs {
-		vp8x = vp8x || fc == "VP8X"
-		vp8l = vp8l || fc == "VP8L"
-		alph = alph || fc == "ALPH"
-		if fc == "VP8 " && vp8 == nil {
-			vp8 = payloads[j]
-		}
-	}
-	if vp8 != nil {
-		if _, sharpness, ok := vp8FrameHeader(vp8); !ok || sharpness != 0 {
-			// Upstream's std/vp8 clamps the loop filter's interior limit
-			// with "ilevel.max(no_less_than: 9 - sharpness)" where RFC 6386
-			// (and libwebp, and Go) take the minimum: with a sharpness above
-			// zero its pixels differ (in our corpus by up to 15).
-			return false, false
-		}
-	}
-	if vp8x && alph && vp8 != nil && len(data) >= 30 {
-		// Upstream's workbuf_len (after decode_image_config) does not count
-		// the alpha plane of VP8X+ALPH+VP8 (std/vp8 learns of it only in
-		// decode_frame), so a decode_frame with that much work buffer can
-		// fail with "#bad workbuf length": the arithmetic of decode_webp.wuffs
-		// and decode_vp8.wuffs.
-		w := int(binary.LittleEndian.Uint32(append(data[24:27:27], 0))) + 1
-		h := int(binary.LittleEndian.Uint32(append(data[27:30:30], 0))) + 1
-		riffLen := int(binary.LittleEndian.Uint32(data[4:]))
-		mbw, mbh := (w+15)/16, (h+15)/16
-		yuv := mbw*16*mbh*16 + 2*(mbw*8*mbh*8)
-		ts := 4 * ((w + 3) >> 2) * ((h + 3) >> 2)
-		reported := 4*w*h + 3*ts
-		if r := yuv + riffLen - 10 + 8; r > reported {
-			reported = r
-		}
-		if w*h+yuv+len(vp8)-10+8 > reported {
-			return false, false
-		}
-	}
 	switch {
-	case vp8x && vp8l:
-		// Upstream's std/webp cannot decode VP8X+VP8L at this commit: it
-		// rejects one with the VP8X alpha flag ("#bad ALPH+VP8L
-		// combination"), which libwebp sets for every lossless image with
-		// alpha, and on one without it does not skip the VP8L chunk's
-		// five-byte header ("#bad Huffman code").
+	case webpCOnly[name] != "":
 		return false, false
-	case name == "vp8l-narrow-clamped":
-		// Plane codes whose distance is below 1 (an image 5 pixels wide):
-		// RFC 9649, libwebp and Go take the distance as 1; upstream's
-		// std/webp (decode_pixels_slow.wuffs) does not clamp, its distance
-		// wraps around, and it reports "#bad back-reference".
-		return false, false
+	case webpAnimated(data):
+		// An animation: Go's x/image/webp does not decode animations (and
+		// may decode an image chunk outside of the ANMF chunks instead).
+		return false, true
 	case name == "vp8l-simple-reversed":
 		// A simple two-symbol Huffman code whose first symbol is the larger
 		// one: Wuffs (and Go) give the first symbol the code 0, libwebp
 		// gives it to the smaller one.
 		return true, false
-	case strings.HasPrefix(name, "container-"):
-		return webpContainerRefs[name], webpContainerRefs[name]
 	}
 	return true, true
+}
+
+// webpAnimated says whether data is a WebP file with the VP8X animation
+// flag.
+func webpAnimated(data []byte) bool {
+	return len(data) >= 21 && string(data[12:16]) == "VP8X" && data[20]&0x02 != 0
+}
+
+// emitWebPAnim emits more runs of an animation: restarts at a later frame
+// (script op L) and at a bogus position (B), frames skipped (C without F),
+// mixed with the other call sequences, in pieces of every size.
+func emitWebPAnim(f *file, i int) {
+	for j, script := range []string{"I*L*", "ICCL*", "ICFCLF*", "I*B*", "ICFB*", "IBC*", "ICCCC*", "IF*L*R*"} {
+		sched := []string{"W", "C1", "C7", "K61", "C97", "K1"}[(i+j)%6]
+		emit(f, pixfmts[(i+j)%len(pixfmts)], j%2, sched, "-", script, false)
+	}
+	emit(f, bgraNonpremul, 1, "C3", "p", "I*L*", false)
+	emit(f, 0x80000565, 0, "K7", "w", "I*", false)
 }
 
 // addWebP adds a WebP file to the corpus, with its references.
 func addWebP(f *file) {
 	files = append(files, f)
-	fourccs, _, payloads := webpChunks(f.data)
-	for j, fc := range fourccs {
-		if fc == "ALPH" && len(payloads[j]) > 0 && payloads[j][0]&3 == 0 {
-			// Upstream's std/webp copies an uncompressed ALPH chunk with a
-			// copy that does not suspend: from a source buffer that holds
-			// only a part of it, it takes that part, and the decoding goes
-			// on out of step. Only a run with the whole file in the
-			// buffer can be compared with the references.
-			f.rawAlpha = true
-		}
-	}
-	goRef, libwebpRef := webpReferencePolicy(f.path, f.data, fourccs, payloads)
+	goRef, libwebpRef := webpReferencePolicy(f.path, f.data)
 	ref, kind := webpGoReference(f.data)
 	if !goRef {
 		ref = nil
@@ -320,6 +260,14 @@ func addWebP(f *file) {
 		r := webpRef{f: f, expected: p, cat: "webp-lossless-libwebp"}
 		if kind == "lossy" {
 			r.cat, r.tol, r.mean = "webp-lossy-libwebp", webpLossyLibwebpTol, webpLossyLibwebpMean
+		}
+		webpRefs = append(webpRefs, r)
+	}
+	if p := libwebpAnimPaths[f.path]; p != "" && libwebpRef {
+		// Any VP8 chunk (in any ANMF chunk) makes it lossy.
+		r := webpRef{f: f, expected: p, cat: "webp-anim-lossless-libwebp", anim: true}
+		if bytes.Contains(f.data, []byte("VP8 ")) {
+			r.cat, r.tol, r.mean = "webp-anim-lossy-libwebp", webpLossyLibwebpTol, webpLossyLibwebpMean
 		}
 		webpRefs = append(webpRefs, r)
 	}
@@ -586,11 +534,14 @@ func emitWebPDamage(webps []*file, vp8s []*file) int {
 func emitWebPRefs() {
 	for _, r := range webpRefs {
 		flags := fmt.Sprintf("t%d,a%d,k%s", r.tol, r.mean, r.cat)
-		if r.cat == "webp-lossless-libwebp" {
+		if r.tol == 0 {
 			flags = fmt.Sprintf("t0,a0,k%s", r.cat)
 		}
+		if r.anim {
+			flags += ",A"
+		}
 		fmt.Printf("%s %08X %d %s %s %s %s %s\n", r.f.format, bgraNonpremul, 0, "W", flags, "I*", r.expected, r.f.path)
-		if len(r.f.data) <= 3000 && !r.f.rawAlpha {
+		if len(r.f.data) <= 3000 {
 			fmt.Printf("%s %08X %d %s %s %s %s %s\n", r.f.format, bgraNonpremul, 0, "C1", flags, "I*", r.expected,
 				r.f.path)
 		}

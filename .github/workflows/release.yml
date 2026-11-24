@@ -9,7 +9,7 @@ on:
     tags: [ "v*" ]
 
 env:
-  WUFFS_COMMIT: a87f0bb85b9406d29f48a1c03b6f42c4585145f6
+  WUFFS_COMMIT: 4b527a3d5affb776b0f95b5b8ff196830aaf5bc7
 
 permissions:
   contents: write
@@ -25,7 +25,7 @@ jobs:
       - uses: alire-project/setup-alire@v6
       - name: Wuffs at the pinned commit
         run: |
-          git clone https://github.com/google/wuffs
+          git clone https://github.com/ovenpasta/wuffs
           git -C wuffs checkout "$WUFFS_COMMIT"
       - name: Generated sources are up to date
         run: |

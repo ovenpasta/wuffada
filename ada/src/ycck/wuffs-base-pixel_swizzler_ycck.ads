@@ -9,8 +9,9 @@
 --
 --  Wuffs method                      Ada
 --  --------------------------------  -----------------------------------
---  swizzler.swizzle_ycck!(dst, dst_palette, x_min_incl, ..., src0 .. src3,
---      width0 .. v3, ycc_model, ycc_upsampling, scratch_buffer_2k)
+--  swizzler.swizzle_ycck!(dst, dst_palette, dst_x_offset, dst_y_offset,
+--      x_min_incl, ..., src0 .. src3, width0 .. v3, ycc_model,
+--      ycc_upsampling, scratch_buffer_2k)
 --                                    Swizzle_YCCK
 --
 --  The 20 per-plane numbers of the Wuffs call (widthK, heightK, strideK,
@@ -101,8 +102,14 @@ package Wuffs.Base.Pixel_Swizzler_YCCK with Pure, SPARK_Mode is
    type Source_Planes is array (0 .. 3) of Source_Plane;
 
    --  Converts the rectangle X_Min_Incl .. X_Max_Excl - 1 by Y_Min_Incl ..
-   --  Y_Max_Excl - 1 (clipped to the pixel buffer) from the source planes,
-   --  whose top left sample corresponds to pixel (X_Min_Incl, Y_Min_Incl).
+   --  Y_Max_Excl - 1 from the source planes, whose top left sample
+   --  corresponds to the rectangle's top left corner, and writes pixel (X,
+   --  Y) of it at (Dst_X_Offset + X, Dst_Y_Offset + Y) of the pixel buffer,
+   --  clipped to the pixel buffer.  The offset is applied after upsampling:
+   --  unlike a non-zero X_Min_Incl or Y_Min_Incl it is allowed with fancy
+   --  upsampling.  (C: as in the fork's base library; the C function
+   --  swizzles into a view of the pixel buffer whose top left pixel is at
+   --  the offset, and so does this one.)
    --
    --  Result is Ok_Status; or Error_Bad_Argument for arguments that are
    --  out of range or inconsistent (see the C function for the list);
@@ -114,6 +121,8 @@ package Wuffs.Base.Pixel_Swizzler_YCCK with Pure, SPARK_Mode is
       Pixels            : in out Bytes;
       Palette           : Bytes;
       Dst_Palette       : Bytes;
+      Dst_X_Offset      : U32;
+      Dst_Y_Offset      : U32;
       X_Min_Incl        : U32;
       X_Max_Excl        : U32;
       Y_Min_Incl        : U32;

@@ -55,6 +55,10 @@ package body Wuffs.Std.Webp is
    begin
       if S = Error_Bad_ALPH_VP8L_Combination then
          return 31;
+      elsif S = Error_Bad_ANIM_Chunk then
+         return 20;
+      elsif S = Error_Bad_ANMF_Chunk then
+         return 20;
       elsif S = Error_Bad_Huffman_Code_Over_Subscribed then
          return 40;
       elsif S = Error_Bad_Huffman_Code_Under_Subscribed then
@@ -73,6 +77,8 @@ package body Wuffs.Std.Webp is
          return 16;
       elsif S = Error_Bad_Transform then
          return 19;
+      elsif S = Error_Inconsistent_Width_And_Height then
+         return 35;
       elsif S = Error_Short_Chunk then
          return 17;
       elsif S = Error_Truncated_Input then
@@ -96,6 +102,14 @@ package body Wuffs.Std.Webp is
    begin
       if S = Error_Bad_ALPH_VP8L_Combination then
          Wuffs.Runtime.Copy_Message (Text => "webp: bad ALPH+VP8L combination",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_ANIM_Chunk then
+         Wuffs.Runtime.Copy_Message (Text => "webp: bad ANIM chunk",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Bad_ANMF_Chunk then
+         Wuffs.Runtime.Copy_Message (Text => "webp: bad ANMF chunk",
                                      Buffer => Buffer,
                                      Length => Length);
       elsif S = Error_Bad_Huffman_Code_Over_Subscribed then
@@ -132,6 +146,10 @@ package body Wuffs.Std.Webp is
                                      Length => Length);
       elsif S = Error_Bad_Transform then
          Wuffs.Runtime.Copy_Message (Text => "webp: bad transform",
+                                     Buffer => Buffer,
+                                     Length => Length);
+      elsif S = Error_Inconsistent_Width_And_Height then
+         Wuffs.Runtime.Copy_Message (Text => "webp: inconsistent width and height",
                                      Buffer => Buffer,
                                      Length => Length);
       elsif S = Error_Short_Chunk then
@@ -172,6 +190,8 @@ package body Wuffs.Std.Webp is
       Self.G_Active_Coroutine := 0;
       Self.F_Width := 0;
       Self.F_Height := 0;
+      Self.F_Frame_Width := 0;
+      Self.F_Frame_Height := 0;
       Self.F_Call_Sequence := 0;
       for G_I0 in Self.F_Code_Length_Code_Lengths'Range loop
          Self.F_Code_Length_Code_Lengths (G_I0) := 0;
@@ -181,10 +201,22 @@ package body Wuffs.Std.Webp is
       Self.F_Vp8x_Header_Flags := 0;
       Self.F_Vp8x_Alph_Flags := 0;
       Self.F_Frame_Config_Io_Position := 0;
+      Self.F_Frame_Rect_X0 := 0;
+      Self.F_Frame_Rect_Y0 := 0;
+      Self.F_Frame_Duration := 0;
+      Self.F_Frame_Disposal := 0;
+      Self.F_Frame_Overwrite_Instead_Of_Blend := False;
+      Self.F_Num_Animation_Loops_Value := 0;
+      Self.F_Num_Decoded_Frame_Configs_Value := 0;
+      Self.F_Num_Decoded_Frames_Value := 0;
+      Self.F_Riff_End_Io_Position := 0;
+      Self.F_Frame_End_Io_Position := 0;
+      Self.F_Vp8x_Workbuf_Len := 0;
       Self.F_Riff_Chunk_Length := 0;
       Self.F_Rcl_Remaining := 0;
       Self.F_Sub_Chunk_Length := 0;
       Self.F_Sub_Chunk_Type := 0;
+      Self.F_Frame_Sub_Chunk_Length := 0;
       Self.F_Bits := 0;
       Self.F_N_Bits := 0;
       for G_I0 in Self.F_Seen_Transform'Range loop
@@ -233,6 +265,8 @@ package body Wuffs.Std.Webp is
       end loop;
       Self.G_P_1_Decode_Alph := 0;
       Self.G_P_2_Decode_Alph_Limited := 0;
+      Self.G_S_2_Decode_Alph_Limited_I := 0;
+      Self.G_S_2_Decode_Alph_Limited_J := 0;
       Self.G_P_7_Decode_Huffman_Groups := 0;
       Self.G_S_7_Decode_Huffman_Groups_Hg := 0;
       Self.G_S_7_Decode_Huffman_Groups_Ht := 0;
@@ -282,15 +316,22 @@ package body Wuffs.Std.Webp is
       Self.G_P_31_Do_Decode_Image_Config := 0;
       Self.G_Scratch_32_Do_Decode_Image_Config_Limited := 0;
       Self.G_P_32_Do_Decode_Image_Config_Limited := 0;
-      Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Vp8l := 0;
-      Self.G_P_33_Do_Decode_Image_Config_Limited_Vp8l := 0;
-      Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x := 0;
-      Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8x := 0;
-      Self.G_P_35_Decode_Frame_Config := 0;
-      Self.G_P_36_Do_Decode_Frame_Config := 0;
-      Self.G_P_37_Decode_Frame := 0;
-      Self.G_Scratch_38_Do_Decode_Frame := 0;
-      Self.G_P_38_Do_Decode_Frame := 0;
+      Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Anim := 0;
+      Self.G_P_33_Do_Decode_Image_Config_Limited_Anim := 0;
+      Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8l := 0;
+      Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8l := 0;
+      Self.G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x := 0;
+      Self.G_P_35_Do_Decode_Image_Config_Limited_Vp8x := 0;
+      Self.G_P_36_Decode_Frame_Config := 0;
+      Self.G_P_37_Do_Decode_Frame_Config := 0;
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      Self.G_P_38_Decode_Anmf_Header := 0;
+      Self.G_S_38_Decode_Anmf_Header_X0 := 0;
+      Self.G_S_38_Decode_Anmf_Header_Y0 := 0;
+      Self.G_S_38_Decode_Anmf_Header_W := 0;
+      Self.G_P_39_Decode_Frame := 0;
+      Self.G_Scratch_40_Do_Decode_Frame := 0;
+      Self.G_P_40_Do_Decode_Frame := 0;
       Self.Magic := Wuffs.Runtime.Magic_Initialized;
    end Initialize;
 
@@ -385,12 +426,14 @@ package body Wuffs.Std.Webp is
    is
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_R_Src : Wuffs.Base.IO.Reader;
+      V_I : Wuffs.U64 := 0;
+      V_J : Wuffs.U64 := 0;
+      V_N_Copied : Wuffs.U32 := 0;
       V_N : Wuffs.U64 := 0;
       G_T1 : Wuffs.U8;
       G_Susp : Wuffs.U32;
       G_T2 : Wuffs.Runtime.Slice_U8;
       G_T3 : Wuffs.U32;
-      pragma Warnings (Off, G_T3);
       G_Null_Pixels_4 : Wuffs.Bytes (1 .. 0);
       pragma Warnings (Off, G_Null_Pixels_4);
       G_Null_Palette_4 : Wuffs.Bytes (1 .. 0);
@@ -404,6 +447,10 @@ package body Wuffs.Std.Webp is
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
       G_Susp := Self.G_P_2_Decode_Alph_Limited;
+      if G_Susp /= 0 then
+         V_I := Self.G_S_2_Decode_Alph_Limited_I;
+         V_J := Self.G_S_2_Decode_Alph_Limited_J;
+      end if;
       case G_Susp is
          when 0 =>
             null;
@@ -411,6 +458,8 @@ package body Wuffs.Std.Webp is
             goto G_Resume_1;
          when 2 =>
             goto G_Resume_2;
+         when 3 =>
+            goto G_Resume_3;
          when others =>
             goto G_Suspend;
       end case;
@@ -425,23 +474,60 @@ package body Wuffs.Std.Webp is
       if (Self.F_Vp8x_Alph_Flags and 3) /= 0 then
          goto G_Else_2;
       end if;
+      V_I := 0;
+      V_J := Wuffs.U64 (Self.F_Frame_Width * Self.F_Frame_Height);
+      <<G_Head_3>>
+      if V_I >= V_J then
+         goto G_Done_4;
+      end if;
+      pragma Warnings ("C");
+      pragma Assert (V_J <= 16#1000_0000#);
+      pragma Warnings ("c");
+      if V_J > Wuffs.U64 (A_Workbuf'Length) then
+         G_Status := Wuffs.Base.Error_Bad_Workbuf_Length;
+         goto G_Exit;
+      end if;
+      pragma Warnings ("C");
+      pragma Assert (V_J > V_I);
+      pragma Warnings ("c");
       G_T2 :=
-        (Base => A_Workbuf'Unrestricted_Access,
-         First => A_Workbuf'First,
-         Length => A_Workbuf'Length);
+        Wuffs.Runtime.Subslice_IJ (S => (Base => A_Workbuf'Unrestricted_Access,
+                                         First => A_Workbuf'First,
+                                         Length => A_Workbuf'Length),
+                                   I => Wuffs.Index (V_I),
+                                   J => Wuffs.Index (V_J));
       Wuffs.Runtime.Reader_Limited_Copy_U32_To_Slice
         (Data => A_Src,
          R => G_R_Src,
-         Up_To => Self.F_Width * Self.F_Height,
+         Up_To => Wuffs.U32 (V_J - V_I and 16#FFFF_FFFF#),
          Dst => G_T2.Base (G_T2.First .. Wuffs.Runtime.Last (G_T2)),
          N => G_T3);
+      V_N_Copied := G_T3;
+      V_I := V_I + Wuffs.U64 (V_N_Copied);
+      if V_I >= V_J then
+         goto G_Else_6;
+      end if;
+      G_Status := Wuffs.Base.Suspension_Short_Read;
+      G_Susp := 2;
+      goto G_Suspend;
+      <<G_Resume_2>>
+      goto G_Fi_5;
+      <<G_Else_6>>
+      null;
+      <<G_Fi_5>>
+      goto G_Head_3;
+      <<G_Done_4>>
+      null;
+      pragma Warnings ("C");
+      pragma Assert (V_J <= 16#1000_0000#);
+      pragma Warnings ("c");
       goto G_Fi_1;
       <<G_Else_2>>
       if (Self.F_Vp8x_Alph_Flags and 3) /= 1 then
-         goto G_Else_3;
+         goto G_Else_7;
       end if;
-      G_Susp := 2;
-      <<G_Resume_2>>
+      G_Susp := 3;
+      <<G_Resume_3>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       G_Status :=
         Do_Decode_Frame_Vp8l (Self,
@@ -459,7 +545,7 @@ package body Wuffs.Std.Webp is
       if not Wuffs.Is_Ok (G_Status) then
          goto G_Suspend;
       end if;
-      V_N := Wuffs.U64 (Self.F_Width * Self.F_Height * 4);
+      V_N := Wuffs.U64 (Self.F_Frame_Width * Self.F_Frame_Height * 4);
       if V_N <= Wuffs.U64 (A_Workbuf'Length) then
          G_T6 :=
            Wuffs.Runtime.Subslice_J ((Base => A_Workbuf'Unrestricted_Access,
@@ -469,12 +555,12 @@ package body Wuffs.Std.Webp is
          Compact_Alph (Self, G_T6.Base (G_T6.First .. Wuffs.Runtime.Last (G_T6)));
       end if;
       goto G_Fi_1;
-      <<G_Else_3>>
+      <<G_Else_7>>
       G_Status := Error_Bad_VP8X_Chunk;
       goto G_Exit;
       <<G_Fi_1>>
       Self.F_Vp8x_Alph_Flags := Self.F_Vp8x_Alph_Flags or 2;
-      V_N := Wuffs.U64 (Self.F_Width * Self.F_Height);
+      V_N := Wuffs.U64 (Self.F_Frame_Width * Self.F_Frame_Height);
       if V_N <= Wuffs.U64 (A_Workbuf'Length) then
          if (Self.F_Vp8x_Alph_Flags and 16#0C#) = 16#04# then
             G_T7 :=
@@ -503,6 +589,8 @@ package body Wuffs.Std.Webp is
       goto G_Exit;
       <<G_Suspend>>
       Self.G_P_2_Decode_Alph_Limited := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_S_2_Decode_Alph_Limited_I := V_I;
+      Self.G_S_2_Decode_Alph_Limited_J := V_J;
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
@@ -541,13 +629,13 @@ package body Wuffs.Std.Webp is
    begin
       V_Y := 0;
       G_Loop_1 :
-      while V_Y < Self.F_Height loop
+      while V_Y < Self.F_Frame_Height loop
          pragma Warnings ("C");
          pragma Assert (V_Y < 16#4000#);
          pragma Warnings ("c");
          V_Pred := 0;
          if V_Y > 0 then
-            V_I := Wuffs.U64 ((V_Y - 1) * Self.F_Width);
+            V_I := Wuffs.U64 ((V_Y - 1) * Self.F_Frame_Width);
             if V_I >= Wuffs.U64 (A_S'Length) then
                exit G_Loop_1;
             end if;
@@ -555,12 +643,12 @@ package body Wuffs.Std.Webp is
          end if;
          V_X := 0;
          G_Loop_2 :
-         while V_X < Self.F_Width loop
+         while V_X < Self.F_Frame_Width loop
             pragma Warnings ("C");
             pragma Loop_Invariant (V_Y < 16#4000#);
             pragma Assert (V_X < 16#4000#);
             pragma Warnings ("c");
-            V_I := Wuffs.U64 (V_Y * Self.F_Width + V_X);
+            V_I := Wuffs.U64 (V_Y * Self.F_Frame_Width + V_X);
             if V_I >= Wuffs.U64 (A_S'Length) then
                exit G_Loop_2;
             end if;
@@ -583,7 +671,7 @@ package body Wuffs.Std.Webp is
    begin
       V_X := 0;
       G_Loop_1 :
-      while V_X < Self.F_Width loop
+      while V_X < Self.F_Frame_Width loop
          pragma Warnings ("C");
          pragma Assert (V_X < 16#4000#);
          pragma Warnings ("c");
@@ -597,12 +685,12 @@ package body Wuffs.Std.Webp is
          end if;
          V_Y := 0;
          G_Loop_2 :
-         while V_Y < Self.F_Height loop
+         while V_Y < Self.F_Frame_Height loop
             pragma Warnings ("C");
             pragma Loop_Invariant (V_X < 16#4000#);
             pragma Assert (V_Y < 16#4000#);
             pragma Warnings ("c");
-            V_I := Wuffs.U64 (V_Y * Self.F_Width + V_X);
+            V_I := Wuffs.U64 (V_Y * Self.F_Frame_Width + V_X);
             if V_I >= Wuffs.U64 (A_S'Length) then
                exit G_Loop_2;
             end if;
@@ -629,7 +717,7 @@ package body Wuffs.Std.Webp is
    begin
       V_X := 0;
       G_Loop_1 :
-      while V_X < Self.F_Width loop
+      while V_X < Self.F_Frame_Width loop
          pragma Warnings ("C");
          pragma Assert (V_X < 16#4000#);
          pragma Warnings ("c");
@@ -643,12 +731,12 @@ package body Wuffs.Std.Webp is
       end loop G_Loop_1;
       V_Y := 1;
       G_Loop_2 :
-      while V_Y < Self.F_Height loop
+      while V_Y < Self.F_Frame_Height loop
          pragma Warnings ("C");
          pragma Loop_Invariant (V_Y >= 1);
          pragma Assert (V_Y < 16#4000#);
          pragma Warnings ("c");
-         V_I := Wuffs.U64 ((V_Y - 1) * Self.F_Width + 0);
+         V_I := Wuffs.U64 ((V_Y - 1) * Self.F_Frame_Width + 0);
          if V_I >= Wuffs.U64 (A_S'Length) then
             exit G_Loop_2;
          end if;
@@ -657,18 +745,18 @@ package body Wuffs.Std.Webp is
          V_L := V_T;
          V_X := 0;
          G_Loop_3 :
-         while V_X < Self.F_Width loop
+         while V_X < Self.F_Frame_Width loop
             pragma Warnings ("C");
             pragma Loop_Invariant (V_Y >= 1);
             pragma Loop_Invariant (V_Y < 16#4000#);
             pragma Assert (V_X < 16#4000#);
             pragma Warnings ("c");
-            V_I := Wuffs.U64 ((V_Y - 1) * Self.F_Width + V_X);
+            V_I := Wuffs.U64 ((V_Y - 1) * Self.F_Frame_Width + V_X);
             if V_I >= Wuffs.U64 (A_S'Length) then
                exit G_Loop_3;
             end if;
             V_T := A_S (A_S'First + Wuffs.Index (V_I));
-            V_I := Wuffs.U64 (V_Y * Self.F_Width + V_X);
+            V_I := Wuffs.U64 (V_Y * Self.F_Frame_Width + V_X);
             if V_I >= Wuffs.U64 (A_S'Length) then
                exit G_Loop_3;
             end if;
@@ -2130,6 +2218,9 @@ package body Wuffs.Std.Webp is
          V_Dy := Interfaces.Shift_Right (V_Dm, 4);
          V_Dx := 7 - (V_Dm and 15);
          V_Back_Ref_Dist_Minus_1 := A_Width * V_Dy + V_Dx;
+         if V_Back_Ref_Dist_Minus_1 >= 16#8000_0000# then
+            V_Back_Ref_Dist_Minus_1 := 0;
+         end if;
       end if;
       pragma Warnings ("C");
       pragma Assert (V_P < 16#4000_0000#);
@@ -2287,7 +2378,7 @@ package body Wuffs.Std.Webp is
       V_Sum_L : Wuffs.U32 range 0 .. 1020 := 0;
       V_Sum_T : Wuffs.U32 range 0 .. 1020 := 0;
    begin
-      if A_Width = 0 or else Self.F_Height = 0 then
+      if A_Width = 0 or else Self.F_Frame_Height = 0 then
          return;
       end if;
       V_W4 := Wuffs.U64 (A_Width * 4);
@@ -2332,7 +2423,7 @@ package body Wuffs.Std.Webp is
                                 Natural (V_Tile_Size_Log2));
       V_Mask := Interfaces.Shift_Left (Wuffs.U32'(1), Natural (V_Tile_Size_Log2)) - 1;
       V_Y := 1;
-      while V_Y < Self.F_Height loop
+      while V_Y < Self.F_Frame_Height loop
          pragma Warnings ("C");
          pragma Assert (V_Y < 16#4000#);
          pragma Warnings ("c");
@@ -2885,7 +2976,7 @@ package body Wuffs.Std.Webp is
                                 Natural (V_Tile_Size_Log2));
       V_Mask := Interfaces.Shift_Left (Wuffs.U32'(1), Natural (V_Tile_Size_Log2)) - 1;
       V_Y := 0;
-      while V_Y < Self.F_Height loop
+      while V_Y < Self.F_Frame_Height loop
          pragma Warnings ("C");
          pragma Assert (V_Y < 16#4000#);
          pragma Warnings ("c");
@@ -3027,7 +3118,7 @@ package body Wuffs.Std.Webp is
       V_Src_Index := Wuffs.U64 (Self.F_Workbuf_Offset_For_Color_Indexing + 1);
       V_Y := 0;
       G_Loop_1 :
-      while V_Y < Self.F_Height loop
+      while V_Y < Self.F_Frame_Height loop
          pragma Warnings ("C");
          pragma Assert (V_Y < 16#4000#);
          pragma Warnings ("c");
@@ -3126,6 +3217,9 @@ package body Wuffs.Std.Webp is
          when others =>
             goto G_Suspend;
       end case;
+      Self.F_Bits := 0;
+      Self.F_N_Bits := 0;
+      Self.F_Workbuf_Offset_For_Color_Indexing := 0;
       Self.F_Seen_Transform (0) := False;
       Self.F_Seen_Transform (1) := False;
       Self.F_Seen_Transform (2) := False;
@@ -3169,7 +3263,7 @@ package body Wuffs.Std.Webp is
       end if;
       goto G_Head_1;
       <<G_Done_2>>
-      V_Width := Self.F_Width;
+      V_Width := Self.F_Frame_Width;
       if Self.F_Seen_Transform (3) then
          V_Width := Self.F_Color_Indexing_Width;
       end if;
@@ -3246,7 +3340,7 @@ package body Wuffs.Std.Webp is
                        A_Src => A_Src,
                        A_Src_Meta => A_Src_Meta,
                        A_Width => V_Width,
-                       A_Height => Self.F_Height,
+                       A_Height => Self.F_Frame_Height,
                        A_Tile_Data => V_Tile_Data.Base
                                         (V_Tile_Data.First
                                          .. Wuffs.Runtime.Last (V_Tile_Data)),
@@ -3276,7 +3370,7 @@ package body Wuffs.Std.Webp is
                                    Length => A_Workbuf'Length),
                                   Wuffs.Index (Wuffs.U64
                                                  (Self.F_Workbuf_Offset_For_Transform (0))));
-      V_Width := Self.F_Width;
+      V_Width := Self.F_Frame_Width;
       if Self.F_Seen_Transform (3)
            and then Wuffs.U64 (Self.F_Workbuf_Offset_For_Color_Indexing) <= Wuffs.U64 (V_Pix.Length)
       then
@@ -3337,7 +3431,7 @@ package body Wuffs.Std.Webp is
                                          Length => A_Workbuf'Length),
                                         Wuffs.Index
                                           (Wuffs.U64 (Self.F_Workbuf_Offset_For_Transform (0))));
-            V_Width := Self.F_Width;
+            V_Width := Self.F_Frame_Width;
             Apply_Transform_Color_Indexing (Self,
                                             A_Pix => V_Pix.Base
                                                        (V_Pix.First
@@ -3363,7 +3457,6 @@ package body Wuffs.Std.Webp is
          end if;
          goto G_Ok;
       end if;
-      Self.F_Call_Sequence := 16#60#;
       <<G_Ok>>
       Self.G_P_22_Do_Decode_Frame_Vp8l := 0;
       goto G_Exit;
@@ -3523,7 +3616,7 @@ package body Wuffs.Std.Webp is
       pragma Assert (V_Transform_Type < 2);
       pragma Assert (V_Tile_Size_Log2 >= 2);
       pragma Warnings ("c");
-      V_Width := Self.F_Width;
+      V_Width := Self.F_Frame_Width;
       if Self.F_Seen_Transform (3) then
          V_Width := Self.F_Color_Indexing_Width;
       end if;
@@ -3566,7 +3659,7 @@ package body Wuffs.Std.Webp is
                                             - 1),
                                      Natural (V_Tile_Size_Log2)),
                        A_Height => Interfaces.Shift_Right
-                                     (Self.F_Height
+                                     (Self.F_Frame_Height
                                         + (Interfaces.Shift_Left
                                              (Wuffs.U32'(1),
                                               Natural (V_Tile_Size_Log2))
@@ -3630,21 +3723,21 @@ package body Wuffs.Std.Webp is
       Self.F_Bits := Interfaces.Shift_Right (Self.F_Bits, 8);
       Self.F_N_Bits := Self.F_N_Bits - 8;
       if Self.F_Color_Indexing_Palette_Size <= 2 then
-         Self.F_Color_Indexing_Width := (Self.F_Width + 7) / 8;
+         Self.F_Color_Indexing_Width := (Self.F_Frame_Width + 7) / 8;
          Self.F_Transform_Tile_Size_Log2 (3) := 3;
       elsif Self.F_Color_Indexing_Palette_Size <= 4 then
-         Self.F_Color_Indexing_Width := (Self.F_Width + 3) / 4;
+         Self.F_Color_Indexing_Width := (Self.F_Frame_Width + 3) / 4;
          Self.F_Transform_Tile_Size_Log2 (3) := 2;
       elsif Self.F_Color_Indexing_Palette_Size <= 16 then
-         Self.F_Color_Indexing_Width := (Self.F_Width + 1) / 2;
+         Self.F_Color_Indexing_Width := (Self.F_Frame_Width + 1) / 2;
          Self.F_Transform_Tile_Size_Log2 (3) := 1;
       else
-         Self.F_Color_Indexing_Width := Self.F_Width;
+         Self.F_Color_Indexing_Width := Self.F_Frame_Width;
          Self.F_Transform_Tile_Size_Log2 (3) := 0;
       end if;
-      if Self.F_Width >= Self.F_Color_Indexing_Width then
+      if Self.F_Frame_Width >= Self.F_Color_Indexing_Width then
          Self.F_Workbuf_Offset_For_Color_Indexing :=
-           4 * (Self.F_Width - Self.F_Color_Indexing_Width) * Self.F_Height;
+           4 * (Self.F_Frame_Width - Self.F_Color_Indexing_Width) * Self.F_Frame_Height;
       end if;
       G_Susp := 7;
       <<G_Resume_7>>
@@ -4015,7 +4108,7 @@ package body Wuffs.Std.Webp is
                                             - 1),
                                      Natural (V_Tile_Size_Log2)),
                        A_Height => Interfaces.Shift_Right
-                                     (Self.F_Height
+                                     (Self.F_Frame_Height
                                         + (Interfaces.Shift_Left
                                              (Wuffs.U32'(1),
                                               Natural (V_Tile_Size_Log2))
@@ -4066,7 +4159,7 @@ package body Wuffs.Std.Webp is
                                                    Natural (V_Tile_Size_Log2))
                                                   - 1),
                                            Natural (V_Tile_Size_Log2))
-                     * Interfaces.Shift_Right (Self.F_Height
+                     * Interfaces.Shift_Right (Self.F_Frame_Height
                                                  + (Interfaces.Shift_Left
                                                       (Wuffs.U32'(1),
                                                        Natural (V_Tile_Size_Log2))
@@ -4173,7 +4266,8 @@ package body Wuffs.Std.Webp is
         Wuffs.Base.Pixel_Formats.Make_Pixel_Format (Repr => 0);
       V_Dst_Bits_Per_Pixel : G_U32_Range_0_256 := 0;
       V_Dst_Bytes_Per_Pixel : G_U32_Range_0_32 := 0;
-      V_Dst_Bytes_Per_Row : Wuffs.U64 range 0 .. 524288 := 0;
+      V_Dst_Bytes_Per_Row0 : Wuffs.U64 range 0 .. 524224 := 0;
+      V_Dst_Bytes_Per_Row1 : Wuffs.U64 range 0 .. 1048512 := 0;
       V_Dst_Palette : Wuffs.Runtime.Slice_U8;
       V_Tab : Wuffs.Base.Pixel_Buffers.Table;
       V_Src_Bytes_Per_Row : Wuffs.U64 range 0 .. 65536 := 0;
@@ -4233,7 +4327,9 @@ package body Wuffs.Std.Webp is
          return Wuffs.Base.Error_Unsupported_Option;
       end if;
       V_Dst_Bytes_Per_Pixel := V_Dst_Bits_Per_Pixel / 8;
-      V_Dst_Bytes_Per_Row := Wuffs.U64 (Self.F_Width * V_Dst_Bytes_Per_Pixel);
+      V_Dst_Bytes_Per_Row0 := Wuffs.U64 (Self.F_Frame_Rect_X0 * V_Dst_Bytes_Per_Pixel);
+      V_Dst_Bytes_Per_Row1 :=
+        Wuffs.U64 ((Self.F_Frame_Rect_X0 + Self.F_Frame_Width) * V_Dst_Bytes_Per_Pixel);
       pragma Warnings ("C");
       pragma Assert (not A_Dst_Null);
       pragma Warnings ("c");
@@ -4256,7 +4352,8 @@ package body Wuffs.Std.Webp is
       pragma Assert (not A_Dst_Null);
       pragma Warnings ("c");
       V_Tab := Wuffs.Base.Pixel_Buffers.Plane (PB => A_Dst, P => 0);
-      V_Src_Bytes_Per_Row := Wuffs.U64 (Self.F_Width * 4);
+      V_Src_Bytes_Per_Row := Wuffs.U64 (Self.F_Frame_Width * 4);
+      V_Y := Self.F_Frame_Rect_Y0;
       while V_Src_Bytes_Per_Row <= Wuffs.U64 (M_Src.Length) loop
          Wuffs.Base.Pixel_Buffers.Row_U32 (T => V_Tab,
                                            Y => V_Y,
@@ -4269,8 +4366,16 @@ package body Wuffs.Std.Webp is
                                             Length => A_Dst_Pixels'Length),
                                       I => G_T4,
                                       J => G_T4 + G_T5);
-         if V_Dst_Bytes_Per_Row < Wuffs.U64 (V_Dst.Length) then
-            V_Dst := Wuffs.Runtime.Subslice_J (V_Dst, Wuffs.Index (V_Dst_Bytes_Per_Row));
+         if V_Dst_Bytes_Per_Row1 < Wuffs.U64 (V_Dst.Length) then
+            V_Dst := Wuffs.Runtime.Subslice_J (V_Dst, Wuffs.Index (V_Dst_Bytes_Per_Row1));
+         end if;
+         if V_Dst_Bytes_Per_Row0 < Wuffs.U64 (V_Dst.Length) then
+            V_Dst := Wuffs.Runtime.Subslice_I (V_Dst, Wuffs.Index (V_Dst_Bytes_Per_Row0));
+         else
+            V_Dst :=
+              (Base => Wuffs.Runtime.Empty_Bytes_Variable'Unrestricted_Access,
+               First => Wuffs.Runtime.Empty_Bytes_Variable'First,
+               Length => Wuffs.Runtime.Empty_Bytes_Variable'Length);
          end if;
          G_T6 := Wuffs.Runtime.Subslice_J (M_Src, Wuffs.Index (V_Src_Bytes_Per_Row));
          Wuffs.Runtime.Swizzle_Interleaved_From_Slice
@@ -4490,6 +4595,9 @@ package body Wuffs.Std.Webp is
          goto G_Exit;
       end if;
       Self.F_Rcl_Remaining := Self.F_Riff_Chunk_Length;
+      Self.F_Riff_End_Io_Position :=
+        Wuffs.Base.Ints.Sat_Add_U64 (X => Wuffs.Base.IO.Position (G_R_Src),
+                                     Y => Wuffs.U64 (Self.F_Riff_Chunk_Length));
       <<G_Head_5>>
       Wuffs.Base.IO.Begin_Limit (M => A_Src_Meta,
                                  R => G_R_Src,
@@ -4539,6 +4647,8 @@ package body Wuffs.Std.Webp is
       goto G_Head_5;
       <<G_Done_6>>
       Self.F_Frame_Config_Io_Position := Wuffs.Base.IO.Position (G_R_Src);
+      Self.F_Frame_End_Io_Position := Self.F_Frame_Config_Io_Position;
+      Self.F_Frame_Sub_Chunk_Length := Self.F_Sub_Chunk_Length;
       if Self.F_Variant /= 16#01# and then not A_Dst_Null then
          Wuffs.Base.Pixel_Formats.Set (C => A_Dst,
                                        Pixfmt_Repr => 16#8100_8888#,
@@ -4599,6 +4709,8 @@ package body Wuffs.Std.Webp is
             goto G_Resume_3;
          when 4 =>
             goto G_Resume_4;
+         when 5 =>
+            goto G_Resume_5;
          when others =>
             goto G_Suspend;
       end case;
@@ -4769,6 +4881,22 @@ package body Wuffs.Std.Webp is
       <<G_Resume_4>>
       goto G_Head_7;
       <<G_Done_8>>
+      if (Self.F_Vp8x_Header_Flags and 16#02#) = 0 then
+         goto G_Else_10;
+      end if;
+      G_Susp := 5;
+      <<G_Resume_5>>
+      Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
+      G_Status :=
+        Do_Decode_Image_Config_Limited_Anim (Self, A_Src => A_Src, A_Src_Meta => A_Src_Meta);
+      Wuffs.Base.IO.Reload (G_R_Src, A_Src_Meta);
+      if not Wuffs.Is_Ok (G_Status) then
+         goto G_Suspend;
+      end if;
+      goto G_Fi_9;
+      <<G_Else_10>>
+      null;
+      <<G_Fi_9>>
       null;
       <<G_Ok>>
       Self.G_P_32_Do_Decode_Image_Config_Limited := 0;
@@ -4781,6 +4909,186 @@ package body Wuffs.Std.Webp is
       return G_Status;
    end Do_Decode_Image_Config_Limited;
 
+   function Do_Decode_Image_Config_Limited_Anim
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status
+   is
+      G_Status : Wuffs.Status := Wuffs.Ok_Status;
+      G_R_Src : Wuffs.Base.IO.Reader;
+      V_C64 : Wuffs.U64 := 0;
+      V_Chunk_Type : Wuffs.U32 := 0;
+      G_Susp : Wuffs.U32;
+      G_T1 : Boolean;
+      G_T2 : Wuffs.U16;
+      G_T3 : Boolean;
+      G_T4 : Wuffs.U64;
+      G_T5 : Boolean;
+   begin
+      G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
+      G_Susp := Self.G_P_33_Do_Decode_Image_Config_Limited_Anim;
+      case G_Susp is
+         when 0 =>
+            null;
+         when 1 =>
+            goto G_Resume_1;
+         when 2 =>
+            goto G_Resume_2;
+         when 3 =>
+            goto G_Resume_3;
+         when 4 =>
+            goto G_Resume_4;
+         when 5 =>
+            goto G_Resume_5;
+         when others =>
+            goto G_Suspend;
+      end case;
+      <<G_Head_1>>
+      if Wuffs.Base.Ints.Sat_Sub_U64 (X => Self.F_Riff_End_Io_Position,
+                                      Y => Wuffs.Base.IO.Position (G_R_Src))
+           >= 8
+      then
+         goto G_Else_4;
+      end if;
+      G_Status := Error_Short_Chunk;
+      goto G_Exit;
+      <<G_Else_4>>
+      if Wuffs.Base.IO.Length (G_R_Src) >= 8 then
+         goto G_Else_5;
+      end if;
+      G_Status := Wuffs.Base.Suspension_Short_Read;
+      G_Susp := 1;
+      goto G_Suspend;
+      <<G_Resume_1>>
+      goto G_Continue_1;
+      <<G_Else_5>>
+      V_C64 := Wuffs.Base.IO.Peek_U64LE (A_Src, G_R_Src);
+      V_Chunk_Type := Wuffs.U32 (V_C64 and 16#FFFF_FFFF#);
+      if V_Chunk_Type = 16#464D_4E41# then
+         goto G_Done_2;
+      end if;
+      Self.F_Sub_Chunk_Length := Wuffs.U32 (Interfaces.Shift_Right (V_C64, 32));
+      Self.F_Sub_Chunk_Has_Padding := (Self.F_Sub_Chunk_Length and 1) /= 0;
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 8);
+      if V_Chunk_Type /= 16#5043_4349# then
+         goto G_Else_7;
+      end if;
+      if Self.F_Variant > 16#04# then
+         G_Status := Error_Bad_Chunk_Order;
+         goto G_Exit;
+      elsif (Self.F_Vp8x_Header_Flags and 16#20#) = 0 then
+         G_Status := Error_Bad_VP8X_Chunk;
+         goto G_Exit;
+      end if;
+      Self.F_Variant := 16#08#;
+      goto G_Fi_6;
+      <<G_Else_7>>
+      if V_Chunk_Type /= 16#4D49_4E41# then
+         goto G_Else_8;
+      end if;
+      if Self.F_Variant > 16#08# then
+         G_Status := Error_Bad_Chunk_Order;
+         goto G_Exit;
+      elsif Self.F_Sub_Chunk_Length < 6 then
+         G_Status := Error_Bad_ANIM_Chunk;
+         goto G_Exit;
+      end if;
+      Self.F_Variant := 16#10#;
+      Self.F_Sub_Chunk_Length := Self.F_Sub_Chunk_Length - 6;
+      Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Anim := 4;
+      G_Susp := 2;
+      <<G_Resume_2>>
+      Wuffs.Base.IO.Skip (R => G_R_Src,
+                          Scratch => Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Anim,
+                          Done => G_T1);
+      if not G_T1 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      if Wuffs.Base.IO.Length (G_R_Src) < 2 then
+         goto G_Else_10;
+      end if;
+      G_T2 := Wuffs.Base.IO.Peek_U16LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 2);
+      goto G_Fi_9;
+      <<G_Else_10>>
+      Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Anim := 0;
+      G_Susp := 3;
+      <<G_Resume_3>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE
+           (Data => A_Src,
+            R => G_R_Src,
+            Scratch => Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Anim,
+            Last_Shift => 8,
+            Done => G_T3,
+            Value => G_T4);
+         exit when G_T3;
+      end loop;
+      G_T2 := Wuffs.U16 (G_T4);
+      <<G_Fi_9>>
+      Self.F_Num_Animation_Loops_Value := Wuffs.U32 (G_T2);
+      goto G_Fi_6;
+      <<G_Else_8>>
+      if not (V_Chunk_Type = 16#4850_4C41#
+                or else V_Chunk_Type = 16#2038_5056#
+                or else V_Chunk_Type = 16#4C38_5056#
+                or else V_Chunk_Type = 16#5838_5056#)
+      then
+         goto G_Else_11;
+      end if;
+      G_Status := Error_Bad_Chunk_Order;
+      goto G_Exit;
+      <<G_Else_11>>
+      null;
+      <<G_Fi_6>>
+      Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Anim := Wuffs.U64 (Self.F_Sub_Chunk_Length);
+      G_Susp := 4;
+      <<G_Resume_4>>
+      Wuffs.Base.IO.Skip (R => G_R_Src,
+                          Scratch => Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Anim,
+                          Done => G_T5);
+      if not G_T5 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      if not Self.F_Sub_Chunk_Has_Padding then
+         goto G_Else_13;
+      end if;
+      G_Susp := 5;
+      <<G_Resume_5>>
+      if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 1);
+      goto G_Fi_12;
+      <<G_Else_13>>
+      null;
+      <<G_Fi_12>>
+      null;
+      <<G_Continue_1>>
+      goto G_Head_1;
+      <<G_Done_2>>
+      if Self.F_Variant /= 16#10# then
+         G_Status := Error_Bad_Chunk_Order;
+         goto G_Exit;
+      end if;
+      Self.G_P_33_Do_Decode_Image_Config_Limited_Anim := 0;
+      goto G_Exit;
+      <<G_Suspend>>
+      Self.G_P_33_Do_Decode_Image_Config_Limited_Anim :=
+        (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      <<G_Exit>>
+      Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
+      return G_Status;
+   end Do_Decode_Image_Config_Limited_Anim;
+
    function Do_Decode_Image_Config_Limited_Vp8l
      (Self : in out Decoder;
       A_Src : Wuffs.Bytes;
@@ -4790,6 +5098,8 @@ package body Wuffs.Std.Webp is
       G_Status : Wuffs.Status := Wuffs.Ok_Status;
       G_R_Src : Wuffs.Base.IO.Reader;
       V_C32 : Wuffs.U32 := 0;
+      V_Width : G_U32_Range_0_16384 := 0;
+      V_Height : G_U32_Range_0_16384 := 0;
       V_Transform_Size : G_U32_Range_0_67108864 := 0;
       G_T1 : Wuffs.U8;
       G_Susp : Wuffs.U32;
@@ -4798,7 +5108,7 @@ package body Wuffs.Std.Webp is
       G_T4 : Wuffs.U64;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_33_Do_Decode_Image_Config_Limited_Vp8l;
+      G_Susp := Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8l;
       case G_Susp is
          when 0 =>
             null;
@@ -4828,7 +5138,7 @@ package body Wuffs.Std.Webp is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
       goto G_Fi_1;
       <<G_Else_2>>
-      Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Vp8l := 0;
+      Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8l := 0;
       G_Susp := 2;
       <<G_Resume_2>>
       loop
@@ -4839,7 +5149,7 @@ package body Wuffs.Std.Webp is
          Wuffs.Base.IO.Read_Step_LE
            (Data => A_Src,
             R => G_R_Src,
-            Scratch => Self.G_Scratch_33_Do_Decode_Image_Config_Limited_Vp8l,
+            Scratch => Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8l,
             Last_Shift => 24,
             Done => G_T3,
             Value => G_T4);
@@ -4848,15 +5158,27 @@ package body Wuffs.Std.Webp is
       G_T2 := Wuffs.U32 (G_T4);
       <<G_Fi_1>>
       V_C32 := G_T2;
-      Self.F_Width := (V_C32 and 16#3FFF#) + 1;
+      V_Width := (V_C32 and 16#3FFF#) + 1;
       V_C32 := Interfaces.Shift_Right (V_C32, 14);
-      Self.F_Height := (V_C32 and 16#3FFF#) + 1;
+      V_Height := (V_C32 and 16#3FFF#) + 1;
       V_C32 := Interfaces.Shift_Right (V_C32, 14);
       V_C32 := Interfaces.Shift_Right (V_C32, 1);
       if V_C32 /= 0 then
          G_Status := Error_Bad_Header;
          goto G_Exit;
       end if;
+      if Self.F_Vp8x_Header_Flags /= 0 then
+         if V_Width /= Self.F_Frame_Width or else V_Height /= Self.F_Frame_Height then
+            G_Status := Error_Inconsistent_Width_And_Height;
+            goto G_Exit;
+         end if;
+         G_Status := Wuffs.Ok_Status;
+         goto G_Ok;
+      end if;
+      Self.F_Width := V_Width;
+      Self.F_Height := V_Height;
+      Self.F_Frame_Width := V_Width;
+      Self.F_Frame_Height := V_Height;
       V_Transform_Size :=
         4
           * Interfaces.Shift_Right (Self.F_Width + 3, 2)
@@ -4869,10 +5191,11 @@ package body Wuffs.Std.Webp is
         4 * Self.F_Width * Self.F_Height + 2 * V_Transform_Size;
       Self.F_Workbuf_Offset_For_Transform (3) :=
         4 * Self.F_Width * Self.F_Height + 3 * V_Transform_Size;
-      Self.G_P_33_Do_Decode_Image_Config_Limited_Vp8l := 0;
+      <<G_Ok>>
+      Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8l := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_33_Do_Decode_Image_Config_Limited_Vp8l :=
+      Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8l :=
         (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -4890,6 +5213,8 @@ package body Wuffs.Std.Webp is
       V_C32 : Wuffs.U32 := 0;
       V_Transform_Size : G_U32_Range_0_67108864 := 0;
       V_Status : Wuffs.Status := Wuffs.Ok_Status;
+      V_R : Wuffs.Base.Ranges.Range_II_U64 := Wuffs.Base.Ranges.Empty_Range_II_U64;
+      V_N : Wuffs.U64 := 0;
       G_T1 : Wuffs.U32;
       G_T2 : Boolean;
       G_T3 : Wuffs.U64;
@@ -4902,7 +5227,7 @@ package body Wuffs.Std.Webp is
       G_T9 : Wuffs.U64;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8x;
+      G_Susp := Self.G_P_35_Do_Decode_Image_Config_Limited_Vp8x;
       case G_Susp is
          when 0 =>
             null;
@@ -4922,7 +5247,7 @@ package body Wuffs.Std.Webp is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
       goto G_Fi_1;
       <<G_Else_2>>
-      Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x := 0;
+      Self.G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x := 0;
       G_Susp := 1;
       <<G_Resume_1>>
       loop
@@ -4933,7 +5258,7 @@ package body Wuffs.Std.Webp is
          Wuffs.Base.IO.Read_Step_LE
            (Data => A_Src,
             R => G_R_Src,
-            Scratch => Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x,
+            Scratch => Self.G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x,
             Last_Shift => 24,
             Done => G_T2,
             Value => G_T3);
@@ -4954,7 +5279,7 @@ package body Wuffs.Std.Webp is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
       goto G_Fi_3;
       <<G_Else_4>>
-      Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x := 0;
+      Self.G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x := 0;
       G_Susp := 2;
       <<G_Resume_2>>
       loop
@@ -4965,7 +5290,7 @@ package body Wuffs.Std.Webp is
          Wuffs.Base.IO.Read_Step_LE
            (Data => A_Src,
             R => G_R_Src,
-            Scratch => Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x,
+            Scratch => Self.G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x,
             Last_Shift => 16,
             Done => G_T5,
             Value => G_T6);
@@ -4986,7 +5311,7 @@ package body Wuffs.Std.Webp is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
       goto G_Fi_5;
       <<G_Else_6>>
-      Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x := 0;
+      Self.G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x := 0;
       G_Susp := 3;
       <<G_Resume_3>>
       loop
@@ -4997,7 +5322,7 @@ package body Wuffs.Std.Webp is
          Wuffs.Base.IO.Read_Step_LE
            (Data => A_Src,
             R => G_R_Src,
-            Scratch => Self.G_Scratch_34_Do_Decode_Image_Config_Limited_Vp8x,
+            Scratch => Self.G_Scratch_35_Do_Decode_Image_Config_Limited_Vp8x,
             Last_Shift => 16,
             Done => G_T8,
             Value => G_T9);
@@ -5011,6 +5336,8 @@ package body Wuffs.Std.Webp is
          goto G_Exit;
       end if;
       Self.F_Height := (V_C32 and 16#3FFF#) + 1;
+      Self.F_Frame_Width := Self.F_Width;
+      Self.F_Frame_Height := Self.F_Height;
       V_Transform_Size :=
         4
           * Interfaces.Shift_Right (Self.F_Width + 3, 2)
@@ -5045,10 +5372,19 @@ package body Wuffs.Std.Webp is
          G_Status := Error_Unsupported_WebP_File;
          goto G_Exit;
       end if;
-      Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8x := 0;
+      V_R := Wuffs.Std.Vp8.Workbuf_Len (Self.F_Vp8);
+      V_N := Wuffs.Base.Ranges.Get_Max_Incl (V_R);
+      if (Self.F_Vp8x_Header_Flags and 16#10#) /= 0 then
+         V_N :=
+           Wuffs.Base.Ints.Sat_Add_U64 (X => V_N, Y => Wuffs.U64 (Self.F_Width * Self.F_Height));
+      end if;
+      Self.F_Vp8x_Workbuf_Len :=
+        Wuffs.Base.Ints.Max_U64 (X => V_N,
+                                 Y => Wuffs.U64 (Self.F_Workbuf_Offset_For_Transform (3)));
+      Self.G_P_35_Do_Decode_Image_Config_Limited_Vp8x := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_34_Do_Decode_Image_Config_Limited_Vp8x :=
+      Self.G_P_35_Do_Decode_Image_Config_Limited_Vp8x :=
         (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -5088,7 +5424,7 @@ package body Wuffs.Std.Webp is
          return Wuffs.Base.Error_Interleaved_Coroutine_Calls;
       end if;
       Self.G_Active_Coroutine := 0;
-      G_Susp := Self.G_P_35_Decode_Frame_Config;
+      G_Susp := Self.G_P_36_Decode_Frame_Config;
       case G_Susp is
          when 0 =>
             null;
@@ -5128,10 +5464,10 @@ package body Wuffs.Std.Webp is
       <<G_Resume_1>>
       goto G_Head_1;
       <<G_Ok>>
-      Self.G_P_35_Decode_Frame_Config := 0;
+      Self.G_P_36_Decode_Frame_Config := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_35_Decode_Frame_Config := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_36_Decode_Frame_Config := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 2 else 0);
       <<G_Exit>>
       if Wuffs.Is_Error (G_Status) then
@@ -5155,12 +5491,14 @@ package body Wuffs.Std.Webp is
       G_Susp : Wuffs.U32;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_36_Do_Decode_Frame_Config;
+      G_Susp := Self.G_P_37_Do_Decode_Frame_Config;
       case G_Susp is
          when 0 =>
             null;
          when 1 =>
             goto G_Resume_1;
+         when 2 =>
+            goto G_Resume_2;
          when others =>
             goto G_Suspend;
       end case;
@@ -5199,38 +5537,457 @@ package body Wuffs.Std.Webp is
       if Self.F_Call_Sequence /= 16#40# then
          goto G_Else_5;
       end if;
-      Self.F_Call_Sequence := 16#60#;
-      G_Status := Wuffs.Base.Note_End_Of_Data;
-      goto G_Ok;
+      Self.F_Num_Decoded_Frames_Value :=
+        Wuffs.Base.Ints.Sat_Add_U64 (X => Self.F_Num_Decoded_Frames_Value, Y => 1);
+      if (Self.F_Vp8x_Header_Flags and 16#02#) = 0 then
+         Self.F_Call_Sequence := 16#60#;
+         G_Status := Wuffs.Base.Note_End_Of_Data;
+         goto G_Ok;
+      end if;
+      Self.F_Call_Sequence := 16#20#;
+      goto G_Fi_1;
       <<G_Else_5>>
       G_Status := Wuffs.Base.Note_End_Of_Data;
       goto G_Ok;
       <<G_Fi_1>>
-      if Self.F_Variant /= 16#01# and then not A_Dst_Null then
-         Wuffs.Base.Pixel_Formats.Set (C => A_Dst,
-                                       Bounds => Wuffs.Base.Ranges.Make_Rect_IE_U32
-                                                   (Min_Incl_X => 0,
-                                                    Min_Incl_Y => 0,
-                                                    Max_Excl_X => Self.F_Width,
-                                                    Max_Excl_Y => Self.F_Height),
-                                       Duration => 0,
-                                       Index => 0,
-                                       IO_Position => Self.F_Frame_Config_Io_Position,
-                                       Disposal => 0,
-                                       Opaque_Within_Bounds => False,
-                                       Overwrite_Instead_Of_Blend => False,
-                                       Background_Color => 16#0000_0000#);
+      if (Self.F_Vp8x_Header_Flags and 16#02#) = 0 then
+         goto G_Else_7;
       end if;
+      G_Susp := 2;
+      <<G_Resume_2>>
+      Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
+      G_Status := Decode_Anmf_Header (Self, A_Src => A_Src, A_Src_Meta => A_Src_Meta);
+      Wuffs.Base.IO.Reload (G_R_Src, A_Src_Meta);
+      if not Wuffs.Is_Ok (G_Status) then
+         goto G_Suspend;
+      end if;
+      if Self.F_Call_Sequence >= 16#60# then
+         G_Status := Wuffs.Base.Note_End_Of_Data;
+         goto G_Ok;
+      end if;
+      goto G_Fi_6;
+      <<G_Else_7>>
+      null;
+      <<G_Fi_6>>
+      if Self.F_Variant /= 16#01# and then not A_Dst_Null then
+         Wuffs.Base.Pixel_Formats.Set
+           (C => A_Dst,
+            Bounds => Wuffs.Base.Ranges.Make_Rect_IE_U32
+                        (Min_Incl_X => Self.F_Frame_Rect_X0,
+                         Min_Incl_Y => Self.F_Frame_Rect_Y0,
+                         Max_Excl_X => Self.F_Frame_Rect_X0 + Self.F_Frame_Width,
+                         Max_Excl_Y => Self.F_Frame_Rect_Y0 + Self.F_Frame_Height),
+            Duration => Self.F_Frame_Duration,
+            Index => Self.F_Num_Decoded_Frame_Configs_Value,
+            IO_Position => Self.F_Frame_Config_Io_Position,
+            Disposal => Wuffs.Base.Pixel_Formats.Animation_Disposal (Self.F_Frame_Disposal),
+            Opaque_Within_Bounds => False,
+            Overwrite_Instead_Of_Blend => Self.F_Frame_Overwrite_Instead_Of_Blend,
+            Background_Color => 16#0000_0000#);
+      end if;
+      Self.F_Num_Decoded_Frame_Configs_Value :=
+        Wuffs.Base.Ints.Sat_Add_U64 (X => Self.F_Num_Decoded_Frame_Configs_Value, Y => 1);
       Self.F_Call_Sequence := 16#40#;
       <<G_Ok>>
-      Self.G_P_36_Do_Decode_Frame_Config := 0;
+      Self.G_P_37_Do_Decode_Frame_Config := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_36_Do_Decode_Frame_Config := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_37_Do_Decode_Frame_Config := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
    end Do_Decode_Frame_Config;
+
+   function Decode_Anmf_Header
+     (Self : in out Decoder;
+      A_Src : Wuffs.Bytes;
+      A_Src_Meta : in out Wuffs.Base.IO.Buffer_Meta)
+      return Wuffs.Status
+   is
+      G_Status : Wuffs.Status := Wuffs.Ok_Status;
+      G_R_Src : Wuffs.Base.IO.Reader;
+      V_N : Wuffs.U64 := 0;
+      V_C32 : Wuffs.U32 := 0;
+      V_X0 : G_U32_Range_0_16382 := 0;
+      V_Y0 : G_U32_Range_0_16382 := 0;
+      V_W : G_U32_Range_0_16384 := 0;
+      V_H : G_U32_Range_0_16384 := 0;
+      V_Transform_Size : G_U32_Range_0_67108864 := 0;
+      V_Flags : Wuffs.U8 := 0;
+      G_T1 : Boolean;
+      G_Susp : Wuffs.U32;
+      G_T2 : Wuffs.U32;
+      G_T3 : Boolean;
+      G_T4 : Wuffs.U64;
+      G_T5 : Wuffs.U32;
+      G_T6 : Boolean;
+      G_T7 : Wuffs.U64;
+      G_T8 : Boolean;
+      G_T9 : Wuffs.U32;
+      G_T10 : Boolean;
+      G_T11 : Wuffs.U64;
+      G_T12 : Wuffs.U32;
+      G_T13 : Boolean;
+      G_T14 : Wuffs.U64;
+      G_T15 : Wuffs.U32;
+      G_T16 : Boolean;
+      G_T17 : Wuffs.U64;
+      G_T18 : Wuffs.U32;
+      G_T19 : Boolean;
+      G_T20 : Wuffs.U64;
+      G_T21 : Wuffs.U32;
+      G_T22 : Boolean;
+      G_T23 : Wuffs.U64;
+      G_T24 : Wuffs.U8;
+   begin
+      G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
+      G_Susp := Self.G_P_38_Decode_Anmf_Header;
+      if G_Susp /= 0 then
+         V_X0 := Self.G_S_38_Decode_Anmf_Header_X0;
+         V_Y0 := Self.G_S_38_Decode_Anmf_Header_Y0;
+         V_W := Self.G_S_38_Decode_Anmf_Header_W;
+      end if;
+      case G_Susp is
+         when 0 =>
+            null;
+         when 1 =>
+            goto G_Resume_1;
+         when 2 =>
+            goto G_Resume_2;
+         when 3 =>
+            goto G_Resume_3;
+         when 4 =>
+            goto G_Resume_4;
+         when 5 =>
+            goto G_Resume_5;
+         when 6 =>
+            goto G_Resume_6;
+         when 7 =>
+            goto G_Resume_7;
+         when 8 =>
+            goto G_Resume_8;
+         when 9 =>
+            goto G_Resume_9;
+         when 10 =>
+            goto G_Resume_10;
+         when others =>
+            goto G_Suspend;
+      end case;
+      if Self.F_Frame_End_Io_Position < Wuffs.Base.IO.Position (G_R_Src) then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
+      Self.G_Scratch_38_Decode_Anmf_Header :=
+        Wuffs.Base.Ints.Sat_Sub_U64 (X => Self.F_Frame_End_Io_Position,
+                                     Y => Wuffs.Base.IO.Position (G_R_Src));
+      G_Susp := 1;
+      <<G_Resume_1>>
+      Wuffs.Base.IO.Skip (R => G_R_Src,
+                          Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                          Done => G_T1);
+      if not G_T1 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      <<G_Head_1>>
+      V_N :=
+        Wuffs.Base.Ints.Sat_Sub_U64 (X => Self.F_Riff_End_Io_Position,
+                                     Y => Wuffs.Base.IO.Position (G_R_Src));
+      if V_N = 0 then
+         Self.F_Call_Sequence := 16#60#;
+         G_Status := Wuffs.Ok_Status;
+         goto G_Ok;
+      elsif V_N < 8 then
+         G_Status := Error_Short_Chunk;
+         goto G_Exit;
+      end if;
+      if Wuffs.Base.IO.Length (G_R_Src) < 4 then
+         goto G_Else_4;
+      end if;
+      G_T2 := Wuffs.Base.IO.Peek_U32LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
+      goto G_Fi_3;
+      <<G_Else_4>>
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      G_Susp := 2;
+      <<G_Resume_2>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
+                                     R => G_R_Src,
+                                     Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                                     Last_Shift => 24,
+                                     Done => G_T3,
+                                     Value => G_T4);
+         exit when G_T3;
+      end loop;
+      G_T2 := Wuffs.U32 (G_T4);
+      <<G_Fi_3>>
+      Self.F_Sub_Chunk_Type := G_T2;
+      if Wuffs.Base.IO.Length (G_R_Src) < 4 then
+         goto G_Else_6;
+      end if;
+      G_T5 := Wuffs.Base.IO.Peek_U32LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
+      goto G_Fi_5;
+      <<G_Else_6>>
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      G_Susp := 3;
+      <<G_Resume_3>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
+                                     R => G_R_Src,
+                                     Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                                     Last_Shift => 24,
+                                     Done => G_T6,
+                                     Value => G_T7);
+         exit when G_T6;
+      end loop;
+      G_T5 := Wuffs.U32 (G_T7);
+      <<G_Fi_5>>
+      Self.F_Sub_Chunk_Length := G_T5;
+      V_N := Wuffs.U64 (Self.F_Sub_Chunk_Length) + Wuffs.U64 (Self.F_Sub_Chunk_Length and 1);
+      if V_N
+           > Wuffs.Base.Ints.Sat_Sub_U64 (X => Self.F_Riff_End_Io_Position,
+                                          Y => Wuffs.Base.IO.Position (G_R_Src))
+      then
+         G_Status := Error_Short_Chunk;
+         goto G_Exit;
+      end if;
+      if Self.F_Sub_Chunk_Type = 16#464D_4E41# then
+         goto G_Done_2;
+      elsif Self.F_Sub_Chunk_Type = 16#4850_4C41#
+              or else Self.F_Sub_Chunk_Type = 16#2038_5056#
+              or else Self.F_Sub_Chunk_Type = 16#4C38_5056#
+              or else Self.F_Sub_Chunk_Type = 16#5838_5056#
+      then
+         G_Status := Error_Bad_Chunk_Order;
+         goto G_Exit;
+      end if;
+      Self.G_Scratch_38_Decode_Anmf_Header := V_N;
+      G_Susp := 4;
+      <<G_Resume_4>>
+      Wuffs.Base.IO.Skip (R => G_R_Src,
+                          Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                          Done => G_T8);
+      if not G_T8 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      goto G_Head_1;
+      <<G_Done_2>>
+      if Self.F_Sub_Chunk_Length < 16 then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
+      Self.F_Frame_Config_Io_Position := Wuffs.Base.IO.Position (G_R_Src) - 8;
+      Self.F_Frame_End_Io_Position := Wuffs.Base.IO.Position (G_R_Src) + V_N;
+      if Wuffs.Base.IO.Length (G_R_Src) < 3 then
+         goto G_Else_8;
+      end if;
+      G_T9 := Wuffs.Base.IO.Peek_U24LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
+      goto G_Fi_7;
+      <<G_Else_8>>
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      G_Susp := 5;
+      <<G_Resume_5>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
+                                     R => G_R_Src,
+                                     Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                                     Last_Shift => 16,
+                                     Done => G_T10,
+                                     Value => G_T11);
+         exit when G_T10;
+      end loop;
+      G_T9 := Wuffs.U32 (G_T11);
+      <<G_Fi_7>>
+      V_C32 := G_T9;
+      if V_C32 >= 16#2000# then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
+      V_X0 := 2 * V_C32;
+      if Wuffs.Base.IO.Length (G_R_Src) < 3 then
+         goto G_Else_10;
+      end if;
+      G_T12 := Wuffs.Base.IO.Peek_U24LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
+      goto G_Fi_9;
+      <<G_Else_10>>
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      G_Susp := 6;
+      <<G_Resume_6>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
+                                     R => G_R_Src,
+                                     Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                                     Last_Shift => 16,
+                                     Done => G_T13,
+                                     Value => G_T14);
+         exit when G_T13;
+      end loop;
+      G_T12 := Wuffs.U32 (G_T14);
+      <<G_Fi_9>>
+      V_C32 := G_T12;
+      if V_C32 >= 16#2000# then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
+      V_Y0 := 2 * V_C32;
+      if Wuffs.Base.IO.Length (G_R_Src) < 3 then
+         goto G_Else_12;
+      end if;
+      G_T15 := Wuffs.Base.IO.Peek_U24LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
+      goto G_Fi_11;
+      <<G_Else_12>>
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      G_Susp := 7;
+      <<G_Resume_7>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
+                                     R => G_R_Src,
+                                     Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                                     Last_Shift => 16,
+                                     Done => G_T16,
+                                     Value => G_T17);
+         exit when G_T16;
+      end loop;
+      G_T15 := Wuffs.U32 (G_T17);
+      <<G_Fi_11>>
+      V_C32 := G_T15;
+      if V_C32 >= Self.F_Width then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
+      pragma Warnings ("C");
+      pragma Assert (V_C32 < 16#4000#);
+      pragma Warnings ("c");
+      V_W := V_C32 + 1;
+      if Wuffs.Base.IO.Length (G_R_Src) < 3 then
+         goto G_Else_14;
+      end if;
+      G_T18 := Wuffs.Base.IO.Peek_U24LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
+      goto G_Fi_13;
+      <<G_Else_14>>
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      G_Susp := 8;
+      <<G_Resume_8>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
+                                     R => G_R_Src,
+                                     Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                                     Last_Shift => 16,
+                                     Done => G_T19,
+                                     Value => G_T20);
+         exit when G_T19;
+      end loop;
+      G_T18 := Wuffs.U32 (G_T20);
+      <<G_Fi_13>>
+      V_C32 := G_T18;
+      if V_C32 >= Self.F_Height then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
+      pragma Warnings ("C");
+      pragma Assert (V_C32 < 16#4000#);
+      pragma Warnings ("c");
+      V_H := V_C32 + 1;
+      if V_X0 + V_W > Self.F_Width or else V_Y0 + V_H > Self.F_Height then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
+      Self.F_Frame_Rect_X0 := V_X0;
+      Self.F_Frame_Rect_Y0 := V_Y0;
+      Self.F_Frame_Width := V_W;
+      Self.F_Frame_Height := V_H;
+      V_Transform_Size :=
+        4 * Interfaces.Shift_Right (V_W + 3, 2) * Interfaces.Shift_Right (V_H + 3, 2);
+      Self.F_Workbuf_Offset_For_Transform (0) := 4 * V_W * V_H + 0 * V_Transform_Size;
+      Self.F_Workbuf_Offset_For_Transform (1) := 4 * V_W * V_H + 1 * V_Transform_Size;
+      Self.F_Workbuf_Offset_For_Transform (2) := 4 * V_W * V_H + 2 * V_Transform_Size;
+      Self.F_Workbuf_Offset_For_Transform (3) := 4 * V_W * V_H + 3 * V_Transform_Size;
+      if Wuffs.Base.IO.Length (G_R_Src) < 3 then
+         goto G_Else_16;
+      end if;
+      G_T21 := Wuffs.Base.IO.Peek_U24LE (A_Src, G_R_Src);
+      Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 3);
+      goto G_Fi_15;
+      <<G_Else_16>>
+      Self.G_Scratch_38_Decode_Anmf_Header := 0;
+      G_Susp := 9;
+      <<G_Resume_9>>
+      loop
+         if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+            G_Status := Wuffs.Base.Suspension_Short_Read;
+            goto G_Suspend;
+         end if;
+         Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
+                                     R => G_R_Src,
+                                     Scratch => Self.G_Scratch_38_Decode_Anmf_Header,
+                                     Last_Shift => 16,
+                                     Done => G_T22,
+                                     Value => G_T23);
+         exit when G_T22;
+      end loop;
+      G_T21 := Wuffs.U32 (G_T23);
+      <<G_Fi_15>>
+      V_C32 := G_T21;
+      Self.F_Frame_Duration := Wuffs.U64 (V_C32) * 705600;
+      G_Susp := 10;
+      <<G_Resume_10>>
+      if Wuffs.Base.IO.Length (G_R_Src) = 0 then
+         G_Status := Wuffs.Base.Suspension_Short_Read;
+         goto G_Suspend;
+      end if;
+      Wuffs.Base.IO.Read_U8 (Data => A_Src, R => G_R_Src, V => G_T24);
+      V_Flags := G_T24;
+      if (V_Flags and 16#01#) = 0 then
+         Self.F_Frame_Disposal := 0;
+      else
+         Self.F_Frame_Disposal := 1;
+      end if;
+      Self.F_Frame_Overwrite_Instead_Of_Blend := (V_Flags and 16#02#) /= 0;
+      Self.F_Variant := 16#20#;
+      Self.F_Vp8x_Alph_Flags := 0;
+      <<G_Ok>>
+      Self.G_P_38_Decode_Anmf_Header := 0;
+      goto G_Exit;
+      <<G_Suspend>>
+      Self.G_P_38_Decode_Anmf_Header := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_S_38_Decode_Anmf_Header_X0 := V_X0;
+      Self.G_S_38_Decode_Anmf_Header_Y0 := V_Y0;
+      Self.G_S_38_Decode_Anmf_Header_W := V_W;
+      <<G_Exit>>
+      Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
+      return G_Status;
+   end Decode_Anmf_Header;
 
    overriding function Decode_Frame
      (Self : in out Decoder;
@@ -5291,7 +6048,7 @@ package body Wuffs.Std.Webp is
          return Wuffs.Base.Error_Interleaved_Coroutine_Calls;
       end if;
       Self.G_Active_Coroutine := 0;
-      G_Susp := Self.G_P_37_Decode_Frame;
+      G_Susp := Self.G_P_39_Decode_Frame;
       case G_Susp is
          when 0 =>
             null;
@@ -5327,10 +6084,10 @@ package body Wuffs.Std.Webp is
       <<G_Resume_1>>
       goto G_Head_1;
       <<G_Ok>>
-      Self.G_P_37_Decode_Frame := 0;
+      Self.G_P_39_Decode_Frame := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_37_Decode_Frame := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_39_Decode_Frame := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       Self.G_Active_Coroutine := (if Wuffs.Is_Suspension (G_Status) then 3 else 0);
       <<G_Exit>>
       if Wuffs.Is_Error (G_Status) then
@@ -5369,11 +6126,15 @@ package body Wuffs.Std.Webp is
       pragma Warnings (Off, G_Discard_8);
       G_Discard_9 : Wuffs.Status;
       pragma Warnings (Off, G_Discard_9);
-      G_T10 : Boolean;
-      G_T11 : Wuffs.Base.IO.Reader_Limit_State;
+      G_Discard_10 : Wuffs.Status;
+      pragma Warnings (Off, G_Discard_10);
+      G_Discard_11 : Wuffs.Status;
+      pragma Warnings (Off, G_Discard_11);
+      G_T12 : Boolean;
+      G_T13 : Wuffs.Base.IO.Reader_Limit_State;
    begin
       G_R_Src := Wuffs.Base.IO.To_Reader (A_Src_Meta);
-      G_Susp := Self.G_P_38_Do_Decode_Frame;
+      G_Susp := Self.G_P_40_Do_Decode_Frame;
       case G_Susp is
          when 0 =>
             null;
@@ -5391,6 +6152,8 @@ package body Wuffs.Std.Webp is
             goto G_Resume_6;
          when 7 =>
             goto G_Resume_7;
+         when 8 =>
+            goto G_Resume_8;
          when others =>
             goto G_Suspend;
       end case;
@@ -5425,6 +6188,15 @@ package body Wuffs.Std.Webp is
       if (Self.F_Variant and 16#03#) /= 0 then
          goto G_Done_5;
       end if;
+      if (Self.F_Vp8x_Header_Flags and 16#02#) /= 0
+           and then Wuffs.Base.Ints.Sat_Sub_U64
+                      (X => Self.F_Frame_End_Io_Position,
+                       Y => Wuffs.Base.IO.Position (G_R_Src))
+                      < 8
+      then
+         G_Status := Error_Bad_ANMF_Chunk;
+         goto G_Exit;
+      end if;
       if Wuffs.Base.IO.Length (G_R_Src) < 4 then
          goto G_Else_7;
       end if;
@@ -5432,7 +6204,7 @@ package body Wuffs.Std.Webp is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
       goto G_Fi_6;
       <<G_Else_7>>
-      Self.G_Scratch_38_Do_Decode_Frame := 0;
+      Self.G_Scratch_40_Do_Decode_Frame := 0;
       G_Susp := 2;
       <<G_Resume_2>>
       loop
@@ -5442,7 +6214,7 @@ package body Wuffs.Std.Webp is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_38_Do_Decode_Frame,
+                                     Scratch => Self.G_Scratch_40_Do_Decode_Frame,
                                      Last_Shift => 24,
                                      Done => G_T3,
                                      Value => G_T4);
@@ -5458,7 +6230,7 @@ package body Wuffs.Std.Webp is
       Wuffs.Base.IO.Skip_U32_Fast (R => G_R_Src, Actual => 4);
       goto G_Fi_8;
       <<G_Else_9>>
-      Self.G_Scratch_38_Do_Decode_Frame := 0;
+      Self.G_Scratch_40_Do_Decode_Frame := 0;
       G_Susp := 3;
       <<G_Resume_3>>
       loop
@@ -5468,7 +6240,7 @@ package body Wuffs.Std.Webp is
          end if;
          Wuffs.Base.IO.Read_Step_LE (Data => A_Src,
                                      R => G_R_Src,
-                                     Scratch => Self.G_Scratch_38_Do_Decode_Frame,
+                                     Scratch => Self.G_Scratch_40_Do_Decode_Frame,
                                      Last_Shift => 24,
                                      Done => G_T6,
                                      Value => G_T7);
@@ -5480,6 +6252,14 @@ package body Wuffs.Std.Webp is
       Self.F_Sub_Chunk_Has_Padding := (Self.F_Sub_Chunk_Length and 1) /= 0;
       if Self.F_Sub_Chunk_Length > 16#7FFF_FFFF# then
          G_Status := Error_Unsupported_WebP_File;
+         goto G_Exit;
+      elsif (Self.F_Vp8x_Header_Flags and 16#02#) /= 0
+              and then Wuffs.Base.Ints.Sat_Sub_U64
+                         (X => Self.F_Frame_End_Io_Position,
+                          Y => Wuffs.Base.IO.Position (G_R_Src))
+                         < Wuffs.U64 (Self.F_Sub_Chunk_Length)
+      then
+         G_Status := Error_Bad_ANMF_Chunk;
          goto G_Exit;
       end if;
       if Self.F_Sub_Chunk_Type /= 16#5043_4349# then
@@ -5541,28 +6321,58 @@ package body Wuffs.Std.Webp is
       if not Wuffs.Is_Ok (G_Status) then
          goto G_Suspend;
       end if;
-      G_Discard_8 := Wuffs.Std.Vp8.Set_Quirk (Self.F_Vp8, A_Key => 16#6D7B_F800#, A_Value => 1);
       goto G_Fi_10;
       <<G_Else_14>>
       if Self.F_Sub_Chunk_Type /= 16#2038_5056# then
          goto G_Else_15;
       end if;
-      G_Discard_9 :=
+      Wuffs.Std.Vp8.Initialize (Self.F_Vp8);
+      G_Discard_8 :=
+        Wuffs.Std.Vp8.Set_Quirk (Self.F_Vp8,
+                                 A_Key => 16#6D7B_F801#,
+                                 A_Value => Wuffs.U64 (Self.F_Frame_Width)
+                                              or Interfaces.Shift_Left
+                                                   (Wuffs.U64 (Self.F_Frame_Height),
+                                                    32));
+      if Self.F_Variant = 16#40# then
+         G_Discard_9 := Wuffs.Std.Vp8.Set_Quirk (Self.F_Vp8, A_Key => 16#6D7B_F800#, A_Value => 1);
+      end if;
+      G_Discard_10 :=
         Wuffs.Std.Vp8.Set_Quirk (Self.F_Vp8,
                                  A_Key => 3,
                                  A_Value => Interfaces.Shift_Left
                                               (Wuffs.U64 (Self.F_Sub_Chunk_Length),
                                                1)
                                               or 1);
+      G_Discard_11 :=
+        Wuffs.Std.Vp8.Set_Quirk (Self.F_Vp8,
+                                 A_Key => 16#6D7B_F802#,
+                                 A_Value => Wuffs.U64 (Self.F_Frame_Rect_X0)
+                                              or Interfaces.Shift_Left
+                                                   (Wuffs.U64 (Self.F_Frame_Rect_Y0),
+                                                    32));
       Self.F_Variant := 16#81#;
       goto G_Done_5;
       <<G_Else_15>>
       if Self.F_Sub_Chunk_Type /= 16#4C38_5056# then
          goto G_Else_16;
       end if;
-      if (Self.F_Vp8x_Header_Flags and 16#10#) /= 0 then
+      if Self.F_Variant = 16#40# then
          G_Status := Error_Bad_ALPH_VP8L_Combination;
          goto G_Exit;
+      elsif Self.F_Sub_Chunk_Length < 5 then
+         G_Status := Error_Short_Chunk;
+         goto G_Exit;
+      end if;
+      Self.F_Sub_Chunk_Length := Self.F_Sub_Chunk_Length - 5;
+      G_Susp := 5;
+      <<G_Resume_5>>
+      Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
+      G_Status :=
+        Do_Decode_Image_Config_Limited_Vp8l (Self, A_Src => A_Src, A_Src_Meta => A_Src_Meta);
+      Wuffs.Base.IO.Reload (G_R_Src, A_Src_Meta);
+      if not Wuffs.Is_Ok (G_Status) then
+         goto G_Suspend;
       end if;
       Self.F_Variant := 16#82#;
       goto G_Done_5;
@@ -5587,21 +6397,21 @@ package body Wuffs.Std.Webp is
       <<G_Else_18>>
       null;
       <<G_Fi_10>>
-      Self.G_Scratch_38_Do_Decode_Frame := Wuffs.U64 (Self.F_Sub_Chunk_Length);
-      G_Susp := 5;
-      <<G_Resume_5>>
+      Self.G_Scratch_40_Do_Decode_Frame := Wuffs.U64 (Self.F_Sub_Chunk_Length);
+      G_Susp := 6;
+      <<G_Resume_6>>
       Wuffs.Base.IO.Skip (R => G_R_Src,
-                          Scratch => Self.G_Scratch_38_Do_Decode_Frame,
-                          Done => G_T10);
-      if not G_T10 then
+                          Scratch => Self.G_Scratch_40_Do_Decode_Frame,
+                          Done => G_T12);
+      if not G_T12 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
       end if;
       if not Self.F_Sub_Chunk_Has_Padding then
          goto G_Else_20;
       end if;
-      G_Susp := 6;
-      <<G_Resume_6>>
+      G_Susp := 7;
+      <<G_Resume_7>>
       if Wuffs.Base.IO.Length (G_R_Src) = 0 then
          G_Status := Wuffs.Base.Suspension_Short_Read;
          goto G_Suspend;
@@ -5618,7 +6428,7 @@ package body Wuffs.Std.Webp is
       Wuffs.Base.IO.Begin_Limit (M => A_Src_Meta,
                                  R => G_R_Src,
                                  Up_To => Wuffs.U64 (Self.F_Sub_Chunk_Length),
-                                 Saved => G_T11);
+                                 Saved => G_T13);
       V_R_Mark := Wuffs.Base.IO.Mark (G_R_Src);
       if (Self.F_Variant and 16#01#) /= 0 then
          Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
@@ -5657,7 +6467,7 @@ package body Wuffs.Std.Webp is
                                                (R => G_R_Src,
                                                 Mark => V_R_Mark)
                                                and 16#FFFF_FFFF#));
-      Wuffs.Base.IO.End_Limit (M => A_Src_Meta, R => G_R_Src, Saved => G_T11);
+      Wuffs.Base.IO.End_Limit (M => A_Src_Meta, R => G_R_Src, Saved => G_T13);
       if Wuffs.Is_Ok (V_Status) then
          goto G_Done_22;
       elsif not Wuffs.Is_Suspension (V_Status) then
@@ -5679,17 +6489,23 @@ package body Wuffs.Std.Webp is
       elsif not Wuffs.Is_Suspension (G_Status) then
          goto G_Exit;
       end if;
-      G_Susp := 7;
+      G_Susp := 8;
       goto G_Suspend;
-      <<G_Resume_7>>
+      <<G_Resume_8>>
       goto G_Head_21;
       <<G_Done_22>>
-      null;
+      Self.F_Num_Decoded_Frames_Value :=
+        Wuffs.Base.Ints.Sat_Add_U64 (X => Self.F_Num_Decoded_Frames_Value, Y => 1);
+      if (Self.F_Vp8x_Header_Flags and 16#02#) /= 0 then
+         Self.F_Call_Sequence := 16#20#;
+      else
+         Self.F_Call_Sequence := 16#60#;
+      end if;
       <<G_Ok>>
-      Self.G_P_38_Do_Decode_Frame := 0;
+      Self.G_P_40_Do_Decode_Frame := 0;
       goto G_Exit;
       <<G_Suspend>>
-      Self.G_P_38_Do_Decode_Frame := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
+      Self.G_P_40_Do_Decode_Frame := (if Wuffs.Is_Suspension (G_Status) then G_Susp else 0);
       <<G_Exit>>
       Wuffs.Base.IO.Save (A_Src_Meta, G_R_Src);
       return G_Status;
@@ -5706,10 +6522,11 @@ package body Wuffs.Std.Webp is
          return Wuffs.Std.Vp8.Frame_Dirty_Rect (Self.F_Vp8);
       end if;
       return
-        Wuffs.Base.Ranges.Make_Rect_IE_U32 (Min_Incl_X => 0,
-                                            Min_Incl_Y => 0,
-                                            Max_Excl_X => Self.F_Width,
-                                            Max_Excl_Y => Self.F_Height);
+        Wuffs.Base.Ranges.Make_Rect_IE_U32 (Min_Incl_X => Self.F_Frame_Rect_X0,
+                                            Min_Incl_Y => Self.F_Frame_Rect_Y0,
+                                            Max_Excl_X => Self.F_Frame_Rect_X0 + Self.F_Frame_Width,
+                                            Max_Excl_Y => Self.F_Frame_Rect_Y0
+                                                            + Self.F_Frame_Height);
    end Frame_Dirty_Rect;
 
    overriding function Num_Animation_Loops (Self : Decoder) return Wuffs.U32 is
@@ -5719,7 +6536,7 @@ package body Wuffs.Std.Webp is
       then
          return 0;
       end if;
-      return 0;
+      return Self.F_Num_Animation_Loops_Value;
    end Num_Animation_Loops;
 
    overriding function Num_Decoded_Frame_Configs (Self : Decoder) return Wuffs.U64 is
@@ -5732,10 +6549,7 @@ package body Wuffs.Std.Webp is
       if Self.F_Variant = 16#01# then
          return Wuffs.Std.Vp8.Num_Decoded_Frame_Configs (Self.F_Vp8);
       end if;
-      if Self.F_Call_Sequence > 16#20# then
-         return 1;
-      end if;
-      return 0;
+      return Self.F_Num_Decoded_Frame_Configs_Value;
    end Num_Decoded_Frame_Configs;
 
    overriding function Num_Decoded_Frames (Self : Decoder) return Wuffs.U64 is
@@ -5748,10 +6562,7 @@ package body Wuffs.Std.Webp is
       if Self.F_Variant = 16#01# then
          return Wuffs.Std.Vp8.Num_Decoded_Frames (Self.F_Vp8);
       end if;
-      if Self.F_Call_Sequence > 16#40# then
-         return 1;
-      end if;
-      return 0;
+      return Self.F_Num_Decoded_Frames_Value;
    end Num_Decoded_Frames;
 
    overriding function Restart_Frame
@@ -5765,19 +6576,38 @@ package body Wuffs.Std.Webp is
             then Wuffs.Base.Error_Disabled_By_Previous_Error
             else Wuffs.Base.Error_Initialize_Not_Called);
       end if;
+      if Self.F_Call_Sequence < 16#20# then
+         return Wuffs.Base.Error_Bad_Call_Sequence;
+      end if;
+      if (Self.F_Vp8x_Header_Flags and 16#02#) /= 0 then
+         if A_Io_Position = 0 then
+            return Wuffs.Base.Error_Bad_Argument;
+         end if;
+         Self.F_Frame_Config_Io_Position := A_Io_Position;
+         Self.F_Frame_End_Io_Position := A_Io_Position;
+         Self.F_Num_Decoded_Frame_Configs_Value := A_Index;
+         Self.F_Num_Decoded_Frames_Value := A_Index;
+         Self.F_Call_Sequence := 16#28#;
+         return Wuffs.Ok_Status;
+      end if;
+      if A_Index /= 0 or else A_Io_Position /= Self.F_Frame_Config_Io_Position then
+         return Wuffs.Base.Error_Bad_Argument;
+      end if;
       if Self.F_Variant = 16#01# then
          V_Status :=
            Wuffs.Std.Vp8.Restart_Frame (Self.F_Vp8,
                                         A_Index => A_Index,
                                         A_Io_Position => A_Io_Position);
-         return Wuffs.Base.Ensure_Not_A_Suspension (V_Status);
+         if not Wuffs.Is_Ok (V_Status) then
+            return Wuffs.Base.Ensure_Not_A_Suspension (V_Status);
+         end if;
+      elsif Self.F_Variant /= 16#02# then
+         Self.F_Variant := 16#04#;
+         Self.F_Vp8x_Alph_Flags := 0;
       end if;
-      if Self.F_Call_Sequence < 16#20# then
-         return Wuffs.Base.Error_Bad_Call_Sequence;
-      end if;
-      if A_Index /= 0 or else A_Io_Position /= Self.F_Frame_Config_Io_Position then
-         return Wuffs.Base.Error_Bad_Argument;
-      end if;
+      Self.F_Sub_Chunk_Length := Self.F_Frame_Sub_Chunk_Length;
+      Self.F_Num_Decoded_Frame_Configs_Value := 0;
+      Self.F_Num_Decoded_Frames_Value := 0;
       Self.F_Call_Sequence := 16#28#;
       return Wuffs.Ok_Status;
    end Restart_Frame;
@@ -5848,8 +6678,6 @@ package body Wuffs.Std.Webp is
    end Tell_Me_More;
 
    overriding function Workbuf_Len (Self : Decoder) return Wuffs.Base.Ranges.Range_II_U64 is
-      V_R : Wuffs.Base.Ranges.Range_II_U64 := Wuffs.Base.Ranges.Empty_Range_II_U64;
-      V_S : Wuffs.Base.Ranges.Range_II_U64 := Wuffs.Base.Ranges.Empty_Range_II_U64;
    begin
       if Self.Magic /= Wuffs.Runtime.Magic_Initialized
            and then Self.Magic /= Wuffs.Runtime.Magic_Disabled
@@ -5858,32 +6686,20 @@ package body Wuffs.Std.Webp is
       end if;
       if Self.F_Variant = 16#01# then
          return Wuffs.Std.Vp8.Workbuf_Len (Self.F_Vp8);
+      elsif Self.F_Variant = 16#02# then
+         return
+           Wuffs.Base.Ranges.Make_Range_II_U64 (Min_Incl => Wuffs.U64
+                                                              (Self.F_Workbuf_Offset_For_Transform
+                                                                 (3)),
+                                                Max_Incl => Wuffs.U64
+                                                              (Self.F_Workbuf_Offset_For_Transform
+                                                                 (3)));
+      elsif Self.F_Vp8x_Workbuf_Len > 0 then
+         return
+           Wuffs.Base.Ranges.Make_Range_II_U64 (Min_Incl => Self.F_Vp8x_Workbuf_Len,
+                                                Max_Incl => Self.F_Vp8x_Workbuf_Len);
       end if;
-      V_R :=
-        Wuffs.Base.Ranges.Make_Range_II_U64 (Min_Incl => Wuffs.U64
-                                                           (Self.F_Workbuf_Offset_For_Transform
-                                                              (3)),
-                                             Max_Incl => Wuffs.U64
-                                                           (Self.F_Workbuf_Offset_For_Transform
-                                                              (3)));
-      if Self.F_Variant /= 16#02# then
-         V_S := Wuffs.Std.Vp8.Workbuf_Len (Self.F_Vp8);
-         if Wuffs.Base.Ranges.Is_Empty (V_S) then
-            return V_S;
-         end if;
-         V_R :=
-           Wuffs.Base.Ranges.Make_Range_II_U64 (Min_Incl => Wuffs.Base.Ints.Max_U64
-                                                              (X => Wuffs.Base.Ranges.Get_Min_Incl
-                                                                      (V_S),
-                                                               Y => Wuffs.Base.Ranges.Get_Min_Incl
-                                                                      (V_R)),
-                                                Max_Incl => Wuffs.Base.Ints.Max_U64
-                                                              (X => Wuffs.Base.Ranges.Get_Max_Incl
-                                                                      (V_S),
-                                                               Y => Wuffs.Base.Ranges.Get_Max_Incl
-                                                                      (V_R)));
-      end if;
-      return V_R;
+      return Wuffs.Base.Ranges.Make_Range_II_U64 (Min_Incl => 1, Max_Incl => 0);
    end Workbuf_Len;
 
 end Wuffs.Std.Webp;

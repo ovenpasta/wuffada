@@ -13,7 +13,8 @@ apply it). PROFILE is the build profile that the mutant is tested with.
 Mutants 01 to 25 are the implementer's of milestone 3, R01 to R20 came from
 the independent review of it, N01 to N08 cover the review's fixes, M01 to
 M12 are for milestone 4a, J01 to J15 for the JPEG milestone, and W01 to W16
-for the vp8/webp milestone (run those in both profiles: MUTATION_PROFILE; and
+for the vp8/webp milestone and W17 to W33 for the webp2 milestone (fixes and
+animations in the fork) (run those in both profiles: MUTATION_PROFILE; and
 MUTATION_FORMATS='webp|vp8' restricts the image corpus to those formats, see
 mutation.sh), T01 to T19 for the json/cbor (token I/O) milestone (run those in
 both profiles, with MUTATION_TOKENS=1: see mutation.sh); T18 is T01's
@@ -440,6 +441,59 @@ MUTANTS = {
     "W16-webp-subtract-green-skips-blue": ("gen", "checked", lambda: rep(
         GEN + "webp.adb", "Wuffs.Runtime.Set (S => V_P, I => 0, V => Wuffs.Runtime.Get (V_P, 0) + V_G);",
         "null;")),
+
+    # The webp2 milestone (upstream fixes and animations in the fork): the
+    # generated code of std/webp and std/vp8 that changed. Run them in both
+    # profiles, with MUTATION_FORMATS='webp|vp8'.
+    "W17-webp-anmf-x-offset-not-doubled": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "V_X0 := 2 * V_C32;", "V_X0 := V_C32;")),
+    "W18-webp-anmf-duration-units": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Wuffs.U64 (V_C32) * 705600;", "Wuffs.U64 (V_C32) * 7056000;")),
+    "W19-webp-anmf-blend-bit": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Self.F_Frame_Overwrite_Instead_Of_Blend := (V_Flags and 16#02#) /= 0;",
+        "Self.F_Frame_Overwrite_Instead_Of_Blend := (V_Flags and 16#01#) /= 0;")),
+    "W20-webp-anmf-dispose-ignored": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Self.F_Frame_Disposal := 1;", "Self.F_Frame_Disposal := 0;")),
+    "W21-webp-frame-x-offset-not-applied": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "V_Dst_Bytes_Per_Row0 := Wuffs.U64 (Self.F_Frame_Rect_X0 * V_Dst_Bytes_Per_Pixel);",
+        "V_Dst_Bytes_Per_Row0 := 0;")),
+    "W22-webp-vp8l-bits-not-reset": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "      Self.F_Bits := 0;\n      Self.F_N_Bits := 0;\n      Self.F_Workbuf_Offset_For_Color_Indexing := 0;",
+        "      Self.F_Workbuf_Offset_For_Color_Indexing := 0;")),
+    "W23-webp-anmf-workbuf-offsets-stale": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Self.F_Workbuf_Offset_For_Transform (0) := 4 * V_W * V_H + 0 * V_Transform_Size;",
+        "null;")),
+    "W24-webp-distance-not-clamped": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "if V_Back_Ref_Dist_Minus_1 >= 16#8000_0000# then\n            V_Back_Ref_Dist_Minus_1 := 0;",
+        "if V_Back_Ref_Dist_Minus_1 >= 16#8000_0000# then\n            V_Back_Ref_Dist_Minus_1 := 1;")),
+    "W25-vp8-sharpness-max-again": ("gen", "checked", lambda: rep(
+        GEN + "vp8.adb", "Wuffs.Base.Ints.Min_U32 (X => V_Ilevel,", "Wuffs.Base.Ints.Max_U32 (X => V_Ilevel,")),
+    "W26-vp8-level-zero-filtered": ("gen", "checked", lambda: rep(
+        GEN + "vp8.adb", "if V_Level = 0 or else V_Level >= 16#8000_0000# then",
+        "if V_Level >= 16#8000_0000# then")),
+    # W27 to W29 used to fault std/vp8's own copy of the YCbCr conversion for
+    # a frame at an offset, which is gone: swizzle_ycck now takes the offset.
+    "W27-vp8-dst-x-offset-not-passed": ("gen", "checked", lambda: rep(
+        GEN + "vp8.adb", "Dst_X_Offset => Self.F_Quirk_Dst_X,", "Dst_X_Offset => 0,")),
+    "W28-webp-dst-quirk-y-in-wrong-half": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "(Wuffs.U64 (Self.F_Frame_Rect_Y0),\n                                                    32));",
+        "(Wuffs.U64 (Self.F_Frame_Rect_Y0),\n                                                    31));")),
+    "W29-shell-ycck-dst-y-offset-dropped": ("src", "checked", lambda: rep(
+        RT, "Dst_Y_Offset      => Dst_Y_Offset,", "Dst_Y_Offset      => Wuffs.U32'Min (Dst_Y_Offset, 1),")),
+    "W30-webp-restart-chunk-length-not-restored": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Self.F_Sub_Chunk_Length := Self.F_Frame_Sub_Chunk_Length;", "null;")),
+    # The review of the webp2 milestone: the RIFF bound of the chunk peek
+    # after VP8X/ANIM, the count of a skipped still frame, the loop filter's
+    # clip_m16_p15.
+    "W31-webp-anim-peek-not-bounded-by-riff": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "Y => Wuffs.Base.IO.Position (G_R_Src))\n           >= 8\n      then\n         goto G_Else_4;",
+        "Y => Wuffs.Base.IO.Position (G_R_Src))\n           >= 0\n      then\n         goto G_Else_4;")),
+    "W32-webp-skipped-still-frame-not-counted": ("gen", "checked", lambda: rep(
+        GEN + "webp.adb", "         goto G_Else_5;\n      end if;\n      Self.F_Num_Decoded_Frames_Value :=\n"
+        "        Wuffs.Base.Ints.Sat_Add_U64 (X => Self.F_Num_Decoded_Frames_Value, Y => 1);",
+        "         goto G_Else_5;\n      end if;")),
+    "W33-vp8-clip-m16-p15-off-by-one": ("gen", "checked", lambda: rep(
+        GEN + "vp8.adb", "if A_A + 16#10# <= 16#1F# then", "if A_A + 16#10# <= 16#20# then")),
     # ---- The json/cbor (token I/O) milestone.
     "T01-gen-token-major-and-minor-swapped": ("src", "checked", lambda: rep(
         G + "lower_call.go", 'adaNames := []string{"Value_Major", "Value_Minor", "Continued", "Length"}',

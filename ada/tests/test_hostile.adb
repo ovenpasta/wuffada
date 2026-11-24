@@ -740,6 +740,8 @@ procedure Test_Hostile is
             Pixels            => Arena (Pix_At .. Pix_At + 63),
             Palette           => Arena (Pal_At .. Pal_At + 1023),
             Dst_Palette       => Arena (DPal_At .. DPal_At + 1023),
+            Dst_X_Offset      => 0,
+            Dst_Y_Offset      => 0,
             X_Min_Incl        => 0,
             X_Max_Excl        => 4,
             Y_Min_Incl        => 0,
@@ -1074,6 +1076,12 @@ procedure Test_Hostile is
          "jpeg: unsupported precision (12 bits)");
       Expect (Wuffs.Std.Vp8.Error_Bad_QUIRK_SOURCE_LENGTH, Vp8, "vp8: bad QUIRK_SOURCE_LENGTH");
       Expect (Wuffs.Std.Vp8.Error_Unsupported_VP8_File, Vp8, "vp8: unsupported VP8 file");
+      Expect (Wuffs.Std.Vp8.Error_Bad_QUIRK_DST_X_AND_Y, Vp8, "vp8: bad QUIRK_DST_X_AND_Y");
+      Expect (Wuffs.Std.Webp.Error_Bad_ANIM_Chunk, Webp, "webp: bad ANIM chunk");
+      Expect (Wuffs.Std.Webp.Error_Bad_ANMF_Chunk, Webp, "webp: bad ANMF chunk");
+      Expect
+        (Wuffs.Std.Webp.Error_Inconsistent_Width_And_Height, Webp,
+         "webp: inconsistent width and height");
       Expect
         (Wuffs.Std.Webp.Error_Bad_ALPH_VP8L_Combination, Webp, "webp: bad ALPH+VP8L combination");
       Expect

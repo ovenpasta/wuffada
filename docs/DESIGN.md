@@ -15,8 +15,12 @@ Two halves:
    Ada's runtime checks on as a second net and lower Wuffs' proof facts into
    Ada subtypes, assertions and contracts.
 
-Upstream is pinned at `google/wuffs@a87f0bb` (2026-11-18). A checkout lives in
-`./wuffs/` (git-ignored); the Go module depends on the same commit.
+Wuffs is our fork `ovenpasta/wuffs` (branch `wuffada`: upstream
+`google/wuffs@a87f0bb` plus decoder fixes and features written in the Wuffs
+language, in upstream's style so that they can be offered back). The commit
+is `WUFFS_COMMIT` in `.github/workflows/*.yml`; a checkout lives in `./wuffs/`
+(git-ignored), and `go.mod` replaces `github.com/google/wuffs` with the fork
+at the same commit, so the generator uses the fork's Wuffs compiler.
 
 ## Layout
 
@@ -253,6 +257,34 @@ From the review of generator milestone 4a; none affects generated `std` code.
   first 8 bytes of the decoder object.
 * `Wuffs.Base.UTF8.Valid_UTF_8_Length` belongs with the IO package; it lives
   in `ada/src/token` because the IO package was frozen when it was written.
+* JPEG: the reference is upstream's *scalar* C build. Upstream's AVX2 IDCT
+  saturates in 16-bit lanes where its scalar IDCT wraps, so the two upstream
+  builds give different pixels for out-of-range coefficients in corrupt
+  files; on valid files they and the Ada agree byte for byte.
+* WebP: the fork fixes what upstream's decoder got wrong or lacked at
+  `a87f0bb` (lossless inside VP8X, animation, the work-buffer length with an
+  alpha plane, suspension in an uncompressed alpha chunk, three loop-filter
+  errors and a clamp off-by-one, small back-reference distances,
+  `restart_frame`). Lossy and lossless stills and caller-composited
+  animations now match libwebp exactly on the test corpus. The Ada follows
+  the fork's C byte for byte.
+* WebP limits that remain: a VP8X image's `workbuf_len` is bounded by the
+  RIFF chunk length (so it grows with file size for animations; upstream's
+  TODO), and a VP8X file whose RIFF chunk exceeds about 144 MiB is rejected
+  as unsupported. Animated frame configs report a transparent black
+  background: the file's ANIM colour is a hint that libwebp also ignores.
+  The decoder is stricter than libwebp on some malformed containers.
+* `swizzle_ycck` takes a destination offset (a base-library change in the
+  fork, mirrored in the proved `Wuffs.Base.Pixel_Swizzler_YCCK`; the view it
+  builds is proved valid). Upstream's `swizzle_ycck` gives a wrong result for
+  an opaque source pixel blended SRC_OVER into a Y destination, reproduced as
+  it is.
+* WebP: `Wuffs.Std.Webp.Decoder` is about 3.2 MB (Huffman tables and the
+  embedded VP8 decoder). Callers must declare it at library level or
+  allocate it; it never goes on the library's stack.
+* WebP tests: no damaged file has a chunk size exactly one below what its
+  header needs (one surviving mutant); `test.sh` requires libwebp with
+  libwebpdemux.
 * JPEG: the reference is upstream's *scalar* C build. Upstream's AVX2 IDCT
   saturates in 16-bit lanes where its scalar IDCT wraps, so the two upstream
   builds give different pixels for out-of-range coefficients in corrupt

@@ -144,6 +144,7 @@ typedef struct {
   uint32_t doff;          // bytes before the destination's first pixel
   uint32_t dmode;         // of the destination's initial contents
   uint32_t x0, x1, y0, y1;
+  uint32_t dxo, dyo;  // dst_x_offset, dst_y_offset
   uint32_t w[4], h[4], s[4];
   uint32_t hh[4], vv[4];
   size_t len[4];
@@ -192,6 +193,7 @@ static uint32_t call(const call_t* c,
   memset(&swizzler, 0, sizeof(swizzler));
   wuffs_base__status status = wuffs_base__pixel_swizzler__swizzle_ycck(
       &swizzler, &pb, wuffs_base__make_slice_u8(g_palette, 1024),  //
+      c->dxo, c->dyo,                                              //
       c->x0, c->x1, c->y0, c->y1,                                  //
       wuffs_base__make_slice_u8(src[0], c->len[0]),
       wuffs_base__make_slice_u8(src[1], c->len[1]),
@@ -311,6 +313,8 @@ static void make(call_t* c,
   c->y0 = y0n * lv;
   c->x1 = c->x0 + dx;
   c->y1 = c->y0 + dy;
+  c->dxo = 0;
+  c->dyo = 0;
   int32_t dw = (int32_t)c->x1 + ddw;
   int32_t dh = (int32_t)c->y1 + ddh;
   c->dw = (dw < 0) ? 0 : (uint32_t)dw;
@@ -949,6 +953,62 @@ static void sweep_bands(void) {
   counts("YCCK_Bands");
 }
 
+// ---- Destination offsets (dst_x_offset, dst_y_offset): every layout, every
+// upsampling option and every accepted destination format, each with
+// offsets in the destination's interior (the whole rectangle written),
+// offsets that clip the rectangle at the right or bottom (or both), and
+// offsets outside the destination (nothing written).  The rectangle starts
+// at the planes' origin (fancy upsampling accepts no other).  One mark per
+// (layout, upsampling option).
+
+static const uint32_t DST_OFFSETS[6][2] = {
+    {1, 0}, {0, 3}, {2, 1}, {5, 4}, {9, 0}, {0, 7}};
+static const int32_t DST_GROWTH[4][2] = {{6, 7}, {2, 3}, {0, 0}, {-3, -2}};
+static const uint32_t DST_OFFSET_WIDTHS[3] = {9, 17, 33};
+static const uint32_t DST_OFFSET_HEIGHTS[3] = {7, 5, 12};
+
+static void sweep_dst_offsets(void) {
+  begin(11);
+  reset_counts();
+  fill(g_palette, 1024, 0);
+  uint32_t n = 0;
+  for (int l = 0; l < 14; l++) {
+    for (uint32_t ups = 0; ups < 3; ups++) {
+      for (int f = 0; f < 17; f++) {
+        for (int o = 0; o < 8; o++) {
+          call_t c;
+          uint32_t g = (n + (uint32_t)o) % 4;
+          make(&c, LAYOUTS[l], DST_OFFSET_WIDTHS[n % 3],
+               DST_OFFSET_HEIGHTS[(n / 3) % 3], 0, 0, 0, 0, n % 2,
+               DST_GROWTH[g][0], DST_GROWTH[g][1]);
+          if (o < 6) {
+            c.dxo = DST_OFFSETS[o][0];
+            c.dyo = DST_OFFSETS[o][1];
+          } else if (o == 6) {
+            // At or past the right edge.
+            c.dxo = c.dw + (n % 3);
+            c.dyo = 1;
+          } else {
+            // Far past the bottom edge.
+            c.dxo = 2;
+            c.dyo = 0xFFFFFFFFu - (n % 2);
+          }
+          c.fmt = ACCEPTED[f];
+          c.model = (LAYOUTS[l][6] != 0) ? MODELS_4[n % 4] : MODELS_3[n % 3];
+          c.ups = ups;
+          c.mode = n % 5;
+          c.dmode = n % 2;
+          run(&c);
+          n++;
+        }
+      }
+      mark();
+    }
+  }
+  end("YCCK_Dst_Offsets");
+  counts("YCCK_Dst_Offsets");
+}
+
 int main(void) {
   sweep_colors();
   sweep_formats();
@@ -960,5 +1020,6 @@ int main(void) {
   sweep_bands();
   sweep_order();
   sweep_limits();
+  sweep_dst_offsets();
   return 0;
 }

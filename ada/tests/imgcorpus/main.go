@@ -99,11 +99,6 @@ type file struct {
 	refCat  string
 	refTol  int
 	refMean int
-
-	// rawAlpha means a WebP file with an uncompressed ALPH chunk: only a
-	// run with the whole file in the source buffer is compared with the
-	// references (see addWebP).
-	rawAlpha bool
 }
 
 var (
@@ -782,9 +777,6 @@ func makeNetpbms() {
 
 func emit(f *file, pixfmt uint32, blend int, sched string, flags string, script string, expected bool) {
 	e := "-"
-	if f.rawAlpha && sched != "W" {
-		expected = false
-	}
 	if expected && f.expected != "" {
 		e = f.expected
 		if f.jpegCat != "" {
@@ -1000,6 +992,10 @@ func main() {
 			for j, script := range scripts {
 				emit(f, pixfmts[(i+j)%len(pixfmts)], j%2, []string{"W", "C97", "K61"}[(i+j)%3], "m", script, false)
 			}
+		}
+
+		if f.format == "webp" && webpAnimated(f.data) {
+			emitWebPAnim(f, i)
 		}
 
 		// Truncated and corrupted copies of some of the small files (WebP:

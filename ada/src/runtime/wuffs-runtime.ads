@@ -536,6 +536,8 @@ package Wuffs.Runtime with Preelaborate, SPARK_Mode => Off is
       Pixels            : in out Wuffs.Bytes;
       Palette           : Wuffs.Bytes;
       Dst_Palette       : Wuffs.Bytes;
+      Dst_X_Offset      : Wuffs.U32;
+      Dst_Y_Offset      : Wuffs.U32;
       X_Min_Incl        : Wuffs.U32;
       X_Max_Excl        : Wuffs.U32;
       Y_Min_Incl        : Wuffs.U32;

@@ -77,13 +77,13 @@ begin
         [0 => (Width => 2, Height => 1, Stride => 2, H => 1, V => 1),
          1 => Full, 2 => Full, 3 => <>];
    begin
-      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 4, 0, 1, R, G, B, Empty,
+      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 0, 0, 4, 0, 1, R, G, B, Empty,
                     Planes, YCC_Model_RGB, YCC_Upsampling_Fancy_Like_Libjpeg, Scratch,
                     Result);
       Check (Is_Ok (Result), "h2v1 fancy: status");
       Check (Pixels = [5, 1, 0, 255, 6, 2, 25, 255, 7, 3, 75, 255, 8, 4, 100, 255],
              "h2v1 fancy: pixels");
-      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 4, 0, 1, R, G, B, Empty,
+      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 0, 0, 4, 0, 1, R, G, B, Empty,
                     Planes, YCC_Model_RGB, YCC_Upsampling_Basic, Scratch, Result);
       Check (Is_Ok (Result), "h2v1 basic: status");
       Check (Pixels = [5, 1, 0, 255, 6, 2, 0, 255, 7, 3, 100, 255, 8, 4, 100, 255],
@@ -91,20 +91,20 @@ begin
 
       --  A scratch buffer one byte short: bad argument, nothing written.
       Pixels := [others => 16#EE#];
-      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 4, 0, 1, R, G, B, Empty,
+      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 0, 0, 4, 0, 1, R, G, B, Empty,
                     Planes, YCC_Model_RGB, YCC_Upsampling_Basic, Scratch (0 .. 2046),
                     Result);
       Check (Result = Wuffs.Base.Error_Bad_Argument, "short scratch: status");
       Check (Pixels = [0 .. 15 => 16#EE#], "short scratch: pixels untouched");
 
       --  A pixel buffer that does not fit its array: bad argument.
-      Swizzle_YCCK (Buffer (4, 1), Pixels (0 .. 14), Empty, Empty, 0, 4, 0, 1, R, G, B,
+      Swizzle_YCCK (Buffer (4, 1), Pixels (0 .. 14), Empty, Empty, 0, 0, 0, 4, 0, 1, R, G, B,
                     Empty, Planes, YCC_Model_RGB, YCC_Upsampling_Basic, Scratch, Result);
       Check (Result = Wuffs.Base.Error_Bad_Argument, "invalid pixel buffer: status");
       Check (Pixels = [0 .. 15 => 16#EE#], "invalid pixel buffer: pixels untouched");
 
       --  A source plane one byte short: bad argument.
-      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 4, 0, 1, R, G (0 .. 2), B,
+      Swizzle_YCCK (Buffer (4, 1), Pixels, Empty, Empty, 0, 0, 0, 4, 0, 1, R, G (0 .. 2), B,
                     Empty, Planes, YCC_Model_RGB, YCC_Upsampling_Basic, Scratch, Result);
       Check (Result = Wuffs.Base.Error_Bad_Argument, "short plane: status");
       Check (Pixels = [0 .. 15 => 16#EE#], "short plane: pixels untouched");
@@ -124,7 +124,7 @@ begin
         [0 => (Width => 1, Height => 2, Stride => 1, H => 1, V => 1),
          1 => Tall, 2 => Tall, 3 => <>];
    begin
-      Swizzle_YCCK (Buffer (1, 4), Pixels, Empty, Empty, 0, 1, 0, 4, R, G, B, Empty,
+      Swizzle_YCCK (Buffer (1, 4), Pixels, Empty, Empty, 0, 0, 0, 1, 0, 4, R, G, B, Empty,
                     Planes, YCC_Model_RGB, YCC_Upsampling_Fancy_Like_Libwebp, Scratch,
                     Result);
       Check (Is_Ok (Result), "h1v2 fancy: status");
@@ -144,7 +144,7 @@ begin
       One    : constant Source_Plane :=
         (Width => 3, Height => 1, Stride => 3, H => 1, V => 1);
    begin
-      Swizzle_YCCK (Buffer (3, 1), Pixels, Empty, Empty, 0, 3, 0, 1, C, M, Y, K,
+      Swizzle_YCCK (Buffer (3, 1), Pixels, Empty, Empty, 0, 0, 0, 3, 0, 1, C, M, Y, K,
                     [others => One], YCC_Model_CMY, YCC_Upsampling_Basic, Scratch,
                     Result);
       Check (Is_Ok (Result), "cmyk: status");
@@ -152,7 +152,7 @@ begin
              "cmyk: pixels");
       --  Three planes' worth of model with four planes: not supported.
       Pixels := [others => 16#EE#];
-      Swizzle_YCCK (Buffer (3, 1), Pixels, Empty, Empty, 0, 3, 0, 1, C, M, Y, K,
+      Swizzle_YCCK (Buffer (3, 1), Pixels, Empty, Empty, 0, 0, 0, 3, 0, 1, C, M, Y, K,
                     [others => One], YCC_Model_RGB, YCC_Upsampling_Basic, Scratch,
                     Result);
       Check (Result = Wuffs.Base.Error_Unsupported_Pixel_Swizzler_Option,

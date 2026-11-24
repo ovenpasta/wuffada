@@ -51,6 +51,7 @@ package body Test_YCCK is
       DOff, DMode    : U32 := 0;
       No_Pal         : Boolean := False;
       X0, X1, Y0, Y1 : U32 := 0;
+      DXO, DYO       : U32 := 0;  --  dst_x_offset, dst_y_offset
       W, H, S        : Quad := [others => 0];
       HH, VV         : Quad := [others => 0];
       Len            : Lengths := [others => 0];
@@ -120,6 +121,7 @@ package body Test_YCCK is
    procedure Sweep_Bands;
    procedure Sweep_Order;
    procedure Sweep_Limits;
+   procedure Sweep_Dst_Offsets;
 
    -------------
    -- Dst_Len --
@@ -161,6 +163,8 @@ package body Test_YCCK is
          Pixels            => Pixels,
          Palette           => Palette,
          Dst_Palette       => Palette,
+         Dst_X_Offset      => C.DXO,
+         Dst_Y_Offset      => C.DYO,
          X_Min_Incl        => C.X0,
          X_Max_Excl        => C.X1,
          Y_Min_Incl        => C.Y0,
@@ -883,6 +887,71 @@ package body Test_YCCK is
          OD.YCCK_Limits_Bad_Argument, OD.YCCK_Limits_Unsupported, OD.YCCK_Limits_Pixels);
    end Sweep_Limits;
 
+   --  The oracle's DST_OFFSETS, DST_GROWTH, DST_OFFSET_WIDTHS and
+   --  DST_OFFSET_HEIGHTS.
+   type Offset_Pair is array (0 .. 1) of U32;
+   type Growth_Pair is array (0 .. 1) of Integer;
+   Dst_Offsets : constant array (0 .. 5) of Offset_Pair :=
+     [[1, 0], [0, 3], [2, 1], [5, 4], [9, 0], [0, 7]];
+   Dst_Growth : constant array (U32 range 0 .. 3) of Growth_Pair :=
+     [[6, 7], [2, 3], [0, 0], [-3, -2]];
+   Dst_Offset_Widths  : constant array (U32 range 0 .. 2) of U32 := [9, 17, 33];
+   Dst_Offset_Heights : constant array (U32 range 0 .. 2) of U32 := [7, 5, 12];
+
+   -----------------------
+   -- Sweep_Dst_Offsets --
+   -----------------------
+
+   procedure Sweep_Dst_Offsets is
+      C : Call;
+      N : U32 := 0;
+      G : U32;
+      M : Natural := 0;
+   begin
+      Start (11);
+      Reset_Counts;
+      Fill (Palette, 0);
+      for L in Layouts'Range loop
+         for Ups in U32 range 0 .. 2 loop
+            for F in Accepted'Range loop
+               for O in 0 .. 7 loop
+                  G := (N + U32 (O)) mod 4;
+                  C := Make (Layouts (L), Dst_Offset_Widths (N mod 3),
+                             Dst_Offset_Heights ((N / 3) mod 3), 0, 0, 0, 0, N mod 2,
+                             Dst_Growth (G) (0), Dst_Growth (G) (1));
+                  if O < 6 then
+                     C.DXO := Dst_Offsets (O) (0);
+                     C.DYO := Dst_Offsets (O) (1);
+                  elsif O = 6 then
+                     --  At or past the right edge.
+                     C.DXO := C.DW + N mod 3;
+                     C.DYO := 1;
+                  else
+                     --  Far past the bottom edge.
+                     C.DXO := 2;
+                     C.DYO := 16#FFFF_FFFF# - N mod 2;
+                  end if;
+                  C.Fmt := Accepted (F);
+                  C.Model := (if Layouts (L) (6) /= 0 then Models_4 (N mod 4)
+                              else Models_3 (N mod 3));
+                  C.Ups := Ups;
+                  C.Mode := N mod 5;
+                  C.DMode := N mod 2;
+                  Run (C);
+                  N := N + 1;
+               end loop;
+            end loop;
+            Mark (OD.YCCK_Dst_Offsets_Marks, "YCCK_Dst_Offsets, layout and upsampling", M);
+            M := M + 1;
+         end loop;
+      end loop;
+      Finish ("YCCK_Dst_Offsets", OD.YCCK_Dst_Offsets);
+      Check_Counts
+        ("YCCK_Dst_Offsets", OD.YCCK_Dst_Offsets_Calls, OD.YCCK_Dst_Offsets_Ok,
+         OD.YCCK_Dst_Offsets_Bad_Argument, OD.YCCK_Dst_Offsets_Unsupported,
+         OD.YCCK_Dst_Offsets_Pixels);
+   end Sweep_Dst_Offsets;
+
    ---------
    -- Run --
    ---------
@@ -899,6 +968,7 @@ package body Test_YCCK is
       Sweep_Bands;
       Sweep_Order;
       Sweep_Limits;
+      Sweep_Dst_Offsets;
    end Run;
 
 end Test_YCCK;

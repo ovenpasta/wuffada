@@ -1,10 +1,10 @@
 #!/bin/sh
 # Regenerates the Ada code, builds it in both profiles and runs every test.
 # Exits non-zero on the first failure. Needs Go, a C compiler (cc, for the
-# cross-check against upstream's C back-end), libwebp's headers and library
-# (for ada/tests/crosscheck/webpref.c, the second reference decoder for
-# WebP), Alire (alr) with the project's GNAT toolchain, and the Wuffs
-# checkout at ./wuffs.
+# cross-check against upstream's C back-end), libwebp's headers and libraries
+# (libwebp and libwebpdemux, for ada/tests/crosscheck/webpref.c, the second
+# reference decoder for WebP and the reference for animations), Alire (alr)
+# with the project's GNAT toolchain, and the Wuffs checkout at ./wuffs.
 #
 # Everything temporary (at most about 800 MB: the test corpora and traces;
 # 768 MB measured with WUFFS_ASAN=1) goes to one directory under
@@ -158,7 +158,7 @@ cmp -s "$tmp/decode.c.trace" "$tmp/decode.c32.trace" ||
 
 say "WebP reference pixels from libwebp (ada/tests/crosscheck/webpref.c)"
 mkdir "$tmp/webpref"
-"${CC:-cc}" -std=c99 -O2 -Wall -o "$tmp/webpref.bin" ada/tests/crosscheck/webpref.c -lwebp ||
+"${CC:-cc}" -std=c99 -O2 -Wall -o "$tmp/webpref.bin" ada/tests/crosscheck/webpref.c -lwebpdemux -lwebp ||
     die "cannot build webpref.c: libwebp's headers and library are needed"
 find wuffs/test/data ada/tests/webpcorpus -name '*.webp' | LC_ALL=C sort > "$tmp/webp.list"
 "$tmp/webpref.bin" "$tmp/webpref" < "$tmp/webp.list" > "$tmp/webpref/list.out" || die "webpref failed"
@@ -469,6 +469,12 @@ for profile in checked release; do
             die "decode_image $f ($profile)"
         go run ./ada/tests/pnmcheck "wuffs/test/data/$f" "$tmp/example.pnm" || die "decode_image $f: wrong pixels ($profile)"
     done
+    # An animated WebP: its first frame, which is the GIF's (gif2webp made
+    # it, losslessly).
+    (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image wuffs/test/data/animated-red-blue.webp "$tmp/example.pnm") ||
+        die "decode_image animated-red-blue.webp ($profile)"
+    go run ./ada/tests/pnmcheck wuffs/test/data/animated-red-blue.gif "$tmp/example.pnm" ||
+        die "decode_image animated-red-blue.webp: wrong pixels ($profile)"
     for f in hippopotamus.bmp hippopotamus.ppm hippopotamus.nie hat.wbmp bricks-color.qoi; do
         (ulimit -s "$stack_kib" && timeout "$run_limit" examples/bin/decode_image "wuffs/test/data/$f" "$tmp/example.pnm") ||
             die "decode_image $f ($profile)"

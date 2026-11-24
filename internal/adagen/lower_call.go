@@ -1736,25 +1736,26 @@ func (io *ioArg) markWritten() {
 }
 
 // swizzleYCCK lowers swizzler.swizzle_ycck!(dst: pb, dst_palette: p,
-// x_min_incl: etc, ..., scratch_buffer_2k: s): a call of the shell's
+// dst_x_offset: etc, ..., scratch_buffer_2k: s): a call of the shell's
 // Swizzle_YCCK, which checks the aliasing of its arrays (the pixels and the
 // scratch buffer are written, everything else is read) and then calls the
 // proved Wuffs.Base.Pixel_Swizzler_YCCK.Swizzle_YCCK. The swizzler itself
 // is not an operand: C only checks that its pointer is not NULL.
 //
-// The Wuffs arguments, in order: dst, dst_palette, x_min_incl, x_max_excl,
-// y_min_incl, y_max_excl, src0 .. src3, width0 .. width3, height0 ..
-// height3, stride0 .. stride3, h0 .. h3, v0 .. v3, ycc_model,
-// ycc_upsampling, scratch_buffer_2k.
+// The Wuffs arguments, in order: dst, dst_palette, dst_x_offset,
+// dst_y_offset, x_min_incl, x_max_excl, y_min_incl, y_max_excl, src0 ..
+// src3, width0 .. width3, height0 .. height3, stride0 .. stride3, h0 .. h3,
+// v0 .. v3, ycc_model, ycc_upsampling, scratch_buffer_2k.
 func (l *lowerer) swizzleYCCK(n *a.Expr, args []*a.Node, view func(val, bool) (val, error)) (val, error) {
-	vs, err := l.argValues(n, args, 33)
+	vs, err := l.argValues(n, args, 35)
 	if err != nil {
 		return val{}, err
 	}
 	for i, o := range args {
 		// The Wuffs compiler has checked the names; check the order that
 		// the indexes below rely on.
-		want := []string{"dst", "dst_palette", "x_min_incl", "x_max_excl", "y_min_incl", "y_max_excl",
+		want := []string{"dst", "dst_palette", "dst_x_offset", "dst_y_offset",
+			"x_min_incl", "x_max_excl", "y_min_incl", "y_max_excl",
 			"src0", "src1", "src2", "src3", "width0", "width1", "width2", "width3",
 			"height0", "height1", "height2", "height3", "stride0", "stride1", "stride2", "stride3",
 			"h0", "h1", "h2", "h3", "v0", "v1", "v2", "v3", "ycc_model", "ycc_upsampling",
@@ -1778,14 +1779,14 @@ func (l *lowerer) swizzleYCCK(n *a.Expr, args []*a.Node, view func(val, bool) (v
 		return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
 	}
 	named = append(named, "Dst_Palette", dstPalette.e)
-	for i, name := range []string{"X_Min_Incl", "X_Max_Excl", "Y_Min_Incl", "Y_Max_Excl"} {
+	for i, name := range []string{"Dst_X_Offset", "Dst_Y_Offset", "X_Min_Incl", "X_Max_Excl", "Y_Min_Incl", "Y_Max_Excl"} {
 		if err := l.numArg(n, vs[2+i], 32); err != nil {
 			return val{}, err
 		}
 		named = append(named, name, vs[2+i].e)
 	}
 	for i := 0; i < 4; i++ {
-		src, err := view(vs[6+i], false)
+		src, err := view(vs[8+i], false)
 		if err != nil {
 			return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
 		}
@@ -1797,7 +1798,7 @@ func (l *lowerer) swizzleYCCK(n *a.Expr, args []*a.Node, view func(val, bool) (v
 			bits = 8
 		}
 		for i := 0; i < 4; i++ {
-			v := vs[10+4*j+i]
+			v := vs[12+4*j+i]
 			if err := l.numArg(n, v, bits); err != nil {
 				return val{}, err
 			}
@@ -1805,12 +1806,12 @@ func (l *lowerer) swizzleYCCK(n *a.Expr, args []*a.Node, view func(val, bool) (v
 		}
 	}
 	for i, name := range []string{"YCC_Model", "YCC_Upsampling"} {
-		if err := l.numArg(n, vs[30+i], 8); err != nil {
+		if err := l.numArg(n, vs[32+i], 8); err != nil {
 			return val{}, err
 		}
-		named = append(named, name, vs[30+i].e)
+		named = append(named, name, vs[32+i].e)
 	}
-	scratch, err := view(vs[32], true)
+	scratch, err := view(vs[34], true)
 	if err != nil {
 		return val{}, fmt.Errorf("%q: %v", n.Str(l.g.tm), err)
 	}

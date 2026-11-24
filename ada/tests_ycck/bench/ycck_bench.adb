@@ -58,7 +58,7 @@ begin
       T0 := Clock;
       for I in 1 .. Repeats loop
          Swizzle_YCCK
-           (PB, Dst (0 .. W * H * BPP - 1), Empty, Empty, 0, W, 0, H, Y, Cb, Cr, Empty,
+           (PB, Dst (0 .. W * H * BPP - 1), Empty, Empty, 0, 0, 0, W, 0, H, Y, Cb, Cr, Empty,
             Planes, 0, Ups, Scratch, Result);
          if not Is_Ok (Result) then
             Ada.Text_IO.Put_Line ("error");

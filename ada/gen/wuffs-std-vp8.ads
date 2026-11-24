@@ -23,33 +23,36 @@ with Wuffs.Runtime;
 
 package Wuffs.Std.Vp8 with Preelaborate is
 
+   --  Wuffs: status "#bad QUIRK_DST_X_AND_Y"
+   Error_Bad_QUIRK_DST_X_AND_Y : constant Wuffs.Status := (Error, 16#001B_0001#);
+
    --  Wuffs: status "#bad QUIRK_SOURCE_LENGTH"
-   Error_Bad_QUIRK_SOURCE_LENGTH : constant Wuffs.Status := (Error, 16#001B_0001#);
+   Error_Bad_QUIRK_SOURCE_LENGTH : constant Wuffs.Status := (Error, 16#001B_0002#);
 
    --  Wuffs: status "#bad QUIRK_WIDTH_AND_HEIGHT"
-   Error_Bad_QUIRK_WIDTH_AND_HEIGHT : constant Wuffs.Status := (Error, 16#001B_0002#);
+   Error_Bad_QUIRK_WIDTH_AND_HEIGHT : constant Wuffs.Status := (Error, 16#001B_0003#);
 
    --  Wuffs: status "#bad header"
-   Error_Bad_Header : constant Wuffs.Status := (Error, 16#001B_0003#);
+   Error_Bad_Header : constant Wuffs.Status := (Error, 16#001B_0004#);
 
    --  Wuffs: status "#inconsistent width and height"
-   Error_Inconsistent_Width_And_Height : constant Wuffs.Status := (Error, 16#001B_0004#);
+   Error_Inconsistent_Width_And_Height : constant Wuffs.Status := (Error, 16#001B_0005#);
 
    --  Wuffs: status "#missing QUIRK_SOURCE_LENGTH"
-   Error_Missing_QUIRK_SOURCE_LENGTH : constant Wuffs.Status := (Error, 16#001B_0005#);
+   Error_Missing_QUIRK_SOURCE_LENGTH : constant Wuffs.Status := (Error, 16#001B_0006#);
 
    --  Wuffs: status "#truncated input"
-   Error_Truncated_Input : constant Wuffs.Status := (Error, 16#001B_0006#);
+   Error_Truncated_Input : constant Wuffs.Status := (Error, 16#001B_0007#);
 
    --  Wuffs: status "#unsupported QUIRK_SOURCE_LENGTH"
-   Error_Unsupported_QUIRK_SOURCE_LENGTH : constant Wuffs.Status := (Error, 16#001B_0007#);
+   Error_Unsupported_QUIRK_SOURCE_LENGTH : constant Wuffs.Status := (Error, 16#001B_0008#);
 
    --  Wuffs: status "#unsupported VP8 file"
-   Error_Unsupported_VP8_File : constant Wuffs.Status := (Error, 16#001B_0008#);
+   Error_Unsupported_VP8_File : constant Wuffs.Status := (Error, 16#001B_0009#);
 
    --  The message of a status of this package (a public or a private one), as
    --  the base library's Get_Message gives it for a base status: the C
-   --  string without its leading '@', '$' or '#', such as "vp8: bad QUIRK_SOURCE_LENGTH".
+   --  string without its leading '@', '$' or '#', such as "vp8: bad QUIRK_DST_X_AND_Y".
    --  Message_Length is zero for any other status.  Get_Message copies as much
    --  of the message as fits to the start of Buffer, sets the rest of Buffer to
    --  spaces and Length to the number of characters copied.
@@ -62,6 +65,9 @@ package Wuffs.Std.Vp8 with Preelaborate is
 
    --  Wuffs: const QUIRK_WIDTH_AND_HEIGHT
    QUIRK_WIDTH_AND_HEIGHT : constant Wuffs.U32 := 16#6D7B_F801#;
+
+   --  Wuffs: const QUIRK_DST_X_AND_Y
+   QUIRK_DST_X_AND_Y : constant Wuffs.U32 := 16#6D7B_F802#;
 
    --  Wuffs: const DECODER_WORKBUF_LEN_MAX_INCL_WORST_CASE
    DECODER_WORKBUF_LEN_MAX_INCL_WORST_CASE : constant Wuffs.U64 := 16#30FF_8000#;
@@ -278,6 +284,8 @@ private
       F_Frame_Config_Io_Position : Wuffs.U64 := 0;
       F_Quirk_Source_Length : Wuffs.U64 := 0;
       F_Quirk_Width_And_Height : Wuffs.U64 := 0;
+      F_Quirk_Dst_X : G_U32_Range_0_16383 := 0;
+      F_Quirk_Dst_Y : G_U32_Range_0_16383 := 0;
       F_Partitioned_Data_Length : G_U32_Range_0_150994935 := 0;
       F_Workbuf_Yuv_Y_Stride : G_U32_Range_0_16384 := 0;
       F_Workbuf_Yuv_Uv_Stride : G_U32_Range_0_8192 := 0;

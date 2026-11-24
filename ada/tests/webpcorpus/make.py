@@ -705,6 +705,163 @@ def vp8l_alpha_stream(bw, values, w, h, rng, transforms=(), cache_bits=0):
     write_tokens(bw, xs, h, cache_bits, 1, toks, rng)
 
 
+# ---- Animations.
+
+def u24(v):
+    return struct.pack("<I", v)[:3]
+
+
+def anmf_chunk(x, y, w, h, body, duration=100, blend=True, dispose=False, size=None):
+    """An ANMF chunk: the frame at (x, y), x and y even, of w by h pixels."""
+    flags = (0 if blend else 2) | (1 if dispose else 0)
+    data = u24(x // 2) + u24(y // 2) + u24(w - 1) + u24(h - 1) + u24(duration) + bytes([flags]) + body
+    if size is None:
+        return chunk(b"ANMF", data)
+    return b"ANMF" + struct.pack("<I", size) + data + (b"\x00" if len(data) % 2 else b"")
+
+
+def anim_chunk(bg=0, loops=0):
+    return chunk(b"ANIM", struct.pack("<IH", bg, loops))
+
+
+def image_chunks(webp):
+    """The ALPH, VP8 and VP8L chunks of a still WebP file, for an ANMF."""
+    return b"".join(chunk(fc, p) for fc, p in chunks_of(webp) if fc in (b"ALPH", b"VP8 ", b"VP8L"))
+
+
+def animations(save, icc, exif, xmp):
+    # Frames of every kind, from libwebp: lossy (opaque), lossy with alpha
+    # (compressed or raw ALPH, every filter), lossless with alpha; and from
+    # the VP8L encoder in this file.
+    frames = {}
+
+    def frame(kind, w, h, seed):
+        key = (kind, w, h, seed)
+        if key not in frames:
+            alpha = ["gradient", "binary", "noise", "holes"][seed % 4]
+            if kind == "lossy":
+                webp = libwebp(w, h, picture(w, h, seed, "mixed"), quality=60, rgb=1)
+            elif kind == "alpha":
+                webp = libwebp(w, h, picture(w, h, seed, "mixed", alpha), quality=60,
+                               alpha_compression=seed % 2, alpha_filtering=seed % 3)
+            elif kind == "lossless":
+                webp = libwebp(w, h, picture(w, h, seed, "edges", alpha), lossless=1)
+            else:
+                webp = vp8l_file(w, h, 400 + seed, data="runs", transforms=[(2, None)])
+            frames[key] = image_chunks(webp)
+        return frames[key]
+
+    flags = ANIM_FLAG | ALPHA_FLAG
+    W, H = 40, 30
+
+    # One file per kind of frames (and a mix), with frames smaller than the
+    # canvas at various (even) offsets, every blend and disposal.
+    layouts = [(0, 0, 40, 30), (2, 4, 17, 13), (10, 6, 30, 23), (0, 16, 39, 14), (22, 0, 18, 29), (4, 2, 9, 1)]
+    for kind in ["lossy", "alpha", "lossless", "vp8l", "mixed"]:
+        body = b""
+        for i, (x, y, w, h) in enumerate(layouts):
+            k = kind if kind != "mixed" else ["lossy", "alpha", "lossless", "vp8l"][i % 4]
+            body += anmf_chunk(x, y, w, h, frame(k, w, h, i), duration=40 * i,
+                               blend=i % 2 == 0, dispose=(i // 2) % 2 == 1)
+        save("anim-%s" % kind, riff(vp8x(flags, W, H) + anim_chunk(0xFF336699, 0) + body))
+
+    # Every blend and disposal combination, three overlapping frames with
+    # alpha.
+    for blend in [0, 1]:
+        for dispose in [0, 1]:
+            body = b""
+            for i, (x, y, w, h) in enumerate([(0, 0, 30, 20), (6, 4, 24, 16), (2, 10, 20, 12)]):
+                k = ["lossless", "alpha", "lossless"][i]
+                body += anmf_chunk(x, y, w, h, frame(k, w, h, 10 + i), blend=blend == 1, dispose=dispose == 1)
+            save("anim-blend%d-dispose%d" % (blend, dispose), riff(vp8x(flags, 30, 22) + anim_chunk() + body))
+
+    # One frame: the whole canvas, or a part of it.
+    save("anim-1frame-whole", riff(vp8x(flags, 21, 13) + anim_chunk() +
+                                   anmf_chunk(0, 0, 21, 13, frame("alpha", 21, 13, 20))))
+    save("anim-1frame-part", riff(vp8x(flags, 21, 13) + anim_chunk() +
+                                  anmf_chunk(6, 2, 11, 9, frame("lossy", 11, 9, 21))))
+    save("anim-1x1", riff(vp8x(flags, 1, 1) + anim_chunk() + anmf_chunk(0, 0, 1, 1, frame("lossy", 1, 1, 22)) +
+                          anmf_chunk(0, 0, 1, 1, frame("lossless", 1, 1, 23))))
+    # Frames at the canvas' right and bottom edges, of odd sizes.
+    save("anim-edges", riff(vp8x(flags, 37, 23) + anim_chunk() +
+                            anmf_chunk(0, 0, 37, 23, frame("lossy", 37, 23, 24)) +
+                            anmf_chunk(36, 22, 1, 1, frame("lossless", 1, 1, 25)) +
+                            anmf_chunk(20, 0, 17, 23, frame("alpha", 17, 23, 26)) +
+                            anmf_chunk(0, 14, 37, 9, frame("lossy", 37, 9, 27))))
+
+    # Loop counts, background colours, durations.
+    two = anmf_chunk(0, 0, 16, 16, frame("lossless", 16, 16, 30)) + \
+        anmf_chunk(4, 4, 8, 8, frame("alpha", 8, 8, 31), duration=0)
+    for loops in [0, 1, 7, 65535]:
+        save("anim-loops%d" % loops, riff(vp8x(flags, 16, 16) + anim_chunk(0, loops) + two))
+    for bg in [0x00000000, 0xFFFF0000, 0x80123456, 0x00FFFFFF]:
+        save("anim-bg%08x" % bg, riff(vp8x(flags, 16, 16) + anim_chunk(bg, 3) + two))
+    save("anim-durations", riff(vp8x(flags, 16, 16) + anim_chunk() +
+                                anmf_chunk(0, 0, 16, 16, frame("lossy", 16, 16, 32), duration=0) +
+                                anmf_chunk(0, 0, 16, 16, frame("lossy", 16, 16, 33), duration=0xFFFFFF) +
+                                anmf_chunk(0, 0, 16, 16, frame("lossy", 16, 16, 34), duration=1)))
+
+    # Metadata and unknown chunks: ICCP before ANIM, EXIF and XMP after the
+    # frames, unknown chunks between frames and at the end of an ANMF chunk
+    # (after its image), odd lengths.
+    a = anmf_chunk(0, 0, 16, 16, frame("alpha", 16, 16, 35))
+    b = anmf_chunk(2, 2, 12, 12, frame("lossless", 12, 12, 36) + chunk(b"ABCD", b"xyz") + chunk(b"EFGH", b""))
+    save("anim-meta", riff(vp8x(flags | ICC_FLAG | EXIF_FLAG | XMP_FLAG, 16, 16) + chunk(b"ICCP", icc) +
+                           anim_chunk() + a + chunk(b"JUNK", b"between") + b + chunk(b"EXIF", exif) +
+                           chunk(b"XMP ", xmp + b"!")))
+    save("anim-meta-before-anim", riff(vp8x(flags | EXIF_FLAG, 16, 16) + chunk(b"EXIF", exif) + anim_chunk() + a))
+    save("anim-two-anim", riff(vp8x(flags, 16, 16) + anim_chunk(0, 2) + a + anim_chunk(0, 5) + b))
+    save("anim-anim-long", riff(vp8x(flags, 16, 16) + chunk(b"ANIM", struct.pack("<IH", 0, 4) + b"abc") + a + b))
+    save("anim-noalphaflag", riff(vp8x(ANIM_FLAG, 16, 16) + anim_chunk() +
+                                  anmf_chunk(0, 0, 16, 16, frame("lossless", 16, 16, 37))))
+
+    # Invalid: a frame outside the canvas, an ANMF before (or without) an
+    # ANIM, no frames, a short ANIM or ANMF, an ALPH chunk before a VP8L
+    # one, frame sizes that differ from the bitstream's, an ANMF without an
+    # image, nested ANMFs, an image chunk outside of an ANMF, a sub-chunk
+    # longer than its ANMF, an ALPH without the VP8X flag, a RIFF that ends
+    # in a frame.
+    l16 = frame("lossless", 16, 16, 40)
+    save("anim-bad-outside-x", riff(vp8x(flags, 16, 16) + anim_chunk() + a + anmf_chunk(2, 0, 16, 16, l16)))
+    save("anim-bad-outside-y", riff(vp8x(flags, 16, 16) + anim_chunk() + anmf_chunk(0, 2, 16, 16, l16)))
+    save("anim-bad-too-wide", riff(vp8x(flags, 16, 16) + anim_chunk() + anmf_chunk(0, 0, 17, 16, l16)))
+    save("anim-bad-no-anim", riff(vp8x(flags, 16, 16) + a + b))
+    save("anim-bad-anim-after", riff(vp8x(flags, 16, 16) + a + anim_chunk() + b))
+    save("anim-bad-no-frames", riff(vp8x(flags, 16, 16) + anim_chunk()))
+    save("anim-bad-no-frames-meta", riff(vp8x(flags | XMP_FLAG, 16, 16) + anim_chunk() + chunk(b"XMP ", xmp)))
+    save("anim-bad-anim-short", riff(vp8x(flags, 16, 16) + chunk(b"ANIM", bytes(5)) + a))
+    save("anim-bad-anmf-short", riff(vp8x(flags, 16, 16) + anim_chunk() + a + chunk(b"ANMF", bytes(15))))
+    save("anim-bad-alph-vp8l", riff(vp8x(flags, 16, 16) + anim_chunk() +
+                                    anmf_chunk(0, 0, 16, 16, chunk(b"ALPH", b"\x00" + bytes(256)) + l16)))
+    save("anim-bad-size-mismatch", riff(vp8x(flags, 16, 16) + anim_chunk() + anmf_chunk(0, 0, 15, 16, l16)))
+    save("anim-bad-size-mismatch-lossy", riff(vp8x(flags, 16, 16) + anim_chunk() +
+                                              anmf_chunk(0, 0, 16, 14, frame("lossy", 16, 16, 41))))
+    save("anim-bad-empty-anmf", riff(vp8x(flags, 16, 16) + anim_chunk() + a +
+                                     anmf_chunk(0, 0, 8, 8, chunk(b"ABCD", b"xyz")) + b))
+    save("anim-bad-header-only-anmf", riff(vp8x(flags, 16, 16) + anim_chunk() + a + anmf_chunk(0, 0, 8, 8, b"")))
+    save("anim-bad-nested-anmf", riff(vp8x(flags, 16, 16) + anim_chunk() + anmf_chunk(0, 0, 16, 16, a)))
+    save("anim-bad-vp8l-outside", riff(vp8x(flags, 16, 16) + anim_chunk() + a + l16))
+    save("anim-bad-subchunk-long", riff(vp8x(flags, 16, 16) + anim_chunk() + a +
+                                        anmf_chunk(0, 0, 16, 16, l16, size=16 + len(l16) - 6)))
+    save("anim-bad-anmf-long", riff(vp8x(flags, 16, 16) + anim_chunk() + a +
+                                    anmf_chunk(0, 0, 16, 16, l16, size=16 + len(l16) + 1000)))
+    save("anim-bad-alph-noflag", riff(vp8x(ANIM_FLAG, 16, 16) + anim_chunk() +
+                                      anmf_chunk(0, 0, 16, 16, frame("alpha", 16, 16, 42))))
+    whole = vp8x(flags, 16, 16) + anim_chunk() + a + b
+    save("anim-bad-riff-ends-in-frame", riff(whole, size=4 + len(whole) - 20))
+    save("anim-bad-truncated", riff(whole)[:-40])
+    # A RIFF chunk that ends 2, 4 or 6 bytes into the first ANMF chunk's
+    # header (the file goes on after it): the decoders must give up, not
+    # wait for more input that the RIFF chunk cannot have.
+    head = vp8x(flags, 16, 16) + anim_chunk()
+    for k in [2, 4, 6]:
+        save("anim-bad-riff-short-%d" % k, riff(head + a + b, size=4 + len(head) + k))
+    # A frame whose VP8L bitstream is larger than its ANMF chunk says (16 by
+    # 16 pixels in a 1 by 2 frame at (22, 6)): an error, after which the
+    # frame's dirty rectangle must still be within the 24 by 16 image.
+    save("anim-bad-vp8l-larger", riff(vp8x(flags, 24, 16) + anim_chunk() + anmf_chunk(22, 6, 1, 2, l16)))
+
+
 # ---- The corpus.
 
 def main(out):
@@ -899,7 +1056,7 @@ def main(out):
     save("container-alph-canvas-mismatch", riff(vp8x(ALPHA_FLAG, w + 1, h) + chunk(b"ALPH", b"\x00" + a) +
                                                 chunk(b"VP8 ", vp8)))
 
-    # Animations (ANIM, ANMF), which std/webp does not decode.
+    # Animations (ANIM, ANMF).
     anmf = struct.pack("<I", 0)[:3] * 2 + struct.pack("<I", w - 1)[:3] + struct.pack("<I", h - 1)[:3] + \
         struct.pack("<I", 100)[:3] + b"\x00"
     save("container-anim-1frame", riff(vp8x(ANIM_FLAG, w, h) + chunk(b"ANIM", bytes(4) + b"\x00\x00") +
@@ -909,6 +1066,7 @@ def main(out):
                                         chunk(b"ANMF", anmf + chunk(b"VP8L", vp8l))))
     save("container-anim-noflag", riff(vp8x(0, w, h) + chunk(b"ANIM", bytes(6)) +
                                        chunk(b"ANMF", anmf + chunk(b"VP8L", vp8l))))
+    animations(save, icc, exif, xmp)
 
     for name, data in sorted(files.items()):
         with open(os.path.join(out, name + ".webp"), "wb") as f:

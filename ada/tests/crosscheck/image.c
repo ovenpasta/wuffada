@@ -156,6 +156,9 @@ static wuffs_base__io_buffer g_sb;
 static wuffs_base__pixel_buffer g_pb;
 static int g_have_pb;
 static uint64_t g_ffio;
+// The index and I/O position of the last frame config (for the script op L).
+static uint64_t g_last_index;
+static uint64_t g_last_io;
 
 static uint64_t fnv(uint64_t h, const uint8_t* p, size_t n) {
   for (size_t i = 0; i < n; i++) {
@@ -462,6 +465,8 @@ static wuffs_base__status run_op(char op) {
     kv("opq", wuffs_base__frame_config__opaque_within_bounds(&fc));
     kv("ovr", wuffs_base__frame_config__overwrite_instead_of_blend(&fc));
     kv("bg", wuffs_base__frame_config__background_color(&fc));
+    g_last_index = wuffs_base__frame_config__index(&fc);
+    g_last_io = wuffs_base__frame_config__io_position(&fc);
   } else if (op == 'F') {
     put_pixels();
   }
@@ -507,6 +512,22 @@ static void run_script(const char* script) {
           src_seek(g_ffio);
         }
         break;
+      case 'L':
+      case 'B': {
+        // L: restart at the last frame config's frame. B: restart at a
+        // bogus position (inside the first frame's header).
+        uint64_t index = (*p == 'L') ? g_last_index : 2;
+        uint64_t io = (*p == 'L') ? g_last_io : (g_ffio + 7);
+        st = wuffs_base__image_decoder__restart_frame(g_dec, index, io);
+        printf("= %d %c", g_run.id, *p);
+        put_status(st);
+        put_counts();
+        printf("\n");
+        if (!st.repr) {
+          src_seek(io);
+        }
+        break;
+      }
       case 'T':
         tell_more();
         break;
@@ -641,6 +662,8 @@ static void do_case(int id, char* line) {
   initialize(format);
   g_have_pb = 0;
   g_ffio = 0;
+  g_last_index = 0;
+  g_last_io = 0;
   for (int i = 0; i < g_run.num_quirks; i++) {
     wuffs_base__status st =
         wuffs_base__image_decoder__set_quirk(g_dec, g_run.quirks[i],

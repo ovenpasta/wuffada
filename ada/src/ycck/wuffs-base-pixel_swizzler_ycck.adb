@@ -1545,12 +1545,153 @@ package body Wuffs.Base.Pixel_Swizzler_YCCK with SPARK_Mode is
       end if;
    end General_Triangle_Filter;
 
-   ------------------
-   -- Swizzle_YCCK --
-   ------------------
+   --  C: dst_view, in wuffs_base__pixel_swizzler__swizzle_ycck.  The pixel
+   --  buffer that the conversion writes to, for the destination offset (DX,
+   --  DY): the part of PB from pixel (DX, DY), of the same format and
+   --  palette.  If that is empty (the offset is outside PB), a view of no
+   --  pixels.  If the format does not have 1 to 8 whole bytes per pixel (no
+   --  format that the conversion accepts), only the size is reduced: such a
+   --  format is rejected anyway, after the clipping that uses that size.
+   --
+   --  Nothing here needs PB to be valid.  For a valid PB the view is proved
+   --  valid (Make_View's postcondition: its plane 0 is a part of PB's, at
+   --  least as wide and as high as its size says), so Swizzle_Window's first
+   --  check, which it makes of any pixel buffer, never fails for it.  The
+   --  three lemmas state the facts about mixed U32, U64 and Index values
+   --  that the provers do not find by themselves within the step limit.
+   procedure Lemma_Row_Bytes_Split (W, DX, B : U32)
+   with
+     Ghost,
+     Pre  => DX < W and then B <= 32,
+     Post => U64 (DX) * U64 (B) <= U64 (W) * U64 (B)
+       and then U64 (W - DX) * U64 (B) = U64 (W) * U64 (B) - U64 (DX) * U64 (B);
 
-   --  C: wuffs_base__pixel_swizzler__swizzle_ycck.
-   procedure Swizzle_YCCK
+   procedure Lemma_Row_Bytes_Split (W, DX, B : U32) is null;
+
+   procedure Lemma_Lt_Index (A, B : U32; C : Index)
+   with
+     Ghost,
+     Pre  => A < B and then Index (B) <= C,
+     Post => Index (A) < C
+       and then U64 (A) < U64 (C)
+       and then Index (B) - Index (A) <= C - Index (A);
+
+   procedure Lemma_Lt_Index (A, B : U32; C : Index) is null;
+
+   procedure Lemma_Sub (A, B : U32; C : Index)
+   with
+     Ghost,
+     Pre  => A < B and then Index (A) < C,
+     Post => Index (B - A) = Index (B) - Index (A)
+       and then (if U64 (A) <= U64 (C) then Index (U64 (C) - U64 (A)) = C - Index (A));
+
+   procedure Lemma_Sub (A, B : U32; C : Index) is null;
+
+   procedure Make_View
+     (PB             : Pixel_Buffer;
+      Length         : Array_Length;
+      Palette_Length : Array_Length;
+      DX, DY         : U32;
+      View           : out Pixel_Buffer)
+   with
+     Post => (if Is_Valid (PB, Length, Palette_Length)
+              then Is_Valid (View, Length, Palette_Length));
+
+   ---------------
+   -- Make_View --
+   ---------------
+
+   procedure Make_View
+     (PB             : Pixel_Buffer;
+      Length         : Array_Length;
+      Palette_Length : Array_Length;
+      DX, DY         : U32;
+      View           : out Pixel_Buffer)
+   is
+      B : constant U32 := Bytes_Per_Pixel (PB.Pixcfg.Pixfmt);
+      T : constant Table := PB.Planes (0);
+   begin
+      View := PB;
+      if DX >= PB.Pixcfg.Width or else DY >= PB.Pixcfg.Height then
+         View.Pixcfg.Width := 0;
+         View.Pixcfg.Height := 0;
+         pragma Assert (Row_Bytes (View.Pixcfg) = 0);
+      else
+         View.Pixcfg.Width := PB.Pixcfg.Width - DX;
+         View.Pixcfg.Height := PB.Pixcfg.Height - DY;
+         Lemma_Row_Bytes_Split (PB.Pixcfg.Width, DX, B);
+         pragma Assert (Bytes_Per_Pixel (View.Pixcfg.Pixfmt) = B);
+         pragma Assert (Row_Bytes (View.Pixcfg) = U64 (PB.Pixcfg.Width - DX) * U64 (B));
+         pragma Assert (Row_Bytes (PB.Pixcfg) = U64 (PB.Pixcfg.Width) * U64 (B));
+         pragma Assert
+           (if Is_Valid (PB, Length, Palette_Length)
+            then U64 (DX) * U64 (B) <= U64 (T.Width)
+              and then Row_Bytes (View.Pixcfg) <= U64 (T.Width) - U64 (DX) * U64 (B));
+         if Is_Valid (PB, Length, Palette_Length) then
+            Lemma_Lt_Index (DY, PB.Pixcfg.Height, T.Height);
+            Lemma_Sub (DY, PB.Pixcfg.Height, T.Height);
+            pragma Assert (Index (View.Pixcfg.Height) <= T.Height - Index (DY));
+         end if;
+         if B in 1 .. 8 then
+            Pixel_Buffers.Subtable
+              (T      => T,
+               IX     => U64 (DX) * U64 (B),
+               IY     => U64 (DY),
+               JX     => U64 (T.Width),
+               JY     => U64 (T.Height),
+               Length => Length,
+               Result => View.Planes (0));
+            pragma Assert
+              (if Is_Valid (PB, Length, Palette_Length)
+               then U64 (View.Planes (0).Width) = U64 (T.Width) - U64 (DX) * U64 (B)
+                 and then View.Planes (0).Height = T.Height - Index (DY));
+            pragma Assert
+              (if Is_Valid (PB, Length, Palette_Length)
+               then Index (View.Pixcfg.Height) <= View.Planes (0).Height);
+         else
+            pragma Assert (View.Planes (0).Height = T.Height);
+            pragma Assert
+              (if Is_Valid (PB, Length, Palette_Length)
+               then Index (View.Pixcfg.Height) <= View.Planes (0).Height);
+         end if;
+      end if;
+   end Make_View;
+
+   --  The conversion of the rectangle to the pixel buffer PB, which is the
+   --  caller's pixel buffer or a view of it (Make_View): C's
+   --  wuffs_base__pixel_swizzler__swizzle_ycck, every check and the clipping
+   --  included, for a zero offset.
+   procedure Swizzle_Window
+     (PB                : Pixel_Buffers.Pixel_Buffer;
+      Pixels            : in out Bytes;
+      Palette           : Bytes;
+      Dst_Palette       : Bytes;
+      X_Min_Incl        : U32;
+      X_Max_Excl        : U32;
+      Y_Min_Incl        : U32;
+      Y_Max_Excl        : U32;
+      Src0              : Bytes;
+      Src1              : Bytes;
+      Src2              : Bytes;
+      Src3              : Bytes;
+      Planes            : Source_Planes;
+      YCC_Model         : U8;
+      YCC_Upsampling    : U8;
+      Scratch_Buffer_2K : in out Bytes;
+      Result            : out Status)
+   with
+     Post => (Is_Ok (Result)
+              or else Result = Error_Bad_Argument
+              or else Result = Error_Unsupported_Pixel_Swizzler_Option)
+       and then (if not Is_Ok (Result)
+                 then Pixels = Pixels'Old
+                   and then Scratch_Buffer_2K = Scratch_Buffer_2K'Old);
+
+   --------------------
+   -- Swizzle_Window --
+   --------------------
+
+   procedure Swizzle_Window
      (PB                : Pixel_Buffers.Pixel_Buffer;
       Pixels            : in out Bytes;
       Palette           : Bytes;
@@ -1874,6 +2015,65 @@ package body Wuffs.Base.Pixel_Swizzler_YCCK with SPARK_Mode is
            (Func, PB, Pixels, Palette, Scratch_Buffer_2K, Src0, Src1, Src2, Src3,
             P0, P1, P2, P3, G);
       end if;
+   end Swizzle_Window;
+
+   ------------------
+   -- Swizzle_YCCK --
+   ------------------
+
+   --  C: wuffs_base__pixel_swizzler__swizzle_ycck.  C makes its view of the
+   --  pixel buffer for a non-zero offset after its argument checks and
+   --  clipping (which uses the view's size); here the view is made first
+   --  and Swizzle_Window does those checks and that clipping on it, which
+   --  gives the same statuses, in the same order, and the same pixels.
+   procedure Swizzle_YCCK
+     (PB                : Pixel_Buffers.Pixel_Buffer;
+      Pixels            : in out Bytes;
+      Palette           : Bytes;
+      Dst_Palette       : Bytes;
+      Dst_X_Offset      : U32;
+      Dst_Y_Offset      : U32;
+      X_Min_Incl        : U32;
+      X_Max_Excl        : U32;
+      Y_Min_Incl        : U32;
+      Y_Max_Excl        : U32;
+      Src0              : Bytes;
+      Src1              : Bytes;
+      Src2              : Bytes;
+      Src3              : Bytes;
+      Planes            : Source_Planes;
+      YCC_Model         : U8;
+      YCC_Upsampling    : U8;
+      Scratch_Buffer_2K : in out Bytes;
+      Result            : out Status)
+   is
+      View : Pixel_Buffer := PB;
+   begin
+      --  (An invalid PB is rejected by Swizzle_Window's first check.)
+      if (Dst_X_Offset /= 0 or else Dst_Y_Offset /= 0)
+        and then Is_Valid (PB, Pixels'Length, Palette'Length)
+      then
+         Make_View (PB, Pixels'Length, Palette'Length, Dst_X_Offset, Dst_Y_Offset, View);
+         pragma Assert (Is_Valid (View, Pixels'Length, Palette'Length));
+      end if;
+      Swizzle_Window
+        (PB                => View,
+         Pixels            => Pixels,
+         Palette           => Palette,
+         Dst_Palette       => Dst_Palette,
+         X_Min_Incl        => X_Min_Incl,
+         X_Max_Excl        => X_Max_Excl,
+         Y_Min_Incl        => Y_Min_Incl,
+         Y_Max_Excl        => Y_Max_Excl,
+         Src0              => Src0,
+         Src1              => Src1,
+         Src2              => Src2,
+         Src3              => Src3,
+         Planes            => Planes,
+         YCC_Model         => YCC_Model,
+         YCC_Upsampling    => YCC_Upsampling,
+         Scratch_Buffer_2K => Scratch_Buffer_2K,
+         Result            => Result);
    end Swizzle_YCCK;
 
 end Wuffs.Base.Pixel_Swizzler_YCCK;
